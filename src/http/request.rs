@@ -1,4 +1,6 @@
-use super::headers::{Header, RequestHeader, RequestHeaderMap};
+use std::convert::TryFrom;
+
+use super::headers::{RequestHeader, RequestHeaderMap};
 use super::method::Method;
 
 #[allow(dead_code)]
@@ -14,8 +16,8 @@ pub struct Request {
 #[derive(Debug)]
 pub struct RequestError;
 
-impl Request {
-    pub fn from_string(string: &str) -> Result<Self, RequestError> {
+impl TryFrom<&str> for Request {
+    fn try_from(string: &str) -> Result<Self, RequestError> {
         let mut lines = string.split("\r\n");
 
         let start_line: Vec<&str> = lines.next().unwrap().split(" ").collect();
@@ -34,7 +36,7 @@ impl Request {
             let line_parts: Vec<&str> = line.splitn(2, ':').collect();
             safe_assert(line_parts.len() == 2)?;
             headers.insert(
-                RequestHeader::from_name(line_parts[0]),
+                RequestHeader::from(line_parts[0]),
                 line_parts[1].trim_start().to_string(),
             );
         }
@@ -49,6 +51,8 @@ impl Request {
             content,
         })
     }
+
+    type Error = RequestError;
 }
 
 fn safe_assert(condition: bool) -> Result<(), RequestError> {

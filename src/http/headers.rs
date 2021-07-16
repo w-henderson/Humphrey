@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 pub trait Header {
-    fn from_name(name: &str) -> Self;
     fn default(&self) -> Option<&str>;
 }
 
@@ -65,11 +64,8 @@ pub enum ResponseHeader {
     Custom { name: String },
 }
 
-impl Header for RequestHeader {
-    fn from_name(name: &str) -> Self
-    where
-        Self: Sized,
-    {
+impl From<&str> for RequestHeader {
+    fn from(name: &str) -> Self {
         match name {
             "Accept" => Self::Accept,
             "Accept-Charset" => Self::AcceptCharset,
@@ -99,7 +95,9 @@ impl Header for RequestHeader {
             },
         }
     }
+}
 
+impl Header for RequestHeader {
     fn default(&self) -> Option<&str> {
         match self {
             Self::Accept => Some("text/html"),
@@ -114,8 +112,8 @@ impl Header for RequestHeader {
     }
 }
 
-impl Header for ResponseHeader {
-    fn from_name(name: &str) -> Self {
+impl From<&str> for ResponseHeader {
+    fn from(name: &str) -> Self {
         match name {
             "Access-Control-Allow-Origin" => Self::AccessControlAllowOrigin,
             "Age" => Self::Age,
@@ -144,7 +142,9 @@ impl Header for ResponseHeader {
             },
         }
     }
+}
 
+impl Header for ResponseHeader {
     fn default(&self) -> Option<&str> {
         match self {
             ResponseHeader::CacheControl => Some("max-age=3600"),
