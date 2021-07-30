@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StatusCode {
     Continue,
     SwitchingProtocols,
@@ -93,6 +93,52 @@ impl TryFrom<u16> for StatusCode {
     }
 
     type Error = StatusCodeError;
+}
+
+impl Into<u16> for StatusCode {
+    fn into(self) -> u16 {
+        match self {
+            StatusCode::Continue => 100,
+            StatusCode::SwitchingProtocols => 101,
+            StatusCode::OK => 200,
+            StatusCode::Created => 201,
+            StatusCode::Accepted => 202,
+            StatusCode::NonAuthoritative => 203,
+            StatusCode::NoContent => 204,
+            StatusCode::ResetContent => 205,
+            StatusCode::PartialContent => 206,
+            StatusCode::MultipleChoices => 300,
+            StatusCode::MovedPermanently => 301,
+            StatusCode::Found => 302,
+            StatusCode::SeeOther => 303,
+            StatusCode::NotModified => 304,
+            StatusCode::UseProxy => 305,
+            StatusCode::TemporaryRedirect => 307,
+            StatusCode::BadRequest => 400,
+            StatusCode::Unauthorized => 401,
+            StatusCode::Forbidden => 403,
+            StatusCode::NotFound => 404,
+            StatusCode::MethodNotAllowed => 405,
+            StatusCode::NotAcceptable => 406,
+            StatusCode::ProxyAuthenticationRequired => 407,
+            StatusCode::RequestTimeout => 408,
+            StatusCode::Conflict => 409,
+            StatusCode::Gone => 410,
+            StatusCode::LengthRequired => 411,
+            StatusCode::PreconditionFailed => 412,
+            StatusCode::RequestEntityTooLarge => 413,
+            StatusCode::RequestURITooLong => 414,
+            StatusCode::UnsupportedMediaType => 415,
+            StatusCode::RequestedRangeNotSatisfiable => 416,
+            StatusCode::ExpectationFailed => 417,
+            StatusCode::InternalError => 500,
+            StatusCode::NotImplemented => 501,
+            StatusCode::BadGateway => 502,
+            StatusCode::ServiceUnavailable => 503,
+            StatusCode::GatewayTimeout => 504,
+            StatusCode::VersionNotSupported => 505,
+        }
+    }
 }
 
 impl Into<&str> for StatusCode {

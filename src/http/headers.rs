@@ -144,6 +144,42 @@ impl From<&str> for ResponseHeader {
     }
 }
 
+impl From<ResponseHeader> for String {
+    fn from(header: ResponseHeader) -> Self {
+        match header {
+            ResponseHeader::Custom { name } => return name,
+            _ => (),
+        }
+
+        match header {
+            ResponseHeader::AccessControlAllowOrigin => "Access-Control-Allow-Origin",
+            ResponseHeader::Age => "Age",
+            ResponseHeader::Allow => "Allow",
+            ResponseHeader::CacheControl => "Cache-Control",
+            ResponseHeader::Connection => "Connection",
+            ResponseHeader::ContentDisposition => "Content-Disposition",
+            ResponseHeader::ContentEncoding => "Content-Encoding",
+            ResponseHeader::ContentLanguage => "Content-Language",
+            ResponseHeader::ContentLength => "Content-Length",
+            ResponseHeader::ContentLocation => "Content-Location",
+            ResponseHeader::ContentType => "Content-Type",
+            ResponseHeader::Date => "Date",
+            ResponseHeader::ETag => "ETag",
+            ResponseHeader::Expires => "Expires",
+            ResponseHeader::LastModified => "Last-Modified",
+            ResponseHeader::Link => "Link",
+            ResponseHeader::Location => "Location",
+            ResponseHeader::Pragma => "Pragma",
+            ResponseHeader::Server => "Server",
+            ResponseHeader::SetCookie => "Set-Cookie",
+            ResponseHeader::Via => "Via",
+            ResponseHeader::Warning => "Warning",
+            _ => "",
+        }
+        .to_string()
+    }
+}
+
 impl Header for ResponseHeader {
     fn default(&self) -> Option<&str> {
         match self {
