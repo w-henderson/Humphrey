@@ -1,6 +1,7 @@
 use crate::http::date::HTTPDate;
 use crate::http::headers::{ResponseHeader, ResponseHeaderMap};
 use crate::http::status::StatusCode;
+use std::collections::btree_map::Entry;
 
 pub struct Response {
     status_code: StatusCode,
@@ -17,20 +18,43 @@ impl Response {
         }
     }
 
-    pub fn add_header(&mut self, header: ResponseHeader, value: String) -> &mut Self {
+    pub fn with_header(mut self, header: ResponseHeader, value: String) -> Self {
         self.headers.insert(header, value);
         self
     }
 
-    pub fn add_bytes(&mut self, bytes: Vec<u8>) -> &mut Self {
+    pub fn with_bytes(mut self, bytes: Vec<u8>) -> Self {
         self.body.extend(bytes);
         self
     }
 
-    pub fn generate_headers(&mut self) -> &mut Self {
-        self.add_header(ResponseHeader::ContentLength, self.body.len().to_string())
-            .add_header(ResponseHeader::Server, "Humphrey".to_string())
-            .add_header(ResponseHeader::Date, HTTPDate::now())
+    pub fn with_generated_headers(mut self) -> Self {
+        match self.headers.entry(ResponseHeader::ContentLength) {
+            Entry::Occupied(_) => (),
+            Entry::Vacant(v) => {
+                v.insert(self.body.len().to_string());
+            }
+        }
+
+        match self.headers.entry(ResponseHeader::Server) {
+            Entry::Occupied(_) => (),
+            Entry::Vacant(v) => {
+                v.insert("Humphrey".to_string());
+            }
+        }
+
+        match self.headers.entry(ResponseHeader::Date) {
+            Entry::Occupied(_) => (),
+            Entry::Vacant(v) => {
+                v.insert(HTTPDate::now());
+            }
+        }
+
+        self
+    }
+
+    pub fn get_headers(&self) -> &ResponseHeaderMap {
+        &self.headers
     }
 }
 

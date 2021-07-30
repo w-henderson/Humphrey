@@ -1,13 +1,13 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 pub trait Header {
     fn default(&self) -> Option<&str>;
 }
 
-pub type RequestHeaderMap = HashMap<RequestHeader, String>;
-pub type ResponseHeaderMap = HashMap<ResponseHeader, String>;
+pub type RequestHeaderMap = BTreeMap<RequestHeader, String>;
+pub type ResponseHeaderMap = BTreeMap<ResponseHeader, String>;
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub enum RequestHeader {
     Accept,
     AcceptCharset,
@@ -36,7 +36,7 @@ pub enum RequestHeader {
     Custom { name: String },
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub enum ResponseHeader {
     AccessControlAllowOrigin,
     Age,
