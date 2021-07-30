@@ -1,9 +1,7 @@
-use humphrey::http::request::Request;
-use std::convert::TryFrom;
+use humphrey::App;
+use std::net::SocketAddr;
 
 fn main() {
-    let request = "GET / HTTP/1.1\r\nHost: localhost\r\nUser-Agent: Chrome\r\nAccept:text/html\r\n";
-
-    let parsed_request = Request::try_from(request).unwrap();
-    println!("{:?}", parsed_request);
+    let mut app = App::new();
+    app.run(&("127.0.0.1:80".parse().unwrap()));
 }
