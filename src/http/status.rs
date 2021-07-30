@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum StatusCode {
     Continue,
     SwitchingProtocols,
@@ -43,6 +43,7 @@ pub enum StatusCode {
     VersionNotSupported,
 }
 
+#[derive(PartialEq, Eq)]
 pub struct StatusCodeError;
 
 impl TryFrom<u16> for StatusCode {

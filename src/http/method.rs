@@ -1,6 +1,6 @@
 use super::request::RequestError;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Method {
     Get,
     Post,

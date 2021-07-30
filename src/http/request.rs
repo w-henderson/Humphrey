@@ -13,7 +13,7 @@ pub struct Request {
     content: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct RequestError;
 
 impl TryFrom<&str> for Request {
