@@ -74,7 +74,7 @@ fn client_handler<State>(
     state: Arc<Mutex<State>>,
 ) {
     loop {
-        let request = Request::from_stream(&stream);
+        let request = Request::from_stream(&mut stream);
         let cloned_state = state.clone();
 
         if match &request {

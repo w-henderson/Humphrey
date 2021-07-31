@@ -2,7 +2,6 @@ use super::headers::{RequestHeader, RequestHeaderMap};
 use super::method::Method;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read};
-use std::net::TcpStream;
 
 #[derive(Debug)]
 pub struct Request {
@@ -28,7 +27,7 @@ impl std::fmt::Display for RequestError {
 impl Error for RequestError {}
 
 impl Request {
-    pub fn from_stream(stream: &TcpStream) -> Result<Self, RequestError> {
+    pub fn from_stream(stream: &mut impl Read) -> Result<Self, RequestError> {
         let mut reader = BufReader::new(stream);
         let mut start_line_buf: Vec<u8> = Vec::new();
         reader
