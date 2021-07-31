@@ -1,9 +1,12 @@
 use crate::http::date::HTTPDate;
-use crate::http::headers::{ResponseHeader, ResponseHeaderMap};
+use crate::http::headers::{RequestHeader, ResponseHeader, ResponseHeaderMap};
+use crate::http::request::Request;
 use crate::http::status::StatusCode;
 use std::collections::btree_map::Entry;
 
+#[derive(Debug)]
 pub struct Response {
+    version: String,
     status_code: StatusCode,
     headers: ResponseHeaderMap,
     body: Vec<u8>,
@@ -12,6 +15,7 @@ pub struct Response {
 impl Response {
     pub fn new(status_code: StatusCode) -> Self {
         Self {
+            version: "HTTP/1.1".to_string(),
             status_code,
             headers: ResponseHeaderMap::new(),
             body: Vec::new(),
@@ -25,6 +29,20 @@ impl Response {
 
     pub fn with_bytes(mut self, bytes: Vec<u8>) -> Self {
         self.body.extend(bytes);
+        self
+    }
+
+    pub fn with_request_compatibility(mut self, request: &Request) -> Self {
+        if let Some(connection) = request.headers.get(&RequestHeader::Connection) {
+            self.headers
+                .insert(ResponseHeader::Connection, connection.to_string());
+        } else {
+            self.headers
+                .insert(ResponseHeader::Connection, "Close".to_string());
+        }
+
+        self.version = request.version.clone();
+
         self
     }
 
@@ -50,6 +68,13 @@ impl Response {
             }
         }
 
+        match self.headers.entry(ResponseHeader::Connection) {
+            Entry::Occupied(_) => (),
+            Entry::Vacant(v) => {
+                v.insert("Close".to_string());
+            }
+        }
+
         self
     }
 
@@ -61,7 +86,8 @@ impl Response {
 impl Into<Vec<u8>> for Response {
     fn into(self) -> Vec<u8> {
         let status_line = format!(
-            "HTTP/1.1 {} {}",
+            "{} {} {}",
+            self.version,
             Into::<u16>::into(self.status_code.clone()),
             Into::<&str>::into(self.status_code.clone())
         );
@@ -77,7 +103,11 @@ impl Into<Vec<u8>> for Response {
         }
 
         bytes.extend(b"\r\n\r\n");
-        bytes.extend(self.body);
+
+        if self.body.len() != 0 {
+            bytes.extend(self.body);
+            bytes.extend(b"\r\n");
+        }
 
         bytes
     }

@@ -1,10 +1,10 @@
-use crate::http::request::Request;
+use crate::http::headers::RequestHeader;
+use crate::http::request::{Request, RequestError};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
 
 use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::Arc;
 use std::thread::spawn;
@@ -14,8 +14,8 @@ pub struct App {
     error_handler: ErrorHandler,
 }
 
-type RequestHandler = fn(Request) -> Response;
-type ErrorHandler = fn(Option<Request>, StatusCode) -> Response;
+type RequestHandler = fn(&Request) -> Response;
+type ErrorHandler = fn(Option<&Request>, StatusCode) -> Response;
 
 type HumphreyError = Box<dyn std::error::Error>;
 
@@ -46,8 +46,8 @@ impl App {
         Ok(())
     }
 
-    pub fn with_route(mut self, path: String, handler: RequestHandler) -> Self {
-        self.routes.insert(path, handler);
+    pub fn with_route(mut self, path: &str, handler: RequestHandler) -> Self {
+        self.routes.insert(path.to_string(), handler);
         self
     }
 
@@ -63,15 +63,16 @@ fn client_handler(
     error_handler: Arc<ErrorHandler>,
 ) {
     loop {
-        let mut buf: Vec<u8> = Vec::new();
-        if let Err(_) = stream.read(&mut buf) {
-            return stream.shutdown(std::net::Shutdown::Both).unwrap();
-        };
+        let request = Request::from_stream(&stream);
 
-        let request_string = String::from_utf8(buf).unwrap();
-        let request = Request::try_from(request_string.as_str());
+        if match &request {
+            Ok(_) => false,
+            Err(e) => e == &RequestError::Stream,
+        } {
+            break;
+        }
 
-        let response = match request {
+        let response = match &request {
             Ok(request) => match routes.get(&request.url) {
                 Some(callback) => callback(request),
                 None => error_handler(Some(request), StatusCode::NotFound),
@@ -81,19 +82,38 @@ fn client_handler(
 
         let response_bytes: Vec<u8> = response.into();
         if let Err(_) = stream.write(&response_bytes) {
-            return stream.shutdown(std::net::Shutdown::Both).unwrap();
+            break;
         };
+
+        if let Ok(request) = request {
+            if let Some(connection) = request.headers.get(&RequestHeader::Connection) {
+                if connection.to_ascii_lowercase() != "keep-alive" {
+                    break;
+                }
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
     }
 }
 
-fn error_handler(_: Option<Request>, status_code: StatusCode) -> Response {
+fn error_handler(request: Option<&Request>, status_code: StatusCode) -> Response {
     let body = format!(
         "<html><body><h1>{} {}</h1></body></html>",
         Into::<u16>::into(status_code.clone()),
         Into::<&str>::into(status_code.clone())
     );
 
-    Response::new(status_code)
-        .with_bytes(body.as_bytes().to_vec())
-        .with_generated_headers()
+    if let Some(request) = request {
+        Response::new(status_code)
+            .with_bytes(body.as_bytes().to_vec())
+            .with_request_compatibility(request)
+            .with_generated_headers()
+    } else {
+        Response::new(status_code)
+            .with_bytes(body.as_bytes().to_vec())
+            .with_generated_headers()
+    }
 }

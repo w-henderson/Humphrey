@@ -33,7 +33,7 @@ fn test_response() {
         "Humphrey"
     );
 
-    let expected_bytes: Vec<u8> = b"HTTP/1.1 200 OK\r\nContent-Language: en-GB\r\nContent-Length: 17\r\nContent-Type: text/html\r\nDate: Thu, 1 Jan 1970 00:00:00 GMT\r\nServer: Humphrey\r\n\r\n<body>test</body>".to_vec();
+    let expected_bytes: Vec<u8> = b"HTTP/1.1 200 OK\r\nContent-Language: en-GB\r\nContent-Length: 17\r\nContent-Type: text/html\r\nDate: Thu, 1 Jan 1970 00:00:00 GMT\r\nServer: Humphrey\r\n\r\n<body>test</body>\r\n".to_vec();
     let bytes: Vec<u8> = response.into();
 
     assert_eq!(bytes, expected_bytes);

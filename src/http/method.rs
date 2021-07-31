@@ -15,7 +15,7 @@ impl Method {
             "POST" => Ok(Self::Post),
             "PUT" => Ok(Self::Put),
             "DELETE" => Ok(Self::Delete),
-            _ => Err(RequestError),
+            _ => Err(RequestError::Request),
         }
     }
 }
