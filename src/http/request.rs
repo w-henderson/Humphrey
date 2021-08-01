@@ -1,12 +1,13 @@
-use super::headers::{RequestHeader, RequestHeaderMap};
-use super::method::Method;
+use crate::http::headers::{RequestHeader, RequestHeaderMap};
+use crate::http::method::Method;
+use crate::route::Uri;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read};
 
 #[derive(Debug)]
 pub struct Request {
     pub method: Method,
-    pub url: String,
+    pub uri: Uri,
     pub version: String,
     pub headers: RequestHeaderMap,
     pub content: Option<Vec<u8>>,
@@ -41,7 +42,7 @@ impl Request {
         safe_assert(start_line.len() == 3)?;
 
         let method = Method::from_name(start_line[0])?;
-        let url = start_line[1].to_string();
+        let uri: Uri = start_line[1].parse().map_err(|_| RequestError::Request)?;
         let version = start_line[2].to_string().replace("\r\n", "");
 
         let mut headers = RequestHeaderMap::new();
@@ -76,7 +77,7 @@ impl Request {
 
             Ok(Self {
                 method,
-                url,
+                uri,
                 version,
                 headers,
                 content: Some(content_buf),
@@ -84,7 +85,7 @@ impl Request {
         } else {
             Ok(Self {
                 method,
-                url,
+                uri,
                 version,
                 headers,
                 content: None,

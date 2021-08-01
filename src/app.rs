@@ -2,8 +2,8 @@ use crate::http::headers::RequestHeader;
 use crate::http::request::{Request, RequestError};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
+use crate::route::RouteHandler;
 
-use std::collections::HashMap;
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
@@ -13,14 +13,14 @@ pub struct App<State>
 where
     State: Send + Default + 'static,
 {
-    routes: HashMap<String, RequestHandler<State>>,
+    routes: Vec<RouteHandler<State>>,
     error_handler: ErrorHandler,
     state: Arc<Mutex<State>>,
 }
 
-type RequestHandler<State> = fn(&Request, Arc<Mutex<State>>) -> Response;
-type ErrorHandler = fn(Option<&Request>, StatusCode) -> Response;
-type HumphreyError = Box<dyn std::error::Error>;
+pub type RequestHandler<State> = fn(&Request, Arc<Mutex<State>>) -> Response;
+pub type ErrorHandler = fn(Option<&Request>, StatusCode) -> Response;
+pub type HumphreyError = Box<dyn std::error::Error>;
 
 impl<State> App<State>
 where
@@ -28,7 +28,7 @@ where
 {
     pub fn new() -> Self {
         Self {
-            routes: HashMap::new(),
+            routes: Vec::new(),
             error_handler,
             state: Arc::new(Mutex::new(State::default())),
         }
@@ -56,8 +56,11 @@ where
         Ok(())
     }
 
-    pub fn with_route(mut self, path: &str, handler: RequestHandler<State>) -> Self {
-        self.routes.insert(path.to_string(), handler);
+    pub fn with_route(mut self, route: &str, handler: RequestHandler<State>) -> Self {
+        self.routes.push(RouteHandler {
+            route: route.parse().unwrap(),
+            handler,
+        });
         self
     }
 
@@ -69,7 +72,7 @@ where
 
 fn client_handler<State>(
     mut stream: TcpStream,
-    routes: Arc<HashMap<String, RequestHandler<State>>>,
+    routes: Arc<Vec<RouteHandler<State>>>,
     error_handler: Arc<ErrorHandler>,
     state: Arc<Mutex<State>>,
 ) {
@@ -85,8 +88,8 @@ fn client_handler<State>(
         }
 
         let response = match &request {
-            Ok(request) => match routes.get(&request.url) {
-                Some(callback) => callback(request, cloned_state),
+            Ok(request) => match routes.iter().find(|r| r.route.matches(&request.uri)) {
+                Some(handler) => (handler.handler)(request, cloned_state),
                 None => error_handler(Some(request), StatusCode::NotFound),
             },
             Err(_) => error_handler(None, StatusCode::BadRequest),
