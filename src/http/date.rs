@@ -1,5 +1,7 @@
 use chrono::{Datelike, Timelike, Utc};
 
+/// Represents a date in the correct format for the `Date` header.
+/// The only method that should be used is `HTTPDate::now()`.
 pub struct HTTPDate;
 
 static MONTHS: [&str; 12] = [
@@ -11,7 +13,7 @@ impl HTTPDate {
         let now = Utc::now();
 
         format!(
-            "{:?}, {} {} {} {}:{}:{} GMT",
+            "{:?}, {:02} {:02} {} {:02}:{:02}:{:02} GMT",
             now.weekday(),
             now.day(),
             MONTHS[now.month0() as usize],
