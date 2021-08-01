@@ -26,36 +26,36 @@ pub enum MimeType {
 impl MimeType {
     pub fn from_extension(extension: &str) -> Self {
         match extension {
-            ".css" => MimeType::TextCss,
-            ".html" => MimeType::TextHtml,
-            ".htm" => MimeType::TextHtml,
-            ".js" => MimeType::TextJavaScript,
-            ".txt" => MimeType::TextPlain,
-            ".bmp" => MimeType::ImageBmp,
-            ".gif" => MimeType::ImageGif,
-            ".jpeg" => MimeType::ImageJpeg,
-            ".jpg" => MimeType::ImageJpeg,
-            ".png" => MimeType::ImagePng,
-            ".webp" => MimeType::ImageWebp,
-            ".svg" => MimeType::ImageSvg,
-            ".ico" => MimeType::ImageIcon,
-            ".json" => MimeType::ApplicationJson,
-            ".pdf" => MimeType::ApplicationPdf,
-            ".zip" => MimeType::ApplicationZip,
-            ".mp4" => MimeType::VideoMp4,
-            ".ogv" => MimeType::VideoOgg,
-            ".webm" => MimeType::VideoWebm,
-            ".ttf" => MimeType::FontTtf,
-            ".otf" => MimeType::FontOtf,
-            ".woff" => MimeType::FontWoff,
-            ".woff2" => MimeType::FontWoff2,
+            "css" => MimeType::TextCss,
+            "html" => MimeType::TextHtml,
+            "htm" => MimeType::TextHtml,
+            "js" => MimeType::TextJavaScript,
+            "txt" => MimeType::TextPlain,
+            "bmp" => MimeType::ImageBmp,
+            "gif" => MimeType::ImageGif,
+            "jpeg" => MimeType::ImageJpeg,
+            "jpg" => MimeType::ImageJpeg,
+            "png" => MimeType::ImagePng,
+            "webp" => MimeType::ImageWebp,
+            "svg" => MimeType::ImageSvg,
+            "ico" => MimeType::ImageIcon,
+            "json" => MimeType::ApplicationJson,
+            "pdf" => MimeType::ApplicationPdf,
+            "zip" => MimeType::ApplicationZip,
+            "mp4" => MimeType::VideoMp4,
+            "ogv" => MimeType::VideoOgg,
+            "webm" => MimeType::VideoWebm,
+            "ttf" => MimeType::FontTtf,
+            "otf" => MimeType::FontOtf,
+            "woff" => MimeType::FontWoff,
+            "woff2" => MimeType::FontWoff2,
             _ => MimeType::ApplicationOctetStream,
         }
     }
 }
 
-impl Into<&str> for MimeType {
-    fn into(self) -> &'static str {
+impl Into<String> for MimeType {
+    fn into(self) -> String {
         match self {
             MimeType::TextCss => "text/css",
             MimeType::TextHtml => "text/html",
@@ -80,5 +80,6 @@ impl Into<&str> for MimeType {
             MimeType::FontWoff => "font/woff",
             MimeType::FontWoff2 => "font/woff2",
         }
+        .to_string()
     }
 }
