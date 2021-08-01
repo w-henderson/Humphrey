@@ -27,7 +27,7 @@ impl Uri {
         }
 
         if self.path[self.path.len() - 1] == "*" {
-            &self.path[0..self.path.len() - 2] == &other.path[0..self.path.len() - 2]
+            &self.path[0..self.path.len() - 1] == &other.path[0..self.path.len() - 1]
         } else {
             self.path == other.path
         }
