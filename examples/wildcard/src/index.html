@@ -1,0 +1,24 @@
+<html>
+
+<head>
+  <title>Humphrey Wildcard Example</title>
+
+  <script>
+    function goToWildcard() {
+      let text = document.querySelector("#text").value;
+      window.location = `/wildcard/${text}`;
+    }
+  </script>
+</head>
+
+<body>
+  <h1>Humphrey Wildcard Example</h1>
+
+  Type anything in the box below and press the button.
+  <br><br>
+
+  <input id="text" placeholder="Type something here">
+  <button onclick="goToWildcard();">Go to wildcard page</button>
+</body>
+
+</html>
