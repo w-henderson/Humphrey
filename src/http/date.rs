@@ -9,6 +9,13 @@ static MONTHS: [&str; 12] = [
 ];
 
 impl HTTPDate {
+    /// Creates a new string formatted as an HTTP date representing the current date and time.
+    ///
+    /// ## Example
+    /// ```
+    /// let date = HTTPDate::now();
+    /// println!("{}", date); // "Thu, 01 Jan 1970 00:00:00 GMT"
+    /// ```
     pub fn now() -> String {
         let now = Utc::now();
 

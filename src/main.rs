@@ -14,14 +14,14 @@ fn main() {
     app.run(&("0.0.0.0:80".parse().unwrap())).unwrap();
 }
 
+/// Request handler for every request.
+/// Attempts to open a given file relative to the binary and returns error 404 if not found.
 fn file(request: &Request, _: Arc<Mutex<AppState>>) -> Response {
     let path = if request.uri.path.len() == 0 {
         "index.html".to_string()
     } else {
         request.uri.path.join("/")
     };
-
-    println!("{:?}", request);
 
     if let Ok(mut file) = File::open(&path) {
         let file_extension = path.split(".").last().unwrap_or("");

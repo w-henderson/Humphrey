@@ -1,3 +1,4 @@
+/// Represents a MIME type as used in the `Content-Type` header.
 pub enum MimeType {
     TextCss,
     TextHtml,
@@ -24,6 +25,8 @@ pub enum MimeType {
 }
 
 impl MimeType {
+    /// Converts from a file extension without the `.` to the enum variant.
+    /// If the MIME type cannot be inferred from the extension, returns `MimeType::ApplicationOctetStream`.
     pub fn from_extension(extension: &str) -> Self {
         match extension {
             "css" => MimeType::TextCss,

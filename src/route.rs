@@ -1,11 +1,14 @@
 use crate::app::RequestHandler;
 use std::str::FromStr;
 
+/// Encapsulates a route and its handler.
 pub struct RouteHandler<State> {
     pub route: Uri,
     pub handler: RequestHandler<State>,
 }
 
+/// Represents a URI as part of the request.
+/// Contains both the path as a `Vec<String>` and the query string.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Uri {
     pub path: Vec<String>,
@@ -13,10 +16,13 @@ pub struct Uri {
 }
 
 impl Uri {
+    /// Creates a new `Uri` object with the given parameters.
     pub fn new(path: Vec<String>, query: Option<String>) -> Self {
         Self { path, query }
     }
 
+    /// Checks whether this URI matches the given one, respecting its own wildcards only.
+    /// For example, `/blog/*` will match `/blog/my-first-post` but not the other way around.
     pub fn matches(&self, other: &Uri) -> bool {
         if self.path.len() == 0 {
             if other.path.len() == 0 {

@@ -1,5 +1,19 @@
 use std::convert::TryFrom;
 
+/// Represents an HTTP status code.
+/// Can be converted to and from both `u16` and `&str`.
+///
+/// ## Example
+/// ```
+/// let status = StatusCode::NotFound;
+/// let status2 = StatusCode::try_from(404)?;
+/// assert_eq!(status, status2);
+///
+/// let status_code: u16 = status.into();
+/// let status_name: &str = status.into();
+/// assert_eq!(status_code, 404);
+/// assert_eq!(status_name, "Not Found");
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StatusCode {
     Continue,

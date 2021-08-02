@@ -4,9 +4,13 @@ pub trait Header {
     fn default(&self) -> Option<&str>;
 }
 
+/// Alias for a map of request headers and their values.
 pub type RequestHeaderMap = BTreeMap<RequestHeader, String>;
+
+/// Alias for a map of response headers and their values.
 pub type ResponseHeaderMap = BTreeMap<ResponseHeader, String>;
 
+/// Represents a header received in a request.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub enum RequestHeader {
     Accept,
@@ -36,6 +40,7 @@ pub enum RequestHeader {
     Custom { name: String },
 }
 
+/// Represents a header sent in a response.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub enum ResponseHeader {
     AccessControlAllowOrigin,

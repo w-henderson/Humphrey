@@ -1,6 +1,8 @@
-mod app;
+//! # Humphrey: A Performance-Focused, Lightweight Web Server.
+
+pub mod app;
 pub mod http;
-mod route;
+pub mod route;
 mod tests;
 
 pub use app::App;

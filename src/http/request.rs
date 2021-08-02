@@ -4,18 +4,28 @@ use crate::route::Uri;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read};
 
+/// Represents a request to the server.
+/// Contains parsed information about the request's data.
 #[derive(Debug)]
 pub struct Request {
+    /// The method used in making the request, e.g. "GET".
     pub method: Method,
+    /// The URI to which the request was made.
     pub uri: Uri,
+    /// The HTTP version of the request.
     pub version: String,
+    /// A map of headers included in the request.
     pub headers: RequestHeaderMap,
+    /// The request body, if supplied.
     pub content: Option<Vec<u8>>,
 }
 
+/// An error which occurred during the parsing of a request.
 #[derive(Debug, PartialEq, Eq)]
 pub enum RequestError {
+    /// The request could not be parsed due to invalid data.
     Request,
+    /// The request could not be parsed due to an issue with the stream.
     Stream,
 }
 
@@ -28,6 +38,7 @@ impl std::fmt::Display for RequestError {
 impl Error for RequestError {}
 
 impl Request {
+    /// Attempts to read and parse one HTTP request from the given stream.
     pub fn from_stream(stream: &mut impl Read) -> Result<Self, RequestError> {
         let mut reader = BufReader::new(stream);
         let mut start_line_buf: Vec<u8> = Vec::new();
@@ -94,6 +105,7 @@ impl Request {
     }
 }
 
+/// Asserts that the condition is true, returning a `Result`.
 fn safe_assert(condition: bool) -> Result<(), RequestError> {
     match condition {
         true => Ok(()),

@@ -4,15 +4,33 @@ use crate::http::request::Request;
 use crate::http::status::StatusCode;
 use std::collections::btree_map::Entry;
 
+/// Represents a response from the server.
+/// Implements `Into<Vec<u8>>` so can be serialised into bytes to transmit.
+///
+/// ## Example
+/// ```
+/// fn handler(request: &Request, _: Arc<Mutex<()>>) -> Response {
+///     Response::new(StatusCode::OK) // create the response
+///         .with_bytes(b"<html><body><h1>Success</h1></body></html>".to_vec()) // add the body
+///         .with_request_compatibility(request) // ensure compatibility with the request
+///         .with_generated_headers() // generate required headers
+/// }
+/// ```
 #[derive(Debug)]
 pub struct Response {
+    /// The HTTP version of the response.
     version: String,
+    /// The status code of the response, for example 200 OK.
     status_code: StatusCode,
+    /// A map of the headers included in the response.
     headers: ResponseHeaderMap,
+    /// The body of the response.
     body: Vec<u8>,
 }
 
 impl Response {
+    /// Creates a new response object with the given status code.
+    /// Automatically sets the HTTP version to "HTTP/1.1", sets no headers, and creates an empty body.
     pub fn new(status_code: StatusCode) -> Self {
         Self {
             version: "HTTP/1.1".to_string(),
@@ -22,16 +40,25 @@ impl Response {
         }
     }
 
+    /// Adds the given header to the response.
+    /// Returns itself for use in a builder pattern.
     pub fn with_header(mut self, header: ResponseHeader, value: String) -> Self {
         self.headers.insert(header, value);
         self
     }
-
+    /// Appends the given bytes to the body.
+    /// Returns itself for use in a builder pattern.
     pub fn with_bytes(mut self, bytes: Vec<u8>) -> Self {
         self.body.extend(bytes);
         self
     }
 
+    /// Ensures compatibility with the request it is responding to.
+    /// This is done by respecting the `Connection` header of the request (if supplied), as well as
+    ///   setting the HTTP version to that of the request. While this is not required, it is
+    ///   strongly recommended to fully comply with the browser's request.
+    ///
+    /// Returns itself for use in a builder pattern.
     pub fn with_request_compatibility(mut self, request: &Request) -> Self {
         if let Some(connection) = request.headers.get(&RequestHeader::Connection) {
             self.headers
@@ -46,6 +73,17 @@ impl Response {
         self
     }
 
+    /// Automatically generates required headers.
+    /// **This is required** and must be called after calling `.with_bytes(body)` so the content length is accurate.
+    /// It will not overwrite any already applied headers.
+    ///
+    /// The generated headers are:
+    /// - `Content-Length`: the calculated content length of the body
+    /// - `Server`: the server which responded to the request, in this case the string "Humphrey"
+    /// - `Date`: the formatted date when the response was created
+    /// - `Connection`: will be set to `Close` unless previously set, for example in `.with_request_compatibility(request)`
+    ///
+    /// Returns itself for use in a builder pattern.
     pub fn with_generated_headers(mut self) -> Self {
         match self.headers.entry(ResponseHeader::ContentLength) {
             Entry::Occupied(_) => (),
@@ -78,6 +116,7 @@ impl Response {
         self
     }
 
+    /// Returns a reference to the response's headers.
     pub fn get_headers(&self) -> &ResponseHeaderMap {
         &self.headers
     }
