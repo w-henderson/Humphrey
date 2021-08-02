@@ -78,20 +78,13 @@ impl Response {
     /// It will not overwrite any already applied headers.
     ///
     /// The generated headers are:
-    /// - `Content-Length`: the calculated content length of the body
+    /// - `Content-Length`: the calculated content length of the body if non-zero
     /// - `Server`: the server which responded to the request, in this case the string "Humphrey"
     /// - `Date`: the formatted date when the response was created
     /// - `Connection`: will be set to `Close` unless previously set, for example in `.with_request_compatibility(request)`
     ///
     /// Returns itself for use in a builder pattern.
     pub fn with_generated_headers(mut self) -> Self {
-        match self.headers.entry(ResponseHeader::ContentLength) {
-            Entry::Occupied(_) => (),
-            Entry::Vacant(v) => {
-                v.insert(self.body.len().to_string());
-            }
-        }
-
         match self.headers.entry(ResponseHeader::Server) {
             Entry::Occupied(_) => (),
             Entry::Vacant(v) => {
@@ -110,6 +103,15 @@ impl Response {
             Entry::Occupied(_) => (),
             Entry::Vacant(v) => {
                 v.insert("Close".to_string());
+            }
+        }
+
+        if self.body.len() > 0 {
+            match self.headers.entry(ResponseHeader::ContentLength) {
+                Entry::Occupied(_) => (),
+                Entry::Vacant(v) => {
+                    v.insert(self.body.len().to_string());
+                }
             }
         }
 

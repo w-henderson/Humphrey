@@ -1,5 +1,5 @@
 use crate::app::RequestHandler;
-use std::str::FromStr;
+use std::{fs::File, str::FromStr};
 
 /// Encapsulates a route and its handler.
 pub struct RouteHandler<State> {
@@ -12,13 +12,18 @@ pub struct RouteHandler<State> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Uri {
     pub path: Vec<String>,
+    pub trailing_slash: bool,
     pub query: Option<String>,
 }
 
 impl Uri {
     /// Creates a new `Uri` object with the given parameters.
-    pub fn new(path: Vec<String>, query: Option<String>) -> Self {
-        Self { path, query }
+    pub fn new(path: Vec<String>, query: Option<String>, trailing_slash: bool) -> Self {
+        Self {
+            path,
+            query,
+            trailing_slash,
+        }
     }
 
     /// Checks whether this URI matches the given one, respecting its own wildcards only.
@@ -48,6 +53,9 @@ impl FromStr for Uri {
             return Err(());
         }
 
+        // Store whether the string ends with a `/`
+        let trailing_slash = string.chars().last() == Some('/');
+
         // Split the string into the path and the query string
         let split: Vec<&str> = string.splitn(2, '?').collect();
 
@@ -61,6 +69,37 @@ impl FromStr for Uri {
         // Extract and parse the query string
         let query = split.iter().nth(1).map(|s| s.to_string());
 
-        Ok(Self { path, query })
+        Ok(Self {
+            path,
+            query,
+            trailing_slash,
+        })
     }
+}
+
+pub struct LocatedPath {
+    pub file: File,
+    pub was_redirected: bool,
+}
+
+/// Attemps to open a given path.
+/// If the path itself is not found, attemps to open index files within it.
+/// If these are not found, returns `None`.
+pub fn try_open_path(path: &str) -> Option<LocatedPath> {
+    let paths = vec![
+        path.to_string(),
+        format!("{}/index.html", path),
+        format!("{}/index.htm", path),
+    ];
+
+    for (index, path) in paths.iter().enumerate() {
+        if let Ok(file) = File::open(path) {
+            return Some(LocatedPath {
+                file,
+                was_redirected: index != 0,
+            });
+        }
+    }
+
+    None
 }

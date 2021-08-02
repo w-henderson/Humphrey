@@ -1,8 +1,8 @@
 use humphrey::http::headers::ResponseHeader;
 use humphrey::http::mime::MimeType;
 use humphrey::http::{Request, Response, StatusCode};
+use humphrey::route::try_open_path;
 use humphrey::App;
-use std::fs::File;
 use std::io::Read;
 use std::sync::{Arc, Mutex};
 
@@ -17,17 +17,24 @@ fn main() {
 /// Request handler for every request.
 /// Attempts to open a given file relative to the binary and returns error 404 if not found.
 fn file(request: &Request, _: Arc<Mutex<AppState>>) -> Response {
-    let path = if request.uri.path.len() == 0 {
-        "index.html".to_string()
-    } else {
-        request.uri.path.join("/")
-    };
+    let path = request.uri.path.join("/");
 
-    if let Ok(mut file) = File::open(&path) {
-        let file_extension = path.split(".").last().unwrap_or("");
+    if let Some(mut located) = try_open_path(&path) {
+        if located.was_redirected && !request.uri.trailing_slash {
+            return Response::new(StatusCode::MovedPermanently)
+                .with_header(ResponseHeader::Location, format!("/{}/", &path))
+                .with_request_compatibility(request)
+                .with_generated_headers();
+        }
+
+        let file_extension = if located.was_redirected {
+            "html"
+        } else {
+            path.split(".").last().unwrap_or("")
+        };
         let mime_type = MimeType::from_extension(file_extension);
         let mut contents: Vec<u8> = Vec::new();
-        file.read_to_end(&mut contents).unwrap();
+        located.file.read_to_end(&mut contents).unwrap();
 
         Response::new(StatusCode::OK)
             .with_header(ResponseHeader::ContentType, mime_type.into())

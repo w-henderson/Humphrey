@@ -3,15 +3,17 @@ use crate::route::Uri;
 
 #[test]
 fn test_uri_from_string() {
-    let expected_index = Uri::new(Vec::new(), None);
-    let expected_simple = Uri::new(vec!["contact".to_string()], None);
+    let expected_index = Uri::new(Vec::new(), None, true);
+    let expected_simple = Uri::new(vec!["contact".to_string()], None, false);
     let expected_double = Uri::new(
         vec!["exampleblog".to_string(), "introduction".to_string()],
         None,
+        false,
     );
     let expected_query = Uri::new(
         vec!["api".to_string(), "send".to_string()],
         Some("data=hello".to_string()),
+        false,
     );
 
     let index: Uri = "/".parse().unwrap();
