@@ -1,6 +1,5 @@
 use crate::http::headers::{RequestHeader, RequestHeaderMap};
 use crate::http::method::Method;
-use crate::route::Uri;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read};
 
@@ -11,7 +10,7 @@ pub struct Request {
     /// The method used in making the request, e.g. "GET".
     pub method: Method,
     /// The URI to which the request was made.
-    pub uri: Uri,
+    pub uri: String,
     /// The HTTP version of the request.
     pub version: String,
     /// A map of headers included in the request.
@@ -53,7 +52,7 @@ impl Request {
         safe_assert(start_line.len() == 3)?;
 
         let method = Method::from_name(start_line[0])?;
-        let uri: Uri = start_line[1].parse().map_err(|_| RequestError::Request)?;
+        let uri = start_line[1].to_string();
         let version = start_line[2].to_string().replace("\r\n", "");
 
         let mut headers = RequestHeaderMap::new();

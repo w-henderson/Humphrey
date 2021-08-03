@@ -2,7 +2,7 @@ use crate::http::headers::RequestHeader;
 use crate::http::request::{Request, RequestError};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
-use crate::route::RouteHandler;
+use crate::route::{Route, RouteHandler};
 
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -149,7 +149,7 @@ fn client_handler<State>(
         }
 
         let response = match &request {
-            Ok(request) => match routes.iter().find(|r| r.route.matches(&request.uri)) {
+            Ok(request) => match routes.iter().find(|r| r.route.route_matches(&request.uri)) {
                 Some(handler) => (handler.handler)(request, cloned_state),
                 None => error_handler(Some(request), StatusCode::NotFound),
             },

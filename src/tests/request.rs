@@ -2,7 +2,6 @@
 use crate::http::headers::RequestHeader;
 use crate::http::method::Method;
 use crate::http::Request;
-use crate::route::Uri;
 use std::{collections::BTreeMap, io::Read};
 
 struct MockStream {
@@ -39,7 +38,7 @@ fn test_request_from_stream() {
     assert!(request.is_ok());
 
     let request = request.unwrap();
-    let expected_uri: Uri = "/testpath".parse().unwrap();
+    let expected_uri: String = "/testpath".into();
     assert_eq!(request.method, Method::Get);
     assert_eq!(request.uri, expected_uri);
     assert_eq!(request.version, "HTTP/1.1");

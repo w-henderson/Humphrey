@@ -17,12 +17,10 @@ fn main() {
 /// Request handler for every request.
 /// Attempts to open a given file relative to the binary and returns error 404 if not found.
 fn file(request: &Request, _: Arc<Mutex<AppState>>) -> Response {
-    let path = request.uri.path.join("/");
-
-    if let Some(mut located) = try_open_path(&path) {
-        if located.was_redirected && !request.uri.trailing_slash {
+    if let Some(mut located) = try_open_path(&request.uri) {
+        if located.was_redirected && request.uri.chars().last() != Some('/') {
             return Response::new(StatusCode::MovedPermanently)
-                .with_header(ResponseHeader::Location, format!("/{}/", &path))
+                .with_header(ResponseHeader::Location, format!("{}/", &request.uri))
                 .with_request_compatibility(request)
                 .with_generated_headers();
         }
@@ -30,7 +28,7 @@ fn file(request: &Request, _: Arc<Mutex<AppState>>) -> Response {
         let file_extension = if located.was_redirected {
             "html"
         } else {
-            path.split(".").last().unwrap_or("")
+            request.uri.split(".").last().unwrap_or("")
         };
         let mime_type = MimeType::from_extension(file_extension);
         let mut contents: Vec<u8> = Vec::new();
