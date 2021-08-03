@@ -24,13 +24,8 @@ fn home(request: &Request, _: Arc<Mutex<AppState>>) -> Response {
 fn wildcard(request: &Request, _: Arc<Mutex<AppState>>) -> Response {
     let wildcard_path = request
         .uri // get the URI of the request
-        .path // extract the path and ignore the query string (if any)
-        .iter() // iterate over the path components
-        .skip(1) // ignore the first (it will be "wildcard")
-        .fold(String::new(), |acc, el| acc + &el + "/") // join the remaining ones together with "/"
-        .strip_suffix('/') // remove the trailing slash
-        .unwrap_or("") // unwrap from the option
-        .to_string(); // store on the heap
+        .strip_prefix("/wildcard/") // remove the initial slash
+        .unwrap(); // unwrap from the option
 
     let html = format!(
         "<html><body><h1>Wildcard Path: {}</h1></body></html>",
