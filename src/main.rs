@@ -3,28 +3,30 @@ use humphrey::http::mime::MimeType;
 use humphrey::http::{Request, Response, StatusCode};
 use humphrey::route::try_open_path;
 use humphrey::App;
+
+mod config;
+use config::Config;
+
 use std::io::Read;
 use std::sync::Arc;
 
-#[derive(Default)]
-struct AppConfig {
-    directory_root: String,
-}
-
 fn main() {
-    let app_config = AppConfig::default();
+    if let Ok(config) = config::load_config() {
+        let addr = format!("{}:{}", &config.address, &config.port);
+        let app: App<Config> = App::new().with_state(config).with_route("/*", file_handler);
 
-    let app: App<AppConfig> = App::new()
-        .with_state(app_config)
-        .with_route("/*", file_handler);
-
-    app.run(&("0.0.0.0:80".parse().unwrap())).unwrap();
+        if let Err(_) = app.run(addr) {
+            println!("An error occurred");
+        };
+    } else {
+        println!("An error occurred loading the configuration.");
+    }
 }
 
 /// Request handler for every request.
 /// Attempts to open a given file relative to the binary and returns error 404 if not found.
-fn file_handler(request: &Request, config: Arc<AppConfig>) -> Response {
-    let full_path = format!("{}{}", config.directory_root, request.uri);
+fn file_handler(request: &Request, config: Arc<Config>) -> Response {
+    let full_path = format!("{}{}", config.directory, request.uri);
 
     if let Some(mut located) = try_open_path(&full_path) {
         if located.was_redirected && request.uri.chars().last() != Some('/') {

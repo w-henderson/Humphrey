@@ -5,7 +5,7 @@ use crate::http::status::StatusCode;
 use crate::route::{Route, RouteHandler};
 
 use std::io::Write;
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
 use std::thread::spawn;
 
@@ -86,7 +86,10 @@ where
 
     /// Runs the Humphrey app on the given socket address.
     /// This function will only return if a fatal error is thrown such as the port being in use.
-    pub fn run(self, addr: &SocketAddr) -> Result<(), HumphreyError> {
+    pub fn run<A>(self, addr: A) -> Result<(), HumphreyError>
+    where
+        A: ToSocketAddrs,
+    {
         let socket = TcpListener::bind(addr)?;
         let routes = Arc::new(self.routes);
         let error_handler = Arc::new(self.error_handler);
