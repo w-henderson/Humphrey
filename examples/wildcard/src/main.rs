@@ -1,6 +1,6 @@
 use humphrey::http::{Request, Response, StatusCode};
 use humphrey::App;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[derive(Default)]
 struct AppState;
@@ -12,7 +12,7 @@ fn main() {
     app.run(&("127.0.0.1:80".parse().unwrap())).unwrap();
 }
 
-fn home(request: &Request, _: Arc<Mutex<AppState>>) -> Response {
+fn home(request: &Request, _: Arc<AppState>) -> Response {
     let html = include_str!("index.html");
 
     Response::new(StatusCode::OK)
@@ -21,7 +21,7 @@ fn home(request: &Request, _: Arc<Mutex<AppState>>) -> Response {
         .with_generated_headers()
 }
 
-fn wildcard(request: &Request, _: Arc<Mutex<AppState>>) -> Response {
+fn wildcard(request: &Request, _: Arc<AppState>) -> Response {
     let wildcard_path = request
         .uri // get the URI of the request
         .strip_prefix("/wildcard/") // remove the initial slash

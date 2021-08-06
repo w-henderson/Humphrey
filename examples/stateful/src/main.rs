@@ -13,7 +13,7 @@ struct AppState {
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Initialise app using the `AppState` type as its state
-    let app: App<AppState> = App::new()
+    let app: App<Mutex<AppState>> = App::new()
         .with_route("/", index)
         .with_route("/press", press);
 
