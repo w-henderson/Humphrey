@@ -5,9 +5,13 @@ use std::io::Read;
 
 use humphrey::krauss::wildcard_match;
 
+/// Stores the server configuration.
 pub struct Config {
+    /// Address to host the server on
     pub address: String,
+    /// Port to host the server on
     pub port: u16,
+    /// Root directory to serve files from
     pub directory: String,
 }
 
@@ -21,6 +25,8 @@ impl Default for Config {
     }
 }
 
+/// Locates, parses and returns the server configuration.
+/// Returns `Err` if any part of this process fails.
 pub fn load_config() -> Result<Config, ()> {
     if let Ok(config_string) = read_config() {
         if let Ok(hashmap) = parse_ini(&config_string) {
@@ -47,6 +53,9 @@ pub fn load_config() -> Result<Config, ()> {
     Err(())
 }
 
+/// Locates and reads the configuration file.
+/// Uses the first command line argument as a path, defaults to "humphrey.ini" in the current directory if not specified.
+/// If the file cannot be found and/or read, returns `Err`.
 fn read_config() -> Result<String, ()> {
     let path = args().nth(1).unwrap_or("humphrey.ini".into());
 
@@ -62,6 +71,9 @@ fn read_config() -> Result<String, ()> {
     }
 }
 
+/// Attempts to parse the given string as the INI configuration format.
+/// If successful, returns a hashmap of keys and values.
+/// Otherwise, returns `Err`.
 fn parse_ini(ini: &str) -> Result<HashMap<String, String>, ()> {
     let mut config: HashMap<String, String> = HashMap::new();
 
