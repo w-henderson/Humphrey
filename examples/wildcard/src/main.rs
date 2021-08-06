@@ -1,15 +1,18 @@
 use humphrey::http::{Request, Response, StatusCode};
 use humphrey::App;
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 #[derive(Default)]
 struct AppState;
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let app: App<AppState> = App::new()
         .with_route("/", home)
         .with_route("/wildcard/*", wildcard);
-    app.run(&("127.0.0.1:80".parse().unwrap())).unwrap();
+
+    app.run("127.0.0.1:80")?;
+
+    Ok(())
 }
 
 fn home(request: &Request, _: Arc<AppState>) -> Response {

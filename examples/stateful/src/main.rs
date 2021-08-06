@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with_route("/press", press);
 
     // Run the app on localhost port 80
-    app.run(&("127.0.0.1:80".parse()?))?;
+    app.run("0.0.0.0:80")?;
 
     Ok(())
 }
