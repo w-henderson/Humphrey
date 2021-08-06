@@ -4,20 +4,29 @@ use humphrey::http::{Request, Response, StatusCode};
 use humphrey::route::try_open_path;
 use humphrey::App;
 use std::io::Read;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[derive(Default)]
-struct AppState;
+struct AppConfig {
+    directory_root: String,
+}
 
 fn main() {
-    let app: App<AppState> = App::new().with_route("/*", file);
+    let app_config = AppConfig::default();
+
+    let app: App<AppConfig> = App::new()
+        .with_state(app_config)
+        .with_route("/*", file_handler);
+
     app.run(&("0.0.0.0:80".parse().unwrap())).unwrap();
 }
 
 /// Request handler for every request.
 /// Attempts to open a given file relative to the binary and returns error 404 if not found.
-fn file(request: &Request, _: Arc<Mutex<AppState>>) -> Response {
-    if let Some(mut located) = try_open_path(&request.uri) {
+fn file_handler(request: &Request, config: Arc<AppConfig>) -> Response {
+    let full_path = format!("{}{}", config.directory_root, request.uri);
+
+    if let Some(mut located) = try_open_path(&full_path) {
         if located.was_redirected && request.uri.chars().last() != Some('/') {
             return Response::new(StatusCode::MovedPermanently)
                 .with_header(ResponseHeader::Location, format!("{}/", &request.uri))

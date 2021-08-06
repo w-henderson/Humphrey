@@ -6,7 +6,7 @@ use crate::route::{Route, RouteHandler};
 
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread::spawn;
 
 /// Represents the Humphrey app.
@@ -20,7 +20,7 @@ where
 {
     routes: Vec<RouteHandler<State>>,
     error_handler: ErrorHandler,
-    state: Arc<Mutex<State>>,
+    state: Arc<State>,
 }
 
 /// Represents a function able to handle a request.
@@ -36,7 +36,7 @@ where
 ///         .with_generated_headers() // generate required headers
 /// }
 /// ```
-pub type RequestHandler<State> = fn(&Request, Arc<Mutex<State>>) -> Response;
+pub type RequestHandler<State> = fn(&Request, Arc<State>) -> Response;
 
 /// Represents a function able to handle an error.
 /// The first parameter of type `Option<&Request>` will be `Some` if the request could be parsed.
@@ -73,14 +73,14 @@ pub type HumphreyError = Box<dyn std::error::Error>;
 
 impl<State> App<State>
 where
-    State: Send + Default + 'static,
+    State: Send + Sync + Default + 'static,
 {
     /// Initialises a new Humphrey app.
     pub fn new() -> Self {
         Self {
             routes: Vec::new(),
             error_handler,
-            state: Arc::new(Mutex::new(State::default())),
+            state: Arc::new(State::default()),
         }
     }
 
@@ -106,6 +106,14 @@ where
         }
 
         Ok(())
+    }
+
+    /// Sets the default state for the server.
+    /// Should only be used in cases where the `Default` trait cannot be implemented for `State`.
+    /// For example, if the default state is dynamically generated as it is in the CLI.
+    pub fn with_state(mut self, state: State) -> Self {
+        self.state = Arc::new(state);
+        self
     }
 
     /// Adds a route and associated handler to the server.
@@ -135,7 +143,7 @@ fn client_handler<State>(
     mut stream: TcpStream,
     routes: Arc<Vec<RouteHandler<State>>>,
     error_handler: Arc<ErrorHandler>,
-    state: Arc<Mutex<State>>,
+    state: Arc<State>,
 ) {
     loop {
         let request = Request::from_stream(&mut stream);
