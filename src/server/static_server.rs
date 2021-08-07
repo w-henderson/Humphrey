@@ -9,6 +9,7 @@ use crate::config::Config;
 use std::io::Read;
 use std::sync::Arc;
 
+/// Main function for the static server.
 pub fn main(config: Config) {
     let app: App<String> = App::new()
         .with_state(config.directory.unwrap())
