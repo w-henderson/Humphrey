@@ -21,7 +21,11 @@ where
     routes: Vec<RouteHandler<State>>,
     error_handler: ErrorHandler,
     state: Arc<State>,
+    connection_handler: ConnectionHandler<State>,
 }
+
+pub type ConnectionHandler<State> =
+    fn(TcpStream, Arc<Vec<RouteHandler<State>>>, Arc<ErrorHandler>, Arc<State>);
 
 /// Represents a function able to handle a request.
 /// It is passed a reference to the request as well as the app's state, and must return a response.
@@ -81,6 +85,7 @@ where
             routes: Vec::new(),
             error_handler,
             state: Arc::new(State::default()),
+            connection_handler: client_handler,
         }
     }
 
@@ -100,8 +105,9 @@ where
                     let cloned_routes = routes.clone();
                     let cloned_error_handler = error_handler.clone();
                     let cloned_state = self.state.clone();
+                    let cloned_handler = self.connection_handler.clone();
                     spawn(move || {
-                        client_handler(stream, cloned_routes, cloned_error_handler, cloned_state)
+                        (cloned_handler)(stream, cloned_routes, cloned_error_handler, cloned_state)
                     });
                 }
                 Err(_) => (),
@@ -135,6 +141,13 @@ where
     /// Sets the error handler for the server.
     pub fn with_error_handler(mut self, handler: ErrorHandler) -> Self {
         self.error_handler = handler;
+        self
+    }
+
+    /// Overrides the default connection handler, allowing for manual control over the TCP requests and responses.
+    /// Not recommended as it basically disables most of the server's features.
+    pub fn with_custom_connection_handler(mut self, handler: ConnectionHandler<State>) -> Self {
+        self.connection_handler = handler;
         self
     }
 }
