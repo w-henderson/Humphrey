@@ -39,7 +39,7 @@ fn handler(
 }
 
 /// Pipe bytes from one stream to another, up to 1KiB at a time.
-fn pipe(source: &mut TcpStream, destination: &mut TcpStream) -> Result<(), ()> {
+pub fn pipe(source: &mut TcpStream, destination: &mut TcpStream) -> Result<(), ()> {
     let mut buf: [u8; 1024] = [0; 1024];
 
     loop {

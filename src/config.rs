@@ -37,9 +37,16 @@ pub enum ServerMode {
 }
 
 /// Represents an algorithm for load balancing.
+#[derive(Clone)]
 pub enum LoadBalancerMode {
     RoundRobin,
     Random,
+}
+
+impl Default for LoadBalancerMode {
+    fn default() -> Self {
+        Self::RoundRobin
+    }
 }
 
 impl Default for Config {
