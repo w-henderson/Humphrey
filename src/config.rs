@@ -5,6 +5,9 @@ use std::io::Read;
 
 use humphrey::krauss::wildcard_match;
 
+#[path = "tests/config.rs"]
+mod tests;
+
 /// Stores the server configuration.
 pub struct Config {
     /// Address to host the server on
