@@ -3,8 +3,8 @@ use humphrey::route::RouteHandler;
 
 use crate::config::{Config, LoadBalancerMode};
 use crate::proxy::pipe;
+use crate::util::rand::{Choose, Lcg};
 
-use rand::seq::SliceRandom;
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use std::thread::spawn;
@@ -21,10 +21,12 @@ pub fn main(config: Config) {
 }
 
 #[derive(Default)]
+// Represents a load balancer.
 struct LoadBalancer {
     targets: Vec<String>,
     mode: LoadBalancerMode,
     index: usize,
+    lcg: Lcg,
 }
 
 impl LoadBalancer {
@@ -39,11 +41,7 @@ impl LoadBalancer {
 
                 self.targets[target_index].clone()
             }
-            LoadBalancerMode::Random => self
-                .targets
-                .choose(&mut rand::thread_rng())
-                .unwrap()
-                .clone(),
+            LoadBalancerMode::Random => self.targets.choose(&mut self.lcg).unwrap().clone(),
         }
     }
 }
@@ -54,6 +52,7 @@ impl From<&Config> for LoadBalancer {
             targets: config.load_balancer_targets.clone().unwrap(),
             mode: config.load_balancer_mode.clone().unwrap(),
             index: 0,
+            lcg: Lcg::new(),
         }
     }
 }
