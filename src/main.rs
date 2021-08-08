@@ -1,6 +1,5 @@
 mod config;
 mod server;
-mod util;
 
 use config::ServerMode;
 use server::*;

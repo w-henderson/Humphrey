@@ -1,7 +1,7 @@
-use crate::http::date::HTTPDate;
 use crate::http::headers::{RequestHeader, ResponseHeader, ResponseHeaderMap};
 use crate::http::request::Request;
 use crate::http::status::StatusCode;
+use crate::util::date::DateTime;
 use std::collections::btree_map::Entry;
 
 /// Represents a response from the server.
@@ -95,7 +95,7 @@ impl Response {
         match self.headers.entry(ResponseHeader::Date) {
             Entry::Occupied(_) => (),
             Entry::Vacant(v) => {
-                v.insert(HTTPDate::now());
+                v.insert(DateTime::now().to_string());
             }
         }
 
