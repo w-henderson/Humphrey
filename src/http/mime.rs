@@ -1,4 +1,5 @@
 /// Represents a MIME type as used in the `Content-Type` header.
+#[derive(Clone, Copy)]
 pub enum MimeType {
     TextCss,
     TextHtml,

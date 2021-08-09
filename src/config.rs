@@ -16,6 +16,10 @@ pub struct Config {
     pub port: u16,
     /// Routing mode of the server
     pub mode: ServerMode,
+    /// Size limit of the in-memory file cache, measured in bytes
+    pub cache_limit: usize,
+    /// Time limit for cached items
+    pub cache_time_limit: u64,
     /// Root directory to serve files from
     pub directory: Option<String>,
     /// Proxy target address
@@ -55,6 +59,8 @@ impl Default for Config {
             address: "0.0.0.0".into(),
             port: 80,
             mode: ServerMode::Static,
+            cache_limit: 0,
+            cache_time_limit: 0,
             directory: Some(String::new()),
             proxy_target: None,
             load_balancer_targets: None,
@@ -83,23 +89,46 @@ pub fn load_config() -> Result<Config, &'static str> {
                     // The mode was specified
 
                     if mode == "static" {
-                        Ok(Config {
-                            address: hashmap
-                                .get("server.address".into())
-                                .unwrap_or(&"0.0.0.0".into())
-                                .to_string(),
-                            port,
-                            mode: ServerMode::Static,
-                            directory: Some(
-                                hashmap
-                                    .get("static.directory".into())
-                                    .unwrap_or(&String::new())
-                                    .to_string(),
-                            ),
-                            proxy_target: None,
-                            load_balancer_targets: None,
-                            load_balancer_mode: None,
-                        })
+                        if let Ok(cache_limit) = parse_size(
+                            hashmap
+                                .get("static.cache".into())
+                                .unwrap_or(&"0".into())
+                                .as_str(),
+                        ) {
+                            // The cache size limit was specified and valid or was not specified
+
+                            if let Ok(cache_time_limit) = hashmap
+                                .get("static.cache_time".into())
+                                .unwrap_or(&"60".into())
+                                .parse::<u64>()
+                            {
+                                // The cache time limit was specified and valid or was not specified
+
+                                Ok(Config {
+                                    address: hashmap
+                                        .get("server.address".into())
+                                        .unwrap_or(&"0.0.0.0".into())
+                                        .to_string(),
+                                    port,
+                                    mode: ServerMode::Static,
+                                    cache_limit,
+                                    cache_time_limit,
+                                    directory: Some(
+                                        hashmap
+                                            .get("static.directory".into())
+                                            .unwrap_or(&String::new())
+                                            .to_string(),
+                                    ),
+                                    proxy_target: None,
+                                    load_balancer_targets: None,
+                                    load_balancer_mode: None,
+                                })
+                            } else {
+                                Err("Couldn't parse cache time limit")
+                            }
+                        } else {
+                            Err("Couldn't parse cache limit value")
+                        }
                     } else if mode == "proxy" {
                         if let Some(proxy_target) = hashmap.get("proxy.target") {
                             // The proxy target was specified
@@ -111,6 +140,8 @@ pub fn load_config() -> Result<Config, &'static str> {
                                     .to_string(),
                                 port,
                                 mode: ServerMode::Proxy,
+                                cache_limit: 0,
+                                cache_time_limit: 0,
                                 directory: None,
                                 proxy_target: Some(proxy_target.clone()),
                                 load_balancer_targets: None,
@@ -152,6 +183,8 @@ pub fn load_config() -> Result<Config, &'static str> {
                                             .to_string(),
                                         port,
                                         mode: ServerMode::LoadBalancer,
+                                        cache_limit: 0,
+                                        cache_time_limit: 0,
                                         directory: None,
                                         proxy_target: None,
                                         load_balancer_targets: Some(targets),
@@ -244,4 +277,26 @@ fn parse_ini(ini: &str) -> Result<HashMap<String, String>, ()> {
     }
 
     Ok(config)
+}
+
+/// Parses a size string into its corresponding number of bytes.
+/// For example, 4K => 4096, 1M => 1048576.
+/// If no letter is provided at the end, assumes the number to be in bytes.
+fn parse_size(size: &str) -> Result<usize, ()> {
+    if size.len() == 0 {
+        Err(())
+    } else if size.len() == 1 {
+        size.parse::<usize>().map_err(|_| ())
+    } else {
+        let last_char = size.chars().last().unwrap().to_ascii_uppercase();
+        let number: usize = size[0..size.len() - 1].parse().map_err(|_| ())?;
+
+        match last_char {
+            'K' => Ok(number * 1024),
+            'M' => Ok(number * 1024 * 1024),
+            'G' => Ok(number * 1024 * 1024 * 1024),
+            '0'..='9' => size.parse::<usize>().map_err(|_| ()),
+            _ => Err(()),
+        }
+    }
 }
