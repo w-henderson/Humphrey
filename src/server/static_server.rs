@@ -13,6 +13,7 @@ use std::sync::{Arc, RwLock};
 #[derive(Default)]
 struct AppState {
     directory: String,
+    cache_limit: usize,
     cache: RwLock<Cache>,
 }
 
@@ -20,6 +21,7 @@ impl From<&Config> for AppState {
     fn from(config: &Config) -> Self {
         Self {
             directory: config.directory.as_ref().unwrap().clone(),
+            cache_limit: config.cache_limit,
             cache: RwLock::new(Cache::from(config)),
         }
     }
@@ -41,10 +43,8 @@ pub fn main(config: Config) {
 fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
     let full_path = format!("{}{}", state.directory, request.uri);
 
-    let cache = state.cache.read().unwrap();
-    let cache_limit = cache.cache_limit;
-
-    if cache_limit > 0 {
+    if state.cache_limit > 0 {
+        let cache = state.cache.read().unwrap();
         if let Some(cached) = cache.get(&full_path) {
             return Response::new(StatusCode::OK)
                 .with_header(ResponseHeader::ContentType, cached.mime_type.into())
@@ -52,9 +52,8 @@ fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
                 .with_request_compatibility(request)
                 .with_generated_headers();
         }
+        drop(cache);
     }
-
-    drop(cache);
 
     if let Some(mut located) = try_open_path(&full_path) {
         if located.was_redirected && request.uri.chars().last() != Some('/') {
@@ -73,7 +72,7 @@ fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
         let mut contents: Vec<u8> = Vec::new();
         located.file.read_to_end(&mut contents).unwrap();
 
-        if cache_limit >= contents.len() {
+        if state.cache_limit >= contents.len() {
             let mut cache = state.cache.write().unwrap();
             cache.set(&full_path, contents.clone(), mime_type);
         }
