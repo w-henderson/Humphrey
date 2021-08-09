@@ -1,9 +1,5 @@
 use std::collections::BTreeMap;
 
-pub trait Header {
-    fn default(&self) -> Option<&str>;
-}
-
 /// Alias for a map of request headers and their values.
 pub type RequestHeaderMap = BTreeMap<RequestHeader, String>;
 
@@ -41,7 +37,7 @@ pub enum RequestHeader {
 }
 
 /// Represents a header sent in a response.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ResponseHeader {
     AccessControlAllowOrigin,
     Age,
@@ -67,6 +63,22 @@ pub enum ResponseHeader {
     Warning,
 
     Custom { name: String },
+}
+
+impl PartialOrd for ResponseHeader {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self.category() != other.category() {
+            self.category().partial_cmp(&other.category())
+        } else {
+            self.to_string().partial_cmp(&other.to_string())
+        }
+    }
+}
+
+impl Ord for ResponseHeader {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
 }
 
 impl From<&str> for RequestHeader {
@@ -98,21 +110,6 @@ impl From<&str> for RequestHeader {
             custom => Self::Custom {
                 name: custom.to_string(),
             },
-        }
-    }
-}
-
-impl Header for RequestHeader {
-    fn default(&self) -> Option<&str> {
-        match self {
-            Self::Accept => Some("text/html"),
-            Self::AcceptCharset => Some("utf-8"),
-            Self::AcceptEncoding => Some("identity"),
-            Self::AcceptLanguage => Some("en-GB"),
-            Self::CacheControl => Some("no-cache"),
-            Self::Connection => Some("close"),
-            Self::ContentEncoding => Some("identity"),
-            _ => None,
         }
     }
 }
@@ -149,14 +146,14 @@ impl From<&str> for ResponseHeader {
     }
 }
 
-impl From<ResponseHeader> for String {
-    fn from(header: ResponseHeader) -> Self {
-        match header {
-            ResponseHeader::Custom { name } => return name,
+impl ToString for ResponseHeader {
+    fn to_string(&self) -> String {
+        match self {
+            ResponseHeader::Custom { name } => return name.clone(),
             _ => (),
         }
 
-        match header {
+        match self {
             ResponseHeader::AccessControlAllowOrigin => "Access-Control-Allow-Origin",
             ResponseHeader::Age => "Age",
             ResponseHeader::Allow => "Allow",
@@ -185,15 +182,42 @@ impl From<ResponseHeader> for String {
     }
 }
 
-impl Header for ResponseHeader {
-    fn default(&self) -> Option<&str> {
+/// Represents a category of headers, as defined in [RFC 2616, section 4.2](https://datatracker.ietf.org/doc/html/rfc2616#section-4.2).
+/// Used for ordering headers in responses.
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum HeaderCategory {
+    General,
+    Response,
+    Entity,
+    Other,
+}
+
+impl ResponseHeader {
+    fn category(&self) -> HeaderCategory {
         match self {
-            ResponseHeader::CacheControl => Some("max-age=3600"),
-            ResponseHeader::Connection => Some("close"),
-            ResponseHeader::ContentEncoding => Some("identity"),
-            ResponseHeader::ContentLanguage => Some("en-GB"),
-            ResponseHeader::ContentType => Some("text/html"),
-            _ => None,
+            ResponseHeader::AccessControlAllowOrigin => HeaderCategory::Other,
+            ResponseHeader::Age => HeaderCategory::Response,
+            ResponseHeader::Allow => HeaderCategory::Entity,
+            ResponseHeader::CacheControl => HeaderCategory::General,
+            ResponseHeader::Connection => HeaderCategory::General,
+            ResponseHeader::ContentDisposition => HeaderCategory::Entity,
+            ResponseHeader::ContentEncoding => HeaderCategory::Entity,
+            ResponseHeader::ContentLanguage => HeaderCategory::Entity,
+            ResponseHeader::ContentLength => HeaderCategory::Entity,
+            ResponseHeader::ContentLocation => HeaderCategory::Entity,
+            ResponseHeader::ContentType => HeaderCategory::Entity,
+            ResponseHeader::Date => HeaderCategory::General,
+            ResponseHeader::ETag => HeaderCategory::Response,
+            ResponseHeader::Expires => HeaderCategory::Entity,
+            ResponseHeader::LastModified => HeaderCategory::Entity,
+            ResponseHeader::Link => HeaderCategory::Other,
+            ResponseHeader::Location => HeaderCategory::Response,
+            ResponseHeader::Pragma => HeaderCategory::General,
+            ResponseHeader::Server => HeaderCategory::Response,
+            ResponseHeader::SetCookie => HeaderCategory::Other,
+            ResponseHeader::Via => HeaderCategory::General,
+            ResponseHeader::Warning => HeaderCategory::General,
+            ResponseHeader::Custom { name: _ } => HeaderCategory::Other,
         }
     }
 }

@@ -138,7 +138,7 @@ impl Into<Vec<u8>> for Response {
 
         for (header, value) in self.headers {
             bytes.extend(b"\r\n");
-            bytes.extend(String::from(header).as_bytes());
+            bytes.extend(header.to_string().as_bytes());
             bytes.extend(b": ");
             bytes.extend(value.as_bytes());
         }
