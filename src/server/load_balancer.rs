@@ -1,9 +1,9 @@
 use humphrey::app::{App, ErrorHandler};
 use humphrey::route::RouteHandler;
-use humphrey::util::rand::{Choose, Lcg};
 
 use crate::config::{Config, LoadBalancerMode};
 use crate::proxy::pipe;
+use crate::server::rand::{Choose, Lcg};
 
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};

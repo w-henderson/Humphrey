@@ -1,7 +1,7 @@
+use crate::http::date::DateTime;
 use crate::http::headers::{RequestHeader, ResponseHeader, ResponseHeaderMap};
 use crate::http::request::Request;
 use crate::http::status::StatusCode;
-use crate::util::date::DateTime;
 use std::collections::btree_map::Entry;
 
 /// Represents a response from the server.

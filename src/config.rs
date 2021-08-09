@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::env::args;
 use std::fs::File;
 use std::io::Read;
+use std::str::FromStr;
 
 use humphrey::krauss::wildcard_match;
 
@@ -9,7 +10,7 @@ use humphrey::krauss::wildcard_match;
 mod tests;
 
 /// Stores the server configuration.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Config {
     /// Address to host the server on
     pub address: String,
@@ -17,6 +18,10 @@ pub struct Config {
     pub port: u16,
     /// Routing mode of the server
     pub mode: ServerMode,
+    /// Log level of the server
+    pub log_level: LogLevel,
+    /// Logging output file
+    pub log_file: Option<String>,
     /// Size limit of the in-memory file cache, measured in bytes
     pub cache_limit: usize,
     /// Time limit for cached items
@@ -32,7 +37,7 @@ pub struct Config {
 }
 
 // Represents a hosting mode.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ServerMode {
     /// Host static content from a directory
     Static,
@@ -43,15 +48,40 @@ pub enum ServerMode {
 }
 
 /// Represents an algorithm for load balancing.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LoadBalancerMode {
+    /// Evenly distributes load in a repeating pattern
     RoundRobin,
+    /// Randomly distributes load
     Random,
+}
+
+/// Represents a log level.
+#[derive(Debug, PartialEq, Eq)]
+pub enum LogLevel {
+    Error,
+    Warn,
+    Info,
+    Debug,
 }
 
 impl Default for LoadBalancerMode {
     fn default() -> Self {
         Self::RoundRobin
+    }
+}
+
+impl FromStr for LogLevel {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "error" => Ok(Self::Error),
+            "warn" => Ok(Self::Warn),
+            "info" => Ok(Self::Info),
+            "debug" => Ok(Self::Debug),
+            _ => Err("Log level was invalid"),
+        }
     }
 }
 
@@ -61,6 +91,8 @@ impl Default for Config {
             address: "0.0.0.0".into(),
             port: 80,
             mode: ServerMode::Static,
+            log_level: LogLevel::Warn,
+            log_file: None,
             cache_limit: 0,
             cache_time_limit: 0,
             directory: Some(String::new()),
@@ -73,9 +105,16 @@ impl Default for Config {
 
 /// Locates, parses and returns the server configuration.
 /// Returns `Err` if any part of this process fails.
-pub fn load_config() -> Result<Config, &'static str> {
+pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str> {
     // Load and parse the configuration
-    let config = read_config().map_err(|_| "The configuration file could not be found")?;
+    let config = if config_string.is_some() {
+        config_string.unwrap()
+    } else if let Ok(config) = read_config() {
+        config
+    } else {
+        return Err("The configuration file could not be found");
+    };
+
     let hashmap = parse_ini(&config).map_err(|_| "The configuration file could not be parsed")?;
     let mode = hashmap
         .get("server.mode".into())
@@ -91,6 +130,13 @@ pub fn load_config() -> Result<Config, &'static str> {
         .unwrap_or(&"80".into())
         .parse::<u16>()
         .map_err(|_| "The specified port was invalid")?;
+
+    // Get logging configuration
+    let log_level = hashmap
+        .get("log.level".into())
+        .unwrap_or(&"warn".into())
+        .parse::<LogLevel>()?;
+    let log_file = hashmap.get("log.file".into()).map(|s| s.clone());
 
     match mode.as_str() {
         "static" => {
@@ -116,6 +162,8 @@ pub fn load_config() -> Result<Config, &'static str> {
                 address,
                 port,
                 mode: ServerMode::Static,
+                log_level,
+                log_file,
                 cache_limit: cache_size_limit,
                 cache_time_limit,
                 directory: Some(directory),
@@ -133,6 +181,8 @@ pub fn load_config() -> Result<Config, &'static str> {
                 address,
                 port,
                 mode: ServerMode::Proxy,
+                log_level,
+                log_file,
                 cache_limit: 0,
                 cache_time_limit: 0,
                 directory: None,
@@ -177,6 +227,8 @@ pub fn load_config() -> Result<Config, &'static str> {
                 address,
                 port,
                 mode: ServerMode::LoadBalancer,
+                log_level,
+                log_file,
                 cache_limit: 0,
                 cache_time_limit: 0,
                 directory: None,

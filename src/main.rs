@@ -5,7 +5,7 @@ use config::ServerMode;
 use server::*;
 
 fn main() {
-    match config::load_config() {
+    match config::load_config(None) {
         Ok(config) => match config.mode {
             ServerMode::Static => static_server::main(config),
             ServerMode::Proxy => proxy::main(config),

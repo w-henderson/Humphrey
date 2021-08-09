@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-use crate::util::date::DateTime;
+use crate::http::date::DateTime;
 
 #[test]
 fn test_date_from_timestamp() {
