@@ -17,14 +17,14 @@ const MARCH_01_2000: i64 = 951868800;
 
 /// Represents a date and time.
 pub struct DateTime {
-    timestamp: i64,
-    year: u16,
-    month: u8,
-    day: u8,
-    weekday: u8,
-    hour: u8,
-    minute: u8,
-    second: u8,
+    pub timestamp: i64,
+    pub year: u16,
+    pub month: u8,
+    pub day: u8,
+    pub weekday: u8,
+    pub hour: u8,
+    pub minute: u8,
+    pub second: u8,
 }
 
 impl DateTime {

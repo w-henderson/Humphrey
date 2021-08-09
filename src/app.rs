@@ -150,6 +150,12 @@ where
         self.connection_handler = handler;
         self
     }
+
+    /// Gets a reference to the app's state.
+    /// This should only be used in the main thread, as the state is passed to request handlers otherwise.
+    pub fn get_state(&self) -> &Arc<State> {
+        &self.state
+    }
 }
 
 /// Handles a connection with a client.

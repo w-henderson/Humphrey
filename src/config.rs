@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::env::args;
 use std::fs::File;
 use std::io::Read;
-use std::str::FromStr;
 
+use crate::logger::LogLevel;
 use humphrey::krauss::wildcard_match;
 
 #[path = "tests/config.rs"]
@@ -56,32 +56,9 @@ pub enum LoadBalancerMode {
     Random,
 }
 
-/// Represents a log level.
-#[derive(Debug, PartialEq, Eq)]
-pub enum LogLevel {
-    Error,
-    Warn,
-    Info,
-    Debug,
-}
-
 impl Default for LoadBalancerMode {
     fn default() -> Self {
         Self::RoundRobin
-    }
-}
-
-impl FromStr for LogLevel {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_ascii_lowercase().as_str() {
-            "error" => Ok(Self::Error),
-            "warn" => Ok(Self::Warn),
-            "info" => Ok(Self::Info),
-            "debug" => Ok(Self::Debug),
-            _ => Err("Log level was invalid"),
-        }
     }
 }
 

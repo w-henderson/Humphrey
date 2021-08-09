@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
-use crate::config::{load_config, parse_ini, Config, LogLevel, ServerMode};
+use crate::config::{load_config, parse_ini, Config, ServerMode};
+use crate::logger::LogLevel;
 use std::collections::HashMap;
 
 #[test]
