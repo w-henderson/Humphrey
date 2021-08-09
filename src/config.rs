@@ -9,6 +9,7 @@ use humphrey::krauss::wildcard_match;
 mod tests;
 
 /// Stores the server configuration.
+#[derive(Debug)]
 pub struct Config {
     /// Address to host the server on
     pub address: String,
@@ -31,6 +32,7 @@ pub struct Config {
 }
 
 // Represents a hosting mode.
+#[derive(Debug)]
 pub enum ServerMode {
     /// Host static content from a directory
     Static,
@@ -41,7 +43,7 @@ pub enum ServerMode {
 }
 
 /// Represents an algorithm for load balancing.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum LoadBalancerMode {
     RoundRobin,
     Random,
@@ -72,147 +74,118 @@ impl Default for Config {
 /// Locates, parses and returns the server configuration.
 /// Returns `Err` if any part of this process fails.
 pub fn load_config() -> Result<Config, &'static str> {
-    if let Ok(config_string) = read_config() {
-        // The configuration was read successfully
+    // Load and parse the configuration
+    let config = read_config().map_err(|_| "The configuration file could not be found")?;
+    let hashmap = parse_ini(&config).map_err(|_| "The configuration file could not be parsed")?;
+    let mode = hashmap
+        .get("server.mode".into())
+        .map_or(Err("The mode was not specified"), |s| Ok(s))?;
 
-        if let Ok(hashmap) = parse_ini(&config_string) {
-            // The configuration was parsed successfully
+    // Get and validate the specified address and port
+    let address = hashmap
+        .get("server.address".into())
+        .unwrap_or(&"0.0.0.0".into())
+        .to_string();
+    let port = hashmap
+        .get("server.port".into())
+        .unwrap_or(&"80".into())
+        .parse::<u16>()
+        .map_err(|_| "The specified port was invalid")?;
 
-            if let Ok(port) = hashmap
-                .get("server.port".into())
-                .unwrap_or(&"80".into())
-                .parse::<u16>()
-            {
-                // The port was a valid `u16` number
+    match mode.as_str() {
+        "static" => {
+            // Get and parse the cache size limit
+            let cache_size_limit = hashmap
+                .get("static.cache".into())
+                .map_or("0".into(), |s| s.clone());
+            let cache_size_limit = parse_size(cache_size_limit.clone())?;
 
-                if let Some(mode) = hashmap.get("server.mode".into()) {
-                    // The mode was specified
+            // Get and parse the cache time limit
+            let cache_time_limit = hashmap
+                .get("static.cache_time".into())
+                .unwrap_or(&"60".into())
+                .parse::<u64>()
+                .map_err(|_| "The specified cache time limit was invalid")?;
 
-                    if mode == "static" {
-                        if let Ok(cache_limit) = parse_size(
-                            hashmap
-                                .get("static.cache".into())
-                                .unwrap_or(&"0".into())
-                                .as_str(),
-                        ) {
-                            // The cache size limit was specified and valid or was not specified
+            let directory = hashmap
+                .get("static.directory".into())
+                .unwrap_or(&String::new())
+                .to_string();
 
-                            if let Ok(cache_time_limit) = hashmap
-                                .get("static.cache_time".into())
-                                .unwrap_or(&"60".into())
-                                .parse::<u64>()
-                            {
-                                // The cache time limit was specified and valid or was not specified
-
-                                Ok(Config {
-                                    address: hashmap
-                                        .get("server.address".into())
-                                        .unwrap_or(&"0.0.0.0".into())
-                                        .to_string(),
-                                    port,
-                                    mode: ServerMode::Static,
-                                    cache_limit,
-                                    cache_time_limit,
-                                    directory: Some(
-                                        hashmap
-                                            .get("static.directory".into())
-                                            .unwrap_or(&String::new())
-                                            .to_string(),
-                                    ),
-                                    proxy_target: None,
-                                    load_balancer_targets: None,
-                                    load_balancer_mode: None,
-                                })
-                            } else {
-                                Err("Couldn't parse cache time limit")
-                            }
-                        } else {
-                            Err("Couldn't parse cache limit value")
-                        }
-                    } else if mode == "proxy" {
-                        if let Some(proxy_target) = hashmap.get("proxy.target") {
-                            // The proxy target was specified
-
-                            Ok(Config {
-                                address: hashmap
-                                    .get("server.address".into())
-                                    .unwrap_or(&"0.0.0.0".into())
-                                    .to_string(),
-                                port,
-                                mode: ServerMode::Proxy,
-                                cache_limit: 0,
-                                cache_time_limit: 0,
-                                directory: None,
-                                proxy_target: Some(proxy_target.clone()),
-                                load_balancer_targets: None,
-                                load_balancer_mode: None,
-                            })
-                        } else {
-                            Err("The proxy target was not specified")
-                        }
-                    } else if mode == "load_balancer" {
-                        if let Some(targets_file) = hashmap.get("load_balancer.targets") {
-                            // The load balancer targets file was specified
-
-                            if let Ok(mut targets_file) = File::open(targets_file) {
-                                // The load balancer targets file was successfully opened
-
-                                let mut buf = String::new();
-                                if let Ok(_) = targets_file.read_to_string(&mut buf) {
-                                    // The load balancer targets file was successfully read
-
-                                    let load_balancer_mode = hashmap
-                                        .get("load_balancer.mode".into())
-                                        .unwrap_or(&"round-robin".into())
-                                        .to_string();
-
-                                    // Parse the load balancer mode
-                                    let load_balancer_mode = match load_balancer_mode.as_str() {
-                                        "round-robin" => LoadBalancerMode::RoundRobin,
-                                        "random" => LoadBalancerMode::Random,
-                                        _ => return Err("The load balancer mode was invalid"),
-                                    };
-
-                                    let targets: Vec<String> =
-                                        buf.lines().map(|s| s.to_string()).collect();
-
-                                    Ok(Config {
-                                        address: hashmap
-                                            .get("server.address".into())
-                                            .unwrap_or(&"0.0.0.0".into())
-                                            .to_string(),
-                                        port,
-                                        mode: ServerMode::LoadBalancer,
-                                        cache_limit: 0,
-                                        cache_time_limit: 0,
-                                        directory: None,
-                                        proxy_target: None,
-                                        load_balancer_targets: Some(targets),
-                                        load_balancer_mode: Some(load_balancer_mode),
-                                    })
-                                } else {
-                                    Err("The load balancer targets file could not be read")
-                                }
-                            } else {
-                                Err("The load balancer targets file could not be opened")
-                            }
-                        } else {
-                            Err("The load balancer targets file was not specified")
-                        }
-                    } else {
-                        Err("The server mode was invalid")
-                    }
-                } else {
-                    Err("The server mode was not specified")
-                }
-            } else {
-                Err("The server port is invalid")
-            }
-        } else {
-            Err("The configuration file could not be parsed")
+            Ok(Config {
+                address,
+                port,
+                mode: ServerMode::Static,
+                cache_limit: cache_size_limit,
+                cache_time_limit,
+                directory: Some(directory),
+                proxy_target: None,
+                load_balancer_targets: None,
+                load_balancer_mode: None,
+            })
         }
-    } else {
-        Err("The configuration file could not be found")
+        "proxy" => {
+            let proxy_target = hashmap
+                .get("proxy.target")
+                .map_or(Err("The proxy target was not specified"), |s| Ok(s.clone()))?;
+
+            Ok(Config {
+                address,
+                port,
+                mode: ServerMode::Proxy,
+                cache_limit: 0,
+                cache_time_limit: 0,
+                directory: None,
+                proxy_target: Some(proxy_target.clone()),
+                load_balancer_targets: None,
+                load_balancer_mode: None,
+            })
+        }
+        "load_balancer" => {
+            // Try to get the path to the targets file
+            let targets_file = hashmap.get("load_balancer.targets").map_or(
+                Err("The load balancer targets file was not specified"),
+                |s| Ok(s),
+            )?;
+
+            // Try to open the targets file
+            let mut targets_file = File::open(targets_file)
+                .map_err(|_| "The load balancer targets file could not be opened")?;
+
+            // Try to read the targets file
+            let mut buf = String::new();
+            targets_file
+                .read_to_string(&mut buf)
+                .map_err(|_| "The load balancer targets file could not be read")?;
+
+            // Read the load balancer mode
+            let load_balancer_mode = hashmap
+                .get("load_balancer.mode".into())
+                .unwrap_or(&"round-robin".into())
+                .to_string();
+
+            // Parse the load balancer mode
+            let load_balancer_mode = match load_balancer_mode.as_str() {
+                "round-robin" => LoadBalancerMode::RoundRobin,
+                "random" => LoadBalancerMode::Random,
+                _ => return Err("The load balancer mode was invalid"),
+            };
+
+            let targets: Vec<String> = buf.lines().map(|s| s.to_string()).collect();
+
+            Ok(Config {
+                address,
+                port,
+                mode: ServerMode::LoadBalancer,
+                cache_limit: 0,
+                cache_time_limit: 0,
+                directory: None,
+                proxy_target: None,
+                load_balancer_targets: Some(targets),
+                load_balancer_mode: Some(load_balancer_mode),
+            })
+        }
+        _ => Err("The server mode was invalid"),
     }
 }
 
@@ -282,21 +255,26 @@ fn parse_ini(ini: &str) -> Result<HashMap<String, String>, ()> {
 /// Parses a size string into its corresponding number of bytes.
 /// For example, 4K => 4096, 1M => 1048576.
 /// If no letter is provided at the end, assumes the number to be in bytes.
-fn parse_size(size: &str) -> Result<usize, ()> {
+fn parse_size(size: String) -> Result<usize, &'static str> {
     if size.len() == 0 {
-        Err(())
+        Err("The specified size was invalid")
     } else if size.len() == 1 {
-        size.parse::<usize>().map_err(|_| ())
+        size.parse::<usize>()
+            .map_err(|_| "The specified size was invalid")
     } else {
         let last_char = size.chars().last().unwrap().to_ascii_uppercase();
-        let number: usize = size[0..size.len() - 1].parse().map_err(|_| ())?;
+        let number: usize = size[0..size.len() - 1]
+            .parse()
+            .map_err(|_| "The specified size was invalid")?;
 
         match last_char {
             'K' => Ok(number * 1024),
             'M' => Ok(number * 1024 * 1024),
             'G' => Ok(number * 1024 * 1024 * 1024),
-            '0'..='9' => size.parse::<usize>().map_err(|_| ()),
-            _ => Err(()),
+            '0'..='9' => size
+                .parse::<usize>()
+                .map_err(|_| "The specified size was invalid"),
+            _ => Err("The specified size was invalid"),
         }
     }
 }
