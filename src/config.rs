@@ -20,6 +20,8 @@ pub struct Config {
     pub mode: ServerMode,
     /// Log level of the server
     pub log_level: LogLevel,
+    /// Whether to log to the console
+    pub log_console: bool,
     /// Logging output file
     pub log_file: Option<String>,
     /// Size limit of the in-memory file cache, measured in bytes
@@ -69,6 +71,7 @@ impl Default for Config {
             port: 80,
             mode: ServerMode::Static,
             log_level: LogLevel::Warn,
+            log_console: true,
             log_file: None,
             cache_limit: 0,
             cache_time_limit: 0,
@@ -114,6 +117,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
         .unwrap_or(&"warn".into())
         .parse::<LogLevel>()?;
     let log_file = hashmap.get("log.file".into()).map(|s| s.clone());
+    let log_console = hashmap.get("log.console".into()) != Some(&String::from("false"));
 
     match mode.as_str() {
         "static" => {
@@ -140,6 +144,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 port,
                 mode: ServerMode::Static,
                 log_level,
+                log_console,
                 log_file,
                 cache_limit: cache_size_limit,
                 cache_time_limit,
@@ -159,6 +164,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 port,
                 mode: ServerMode::Proxy,
                 log_level,
+                log_console,
                 log_file,
                 cache_limit: 0,
                 cache_time_limit: 0,
@@ -205,6 +211,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 port,
                 mode: ServerMode::LoadBalancer,
                 log_level,
+                log_console,
                 log_file,
                 cache_limit: 0,
                 cache_time_limit: 0,

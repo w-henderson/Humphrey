@@ -30,6 +30,7 @@ mode = "static"            ; server routing mode
 
 [log]
 level = "info"
+console = false
 file = "humphrey.log"
 
 [static]
@@ -43,6 +44,7 @@ cache_time = 60"#;
         port: 8000,
         mode: ServerMode::Static,
         log_level: LogLevel::Info,
+        log_console: false,
         log_file: Some("humphrey.log".into()),
         cache_limit: 128 * 1024 * 1024,
         cache_time_limit: 60,

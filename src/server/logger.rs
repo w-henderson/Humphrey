@@ -9,6 +9,7 @@ use humphrey::http::date::DateTime;
 /// Encapsulates logging methods and configuration.
 pub struct Logger {
     level: LogLevel,
+    console: bool,
     file: Option<Mutex<File>>,
 }
 
@@ -29,6 +30,7 @@ impl From<&Config> for Logger {
 
         Self {
             level: config.log_level.clone(),
+            console: config.log_console,
             file,
         }
     }
@@ -38,6 +40,7 @@ impl Default for Logger {
     fn default() -> Self {
         Self {
             level: LogLevel::Warn,
+            console: true,
             file: None,
         }
     }
@@ -47,7 +50,7 @@ impl Logger {
     /// Logs an error message.
     pub fn error(&self, message: &str) {
         let string = format!("{} [ERROR] {}", self.time_format(), message);
-        println!("{}", string);
+        self.log_to_console(&string);
         self.log_to_file(&string);
     }
 
@@ -55,7 +58,7 @@ impl Logger {
     pub fn warn(&self, message: &str) {
         if self.level >= LogLevel::Warn {
             let string = format!("{} [WARN]  {}", self.time_format(), message);
-            println!("{}", string);
+            self.log_to_console(&string);
             self.log_to_file(&string);
         }
     }
@@ -64,7 +67,7 @@ impl Logger {
     pub fn info(&self, message: &str) {
         if self.level >= LogLevel::Info {
             let string = format!("{} [INFO]  {}", self.time_format(), message);
-            println!("{}", string);
+            self.log_to_console(&string);
             self.log_to_file(&string);
         }
     }
@@ -73,7 +76,7 @@ impl Logger {
     pub fn debug(&self, message: &str) {
         if self.level == LogLevel::Debug {
             let string = format!("{} [DEBUG] {}", self.time_format(), message);
-            println!("{}", string);
+            self.log_to_console(&string);
             self.log_to_file(&string);
         }
     }
@@ -89,6 +92,12 @@ impl Logger {
             time.minute,
             time.second
         )
+    }
+
+    fn log_to_console(&self, string: &str) {
+        if self.console {
+            println!("{}", string);
+        }
     }
 
     fn log_to_file(&self, string: &str) {
