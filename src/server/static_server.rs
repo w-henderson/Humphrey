@@ -11,6 +11,8 @@ use crate::route::try_open_path;
 use std::io::Read;
 use std::sync::{Arc, RwLock};
 
+/// Represents the application state.
+/// Includes the target directory, cache state, and the logger.
 #[derive(Default)]
 struct AppState {
     directory: String,

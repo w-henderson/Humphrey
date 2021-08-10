@@ -10,6 +10,8 @@ use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use std::thread::spawn;
 
+/// Represents the load balancer application state.
+/// Includes the load balancer instance as well as the logger.
 #[derive(Default)]
 struct AppState {
     load_balancer: Mutex<LoadBalancer>,
@@ -55,6 +57,7 @@ struct LoadBalancer {
 }
 
 impl LoadBalancer {
+    /// Selects a target according to the load balancer mode.
     pub fn select_target(&mut self) -> String {
         match self.mode {
             LoadBalancerMode::RoundRobin => {
@@ -90,11 +93,13 @@ fn handler(
     _: Arc<ErrorHandler>,
     state: Arc<AppState>,
 ) {
+    // Gets a load balancer target using the thread-safe `Mutex`
     let mut load_balancer_lock = state.load_balancer.lock().unwrap();
     let target = load_balancer_lock.select_target();
     drop(load_balancer_lock);
 
     if let Ok(mut destination) = TcpStream::connect(&target) {
+        // Logs the connection's success
         let address = source.peer_addr().unwrap().to_string();
         state
             .logger
@@ -103,9 +108,11 @@ fn handler(
         let mut source_clone = source.try_clone().unwrap();
         let mut destination_clone = destination.try_clone().unwrap();
 
+        // Pipe data in both directions
         let forward = spawn(move || pipe(&mut source, &mut destination));
         let backward = spawn(move || pipe(&mut destination_clone, &mut source_clone));
 
+        // Log any errors
         if let Err(_) = forward.join().unwrap() {
             state.logger.error(&format!(
                 "{}: Error proxying data from client to target, connection closed",

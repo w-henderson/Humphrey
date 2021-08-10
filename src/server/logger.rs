@@ -16,6 +16,7 @@ pub struct Logger {
 impl From<&Config> for Logger {
     fn from(config: &Config) -> Self {
         let file = if let Some(path) = &config.log_file {
+            // If the log file can be opened, wrap it in a `Mutex`
             Some(Mutex::new(
                 OpenOptions::new()
                     .write(true)
@@ -25,6 +26,7 @@ impl From<&Config> for Logger {
                     .unwrap(),
             ))
         } else {
+            // Otherwise don't log to a file
             None
         };
 
@@ -81,6 +83,7 @@ impl Logger {
         }
     }
 
+    /// Formats the current time into the format `YYYY-MM-DD HH:MM:SS`
     fn time_format(&self) -> String {
         let time = DateTime::now();
         format!(
@@ -94,12 +97,14 @@ impl Logger {
         )
     }
 
+    /// Logs the string to the console, if the logging configuration allows it
     fn log_to_console(&self, string: &str) {
         if self.console {
             println!("{}", string);
         }
     }
 
+    /// Logs the string to the log file, if the logging configuration allows it
     fn log_to_file(&self, string: &str) {
         if let Some(file_mutex) = &self.file {
             let mut file = file_mutex.lock().unwrap();
@@ -112,9 +117,13 @@ impl Logger {
 /// Represents a log level.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LogLevel {
+    /// Only errors will be logged
     Error,
+    /// Errors and warnings will be logged
     Warn,
+    /// Errors, warnings and general information will be logged
     Info,
+    /// Everything, including debug information, will be logged
     Debug,
 }
 

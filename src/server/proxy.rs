@@ -9,6 +9,8 @@ use std::net::{Shutdown, TcpStream};
 use std::sync::Arc;
 use std::thread::spawn;
 
+/// Represents the application state.
+/// Includes the proxy target and the logger.
 #[derive(Default)]
 struct AppState {
     target: String,
@@ -53,16 +55,20 @@ fn handler(
     state: Arc<AppState>,
 ) {
     let address = source.peer_addr().unwrap().to_string();
+
     if let Ok(mut destination) = TcpStream::connect(&*state.target) {
+        // The target was successfully connected to
         let mut source_clone = source.try_clone().unwrap();
         let mut destination_clone = destination.try_clone().unwrap();
         state
             .logger
             .info(&format!("{}: Connected, proxying data", &address));
 
+        // Pipe data in both directions
         let forward = spawn(move || pipe(&mut source, &mut destination));
         let backward = spawn(move || pipe(&mut destination_clone, &mut source_clone));
 
+        // Log any errors
         if let Err(_) = forward.join().unwrap() {
             state.logger.error(&format!(
                 "{}: Error proxying data from client to target, connection closed",
