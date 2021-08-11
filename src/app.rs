@@ -168,7 +168,8 @@ fn client_handler<State>(
     state: Arc<State>,
 ) {
     loop {
-        let request = Request::from_stream(&mut stream);
+        let addr = stream.peer_addr().unwrap();
+        let request = Request::from_stream(&mut stream, addr);
         let cloned_state = state.clone();
 
         if match &request {

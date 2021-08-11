@@ -2,6 +2,7 @@ use crate::http::headers::{RequestHeader, RequestHeaderMap};
 use crate::http::method::Method;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read};
+use std::net::SocketAddr;
 
 /// Represents a request to the server.
 /// Contains parsed information about the request's data.
@@ -17,6 +18,8 @@ pub struct Request {
     pub headers: RequestHeaderMap,
     /// The request body, if supplied.
     pub content: Option<Vec<u8>>,
+    /// The address from which the request came
+    pub address: SocketAddr,
 }
 
 /// An error which occurred during the parsing of a request.
@@ -38,7 +41,10 @@ impl Error for RequestError {}
 
 impl Request {
     /// Attempts to read and parse one HTTP request from the given stream.
-    pub fn from_stream(stream: &mut impl Read) -> Result<Self, RequestError> {
+    pub fn from_stream<T>(stream: &mut T, address: SocketAddr) -> Result<Self, RequestError>
+    where
+        T: Read,
+    {
         let mut reader = BufReader::new(stream);
         let mut start_line_buf: Vec<u8> = Vec::new();
         reader
@@ -91,6 +97,7 @@ impl Request {
                 version,
                 headers,
                 content: Some(content_buf),
+                address,
             })
         } else {
             Ok(Self {
@@ -99,6 +106,7 @@ impl Request {
                 version,
                 headers,
                 content: None,
+                address,
             })
         }
     }

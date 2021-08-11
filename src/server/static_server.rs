@@ -56,9 +56,10 @@ fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
     if state.cache_limit > 0 {
         let cache = state.cache.read().unwrap();
         if let Some(cached) = cache.get(&full_path) {
-            state
-                .logger
-                .info(&format!("200 OK (cached) {}", request.uri));
+            state.logger.info(&format!(
+                "{}: 200 OK (cached) {}",
+                request.address, request.uri
+            ));
             return Response::new(StatusCode::OK)
                 .with_header(ResponseHeader::ContentType, cached.mime_type.into())
                 .with_bytes(cached.data.clone())
@@ -70,9 +71,10 @@ fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
 
     if let Some(mut located) = try_open_path(&full_path) {
         if located.was_redirected && request.uri.chars().last() != Some('/') {
-            state
-                .logger
-                .info(&format!("302 Moved Permanently {}", request.uri));
+            state.logger.info(&format!(
+                "{}: 302 Moved Permanently {}",
+                request.address, request.uri
+            ));
             return Response::new(StatusCode::MovedPermanently)
                 .with_header(ResponseHeader::Location, format!("{}/", &request.uri))
                 .with_request_compatibility(request)
@@ -98,14 +100,19 @@ fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
                 .warn(&format!("Couldn't cache, cache too small {}", request.uri));
         }
 
-        state.logger.info(&format!("200 OK {}", request.uri));
+        state
+            .logger
+            .info(&format!("{}: 200 OK {}", request.address, request.uri));
         Response::new(StatusCode::OK)
             .with_header(ResponseHeader::ContentType, mime_type.into())
             .with_bytes(contents)
             .with_request_compatibility(request)
             .with_generated_headers()
     } else {
-        state.logger.warn(&format!("404 Not Found {}", request.uri));
+        state.logger.warn(&format!(
+            "{}: 404 Not Found {}",
+            request.address, request.uri
+        ));
         Response::new(StatusCode::NotFound)
             .with_header(ResponseHeader::ContentType, "text/html".into())
             .with_bytes(b"<h1>404 Not Found</h1>".to_vec())
