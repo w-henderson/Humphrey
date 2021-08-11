@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs::{metadata, File};
 
 pub struct LocatedPath {
     pub file: File,
@@ -24,11 +24,15 @@ pub fn try_open_path(path: &str) -> Option<LocatedPath> {
     };
 
     for (index, path) in paths.iter().enumerate() {
-        if let Ok(file) = File::open(path) {
-            return Some(LocatedPath {
-                file,
-                was_redirected: index != 0,
-            });
+        if let Ok(meta) = metadata(path) {
+            if meta.is_file() {
+                if let Ok(file) = File::open(path) {
+                    return Some(LocatedPath {
+                        file,
+                        was_redirected: index != 0,
+                    });
+                }
+            }
         }
     }
 
