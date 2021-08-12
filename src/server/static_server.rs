@@ -18,6 +18,7 @@ struct AppState {
     directory: String,
     cache_limit: usize,
     cache: RwLock<Cache>,
+    blacklist: Vec<String>,
     logger: Logger,
 }
 
@@ -27,6 +28,7 @@ impl From<&Config> for AppState {
             directory: config.directory.as_ref().unwrap().clone(),
             cache_limit: config.cache_limit,
             cache: RwLock::new(Cache::from(config)),
+            blacklist: config.blacklist.clone(),
             logger: Logger::from(config),
         }
     }
@@ -51,6 +53,19 @@ pub fn main(config: Config) {
 /// Request handler for every request.
 /// Attempts to open a given file relative to the binary and returns error 404 if not found.
 fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
+    // Return error 403 if the address was blacklisted
+    if state.blacklist.contains(&request.address.ip().to_string()) {
+        state.logger.warn(&format!(
+            "{}: Blacklisted IP attempted to request {}",
+            request.address, request.uri
+        ));
+        return Response::new(StatusCode::Forbidden)
+            .with_header(ResponseHeader::ContentType, "text/html".into())
+            .with_bytes(b"<h1>403 Forbidden</h1>".to_vec())
+            .with_request_compatibility(request)
+            .with_generated_headers();
+    }
+
     let full_path = format!("{}{}", state.directory, request.uri);
 
     if state.cache_limit > 0 {

@@ -18,6 +18,8 @@ pub struct Config {
     pub port: u16,
     /// Routing mode of the server
     pub mode: ServerMode,
+    /// Blacklisted IP addresses
+    pub blacklist: Vec<String>,
     /// Log level of the server
     pub log_level: LogLevel,
     /// Whether to log to the console
@@ -70,6 +72,7 @@ impl Default for Config {
             address: "0.0.0.0".into(),
             port: 80,
             mode: ServerMode::Static,
+            blacklist: Vec::new(),
             log_level: LogLevel::Warn,
             log_console: true,
             log_file: None,
@@ -111,6 +114,9 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
         .parse::<u16>()
         .map_err(|_| "The specified port was invalid")?;
 
+    // Get and validate the blacklist file
+    let blacklist = load_blacklist(hashmap.get("server.blacklist".into()).clone())?;
+
     // Get logging configuration
     let log_level = hashmap
         .get("log.level".into())
@@ -143,6 +149,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 address,
                 port,
                 mode: ServerMode::Static,
+                blacklist,
                 log_level,
                 log_console,
                 log_file,
@@ -163,6 +170,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 address,
                 port,
                 mode: ServerMode::Proxy,
+                blacklist,
                 log_level,
                 log_console,
                 log_file,
@@ -210,6 +218,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 address,
                 port,
                 mode: ServerMode::LoadBalancer,
+                blacklist,
                 log_level,
                 log_console,
                 log_file,
@@ -312,5 +321,24 @@ fn parse_size(size: String) -> Result<usize, &'static str> {
                 .map_err(|_| "The specified size was invalid"),
             _ => Err("The specified size was invalid"),
         }
+    }
+}
+
+/// Loads the blacklist file.
+fn load_blacklist(path: Option<&String>) -> Result<Vec<String>, &'static str> {
+    if let Some(path) = path {
+        // Try to open and read the file
+        let mut file = File::open(path).map_err(|_| "Blacklist file could not be opened")?;
+        let mut buf = String::new();
+        file.read_to_string(&mut buf)
+            .map_err(|_| "Blacklist file could not be read")?;
+
+        // Collect the lines of the file into a `Vec`
+        let blacklist: Vec<String> = buf.lines().map(|s| s.to_string()).collect();
+
+        Ok(blacklist)
+    } else {
+        // Return an empty `Vec` if no file was supplied
+        Ok(Vec::new())
     }
 }

@@ -43,6 +43,7 @@ cache_time = 60"#;
         address: "127.0.0.1".into(),
         port: 8000,
         mode: ServerMode::Static,
+        blacklist: Vec::new(),
         log_level: LogLevel::Info,
         log_console: false,
         log_file: Some("humphrey.log".into()),

@@ -14,6 +14,7 @@ use std::thread::spawn;
 #[derive(Default)]
 struct AppState {
     target: String,
+    blacklist: Vec<String>,
     logger: Logger,
 }
 
@@ -21,6 +22,7 @@ impl From<&Config> for AppState {
     fn from(config: &Config) -> Self {
         Self {
             target: config.proxy_target.as_ref().unwrap().clone(),
+            blacklist: config.blacklist.clone(),
             logger: Logger::from(config),
         }
     }
@@ -55,6 +57,17 @@ fn handler(
     state: Arc<AppState>,
 ) {
     let address = source.peer_addr().unwrap().to_string();
+
+    // Prevent blacklisted addresses from starting a connection
+    if state
+        .blacklist
+        .contains(&source.peer_addr().unwrap().ip().to_string())
+    {
+        state
+            .logger
+            .warn(&format!("{}: Blacklisted IP tried to connect", &address));
+        return;
+    }
 
     if let Ok(mut destination) = TcpStream::connect(&*state.target) {
         // The target was successfully connected to

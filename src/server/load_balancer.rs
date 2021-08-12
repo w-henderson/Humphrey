@@ -15,6 +15,7 @@ use std::thread::spawn;
 #[derive(Default)]
 struct AppState {
     load_balancer: Mutex<LoadBalancer>,
+    blacklist: Vec<String>,
     logger: Logger,
 }
 
@@ -22,6 +23,7 @@ impl From<&Config> for AppState {
     fn from(config: &Config) -> Self {
         Self {
             load_balancer: Mutex::new(LoadBalancer::from(config)),
+            blacklist: config.blacklist.clone(),
             logger: Logger::from(config),
         }
     }
@@ -93,6 +95,18 @@ fn handler(
     _: Arc<ErrorHandler>,
     state: Arc<AppState>,
 ) {
+    // Prevent blacklisted addresses from starting a connection
+    if state
+        .blacklist
+        .contains(&source.peer_addr().unwrap().ip().to_string())
+    {
+        state.logger.warn(&format!(
+            "{}: Blacklisted IP tried to connect",
+            source.peer_addr().unwrap().to_string()
+        ));
+        return;
+    }
+
     // Gets a load balancer target using the thread-safe `Mutex`
     let mut load_balancer_lock = state.load_balancer.lock().unwrap();
     let target = load_balancer_lock.select_target();
