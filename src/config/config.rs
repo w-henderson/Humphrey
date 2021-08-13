@@ -6,9 +6,6 @@ use std::io::Read;
 use crate::logger::LogLevel;
 use humphrey::krauss::wildcard_match;
 
-#[path = "tests/config.rs"]
-mod tests;
-
 /// Stores the server configuration.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Config {
@@ -255,7 +252,7 @@ fn read_config() -> Result<String, ()> {
 /// Attempts to parse the given string as the INI configuration format.
 /// If successful, returns a hashmap of keys and values.
 /// Otherwise, returns `Err`.
-fn parse_ini(ini: &str) -> Result<HashMap<String, String>, ()> {
+pub fn parse_ini(ini: &str) -> Result<HashMap<String, String>, ()> {
     let mut config: HashMap<String, String> = HashMap::new();
     let mut section: Option<String> = None;
 

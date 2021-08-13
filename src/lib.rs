@@ -4,6 +4,8 @@ pub mod app;
 pub mod http;
 pub mod krauss;
 pub mod route;
-mod tests;
+
+#[path = "tests/lib/mod.rs"]
+mod lib_tests;
 
 pub use app::App;

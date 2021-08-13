@@ -1,6 +1,9 @@
 mod config;
 mod server;
 
+#[path = "tests/bin/mod.rs"]
+mod bin_tests;
+
 use config::ServerMode;
 use server::*;
 
