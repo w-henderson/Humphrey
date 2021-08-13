@@ -3,6 +3,7 @@ use std::env::args;
 use std::fs::File;
 use std::io::Read;
 
+use crate::config::extended_hashmap::ExtendedMap;
 use crate::logger::LogLevel;
 use humphrey::krauss::wildcard_match;
 
@@ -96,51 +97,33 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
     };
 
     let hashmap = parse_ini(&config).map_err(|_| "The configuration file could not be parsed")?;
-    let mode = hashmap
-        .get("server.mode".into())
-        .map_or(Err("The mode was not specified"), |s| Ok(s))?;
+    let mode = hashmap.get_compulsory("server.mode", "The mode was not specified")?;
 
     // Get and validate the specified address and port
-    let address = hashmap
-        .get("server.address".into())
-        .unwrap_or(&"0.0.0.0".into())
-        .to_string();
-    let port = hashmap
-        .get("server.port".into())
-        .unwrap_or(&"80".into())
-        .parse::<u16>()
-        .map_err(|_| "The specified port was invalid")?;
+    let address = hashmap.get_optional("server.address", "0.0.0.0".into());
+    let port: u16 = hashmap.get_optional_parsed("server.port", 80, "Invalid port")?;
 
     // Get and validate the blacklist file
     let blacklist = load_blacklist(hashmap.get("server.blacklist".into()).clone())?;
 
     // Get logging configuration
-    let log_level = hashmap
-        .get("log.level".into())
-        .unwrap_or(&"warn".into())
-        .parse::<LogLevel>()?;
-    let log_file = hashmap.get("log.file".into()).map(|s| s.clone());
+    let log_level =
+        hashmap.get_optional_parsed("log.level", LogLevel::Warn, "Invalid log level")?;
+    let log_file = hashmap.get_owned("log.file");
     let log_console = hashmap.get("log.console".into()) != Some(&String::from("false"));
 
     match mode.as_str() {
         "static" => {
             // Get and parse the cache size limit
-            let cache_size_limit = hashmap
-                .get("static.cache".into())
-                .map_or("0".into(), |s| s.clone());
-            let cache_size_limit = parse_size(cache_size_limit.clone())?;
+            let cache_size_limit = hashmap.get_optional("static.cache", "0".into());
+            let cache_size_limit = parse_size(cache_size_limit)?;
 
             // Get and parse the cache time limit
-            let cache_time_limit = hashmap
-                .get("static.cache_time".into())
-                .unwrap_or(&"60".into())
-                .parse::<u64>()
-                .map_err(|_| "The specified cache time limit was invalid")?;
+            let cache_time_limit: u64 =
+                hashmap.get_optional_parsed("static.cache_time", 60, "Invalid cache time limit")?;
 
-            let directory = hashmap
-                .get("static.directory".into())
-                .unwrap_or(&String::new())
-                .to_string();
+            // Get the root directory
+            let directory = hashmap.get_optional("static.directory", String::new());
 
             Ok(Config {
                 address,
@@ -159,9 +142,8 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
             })
         }
         "proxy" => {
-            let proxy_target = hashmap
-                .get("proxy.target")
-                .map_or(Err("The proxy target was not specified"), |s| Ok(s.clone()))?;
+            let proxy_target =
+                hashmap.get_compulsory("proxy.target", "The proxy target was not specified")?;
 
             Ok(Config {
                 address,
@@ -181,9 +163,9 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
         }
         "load_balancer" => {
             // Try to get the path to the targets file
-            let targets_file = hashmap.get("load_balancer.targets").map_or(
-                Err("The load balancer targets file was not specified"),
-                |s| Ok(s),
+            let targets_file = hashmap.get_compulsory(
+                "load_balancer.targets",
+                "The load balancer targets file was not specified",
             )?;
 
             // Try to open the targets file
@@ -197,10 +179,8 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 .map_err(|_| "The load balancer targets file could not be read")?;
 
             // Read the load balancer mode
-            let load_balancer_mode = hashmap
-                .get("load_balancer.mode".into())
-                .unwrap_or(&"round-robin".into())
-                .to_string();
+            let load_balancer_mode =
+                hashmap.get_optional("load_balancer.mode", "round-robin".into());
 
             // Parse the load balancer mode
             let load_balancer_mode = match load_balancer_mode.as_str() {
@@ -238,8 +218,12 @@ fn read_config() -> Result<String, ()> {
     let path = args().nth(1).unwrap_or("humphrey.ini".into());
 
     if let Ok(mut file) = File::open(path) {
+        // The file can be opened
+
         let mut string = String::new();
         if let Ok(_) = file.read_to_string(&mut string) {
+            // The file can be read
+
             Ok(string)
         } else {
             Err(())
@@ -258,20 +242,26 @@ pub fn parse_ini(ini: &str) -> Result<HashMap<String, String>, ()> {
 
     for line in ini.lines() {
         if line.chars().nth(0) == Some(';') || line.len() == 0 {
+            // If the line is empty or a comment, ignore it
             continue;
         }
 
         if wildcard_match("[*]", line) {
+            // If the line is a section header, set the section and continue
             section = Some(line[1..line.len() - 1].to_string());
             continue;
         }
 
+        // Get the key and the value separated by the `:`
         let line = line.splitn(2, ';').nth(0).unwrap();
         let mut key_value = line.splitn(2, '=');
         let key = key_value.next();
         let value = key_value.next();
 
         if key.is_some() && value.is_some() {
+            // Both the key and the value are valid
+
+            // If the value is in quotation marks, remove them
             let value = value.unwrap().trim();
             let value = if wildcard_match("\"*\"", value) {
                 &value[1..value.len() - 1]
@@ -279,6 +269,7 @@ pub fn parse_ini(ini: &str) -> Result<HashMap<String, String>, ()> {
                 value
             };
 
+            // If currently in a section, prepend the section name and a dot to the key
             let full_key = if let Some(s) = &section {
                 format!("{}.{}", s, key.unwrap().trim())
             } else {
@@ -299,8 +290,12 @@ pub fn parse_ini(ini: &str) -> Result<HashMap<String, String>, ()> {
 /// If no letter is provided at the end, assumes the number to be in bytes.
 fn parse_size(size: String) -> Result<usize, &'static str> {
     if size.len() == 0 {
+        // Empty string
+
         Err("The specified size was invalid")
     } else if size.len() == 1 {
+        // One character so cannot possibly be valid
+
         size.parse::<usize>()
             .map_err(|_| "The specified size was invalid")
     } else {
