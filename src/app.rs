@@ -22,10 +22,16 @@ where
     error_handler: ErrorHandler,
     state: Arc<State>,
     connection_handler: ConnectionHandler<State>,
+    connection_condition: ConnectionCondition<State>,
 }
 
+/// Represents a function able to handle a connection.
+/// In most cases, the default connection handler should be used.
 pub type ConnectionHandler<State> =
     fn(TcpStream, Arc<Vec<RouteHandler<State>>>, Arc<ErrorHandler>, Arc<State>);
+
+/// Represents a function able to calculate whether a connection will be accepted.
+pub type ConnectionCondition<State> = fn(&mut TcpStream, Arc<State>) -> bool;
 
 /// Represents a function able to handle a request.
 /// It is passed a reference to the request as well as the app's state, and must return a response.
@@ -86,6 +92,7 @@ where
             error_handler,
             state: Arc::new(State::default()),
             connection_handler: client_handler,
+            connection_condition: |_, _| true,
         }
     }
 
@@ -101,14 +108,22 @@ where
 
         for stream in socket.incoming() {
             match stream {
-                Ok(stream) => {
-                    let cloned_routes = routes.clone();
-                    let cloned_error_handler = error_handler.clone();
+                Ok(mut stream) => {
                     let cloned_state = self.state.clone();
-                    let cloned_handler = self.connection_handler.clone();
-                    spawn(move || {
-                        (cloned_handler)(stream, cloned_routes, cloned_error_handler, cloned_state)
-                    });
+                    if (self.connection_condition)(&mut stream, cloned_state) {
+                        let cloned_state = self.state.clone();
+                        let cloned_routes = routes.clone();
+                        let cloned_error_handler = error_handler.clone();
+                        let cloned_handler = self.connection_handler.clone();
+                        spawn(move || {
+                            (cloned_handler)(
+                                stream,
+                                cloned_routes,
+                                cloned_error_handler,
+                                cloned_state,
+                            )
+                        });
+                    }
                 }
                 Err(_) => (),
             }
@@ -141,6 +156,13 @@ where
     /// Sets the error handler for the server.
     pub fn with_error_handler(mut self, handler: ErrorHandler) -> Self {
         self.error_handler = handler;
+        self
+    }
+
+    /// Sets the connection condition, a function which decides whether to accept the connection.
+    /// For example, this could be used for implementing whitelists and blacklists.
+    pub fn with_connection_condition(mut self, condition: ConnectionCondition<State>) -> Self {
+        self.connection_condition = condition;
         self
     }
 

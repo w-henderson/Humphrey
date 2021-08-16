@@ -1,5 +1,5 @@
 #![allow(unused_imports)]
-use crate::config::{load_config, parse_ini, Config, ServerMode};
+use crate::config::{load_config, parse_ini, BlacklistMode, Config, ServerMode};
 use crate::logger::LogLevel;
 use std::collections::HashMap;
 
@@ -33,6 +33,9 @@ level = "info"
 console = false
 file = "humphrey.log"
 
+[blacklist]
+mode = "forbidden"
+
 [static]
 directory = "/var/www"
 cache = 128M
@@ -44,6 +47,7 @@ cache_time = 60"#;
         port: 8000,
         mode: ServerMode::Static,
         blacklist: Vec::new(),
+        blacklist_mode: BlacklistMode::Forbidden,
         log_level: LogLevel::Info,
         log_console: false,
         log_file: Some("humphrey.log".into()),

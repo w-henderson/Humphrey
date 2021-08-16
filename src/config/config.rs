@@ -18,6 +18,8 @@ pub struct Config {
     pub mode: ServerMode,
     /// Blacklisted IP addresses
     pub blacklist: Vec<String>,
+    /// Mode of blacklisting
+    pub blacklist_mode: BlacklistMode,
     /// Log level of the server
     pub log_level: LogLevel,
     /// Whether to log to the console
@@ -58,9 +60,24 @@ pub enum LoadBalancerMode {
     Random,
 }
 
+/// Represents a method of applying the blacklist.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BlacklistMode {
+    /// Does not allow any access from blacklisted addresses
+    Block,
+    /// Returns 400 Forbidden to every request, only available in static mode
+    Forbidden,
+}
+
 impl Default for LoadBalancerMode {
     fn default() -> Self {
         Self::RoundRobin
+    }
+}
+
+impl Default for BlacklistMode {
+    fn default() -> Self {
+        Self::Block
     }
 }
 
@@ -71,6 +88,7 @@ impl Default for Config {
             port: 80,
             mode: ServerMode::Static,
             blacklist: Vec::new(),
+            blacklist_mode: BlacklistMode::Block,
             log_level: LogLevel::Warn,
             log_console: true,
             log_file: None,
@@ -104,7 +122,21 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
     let port: u16 = hashmap.get_optional_parsed("server.port", 80, "Invalid port")?;
 
     // Get and validate the blacklist file
-    let blacklist = load_blacklist(hashmap.get("server.blacklist".into()).clone())?;
+    let blacklist = load_blacklist(hashmap.get("blacklist.file".into()).clone())?;
+
+    // Read the blacklist mode
+    let blacklist_mode = hashmap.get_optional("blacklist.mode", "block".into());
+
+    // Parse the blacklist mode
+    let blacklist_mode = match blacklist_mode.as_str() {
+        "block" => BlacklistMode::Block,
+        "forbidden" => BlacklistMode::Forbidden,
+        _ => return Err("The blacklist mode was invalid"),
+    };
+
+    if mode != "static" && blacklist_mode == BlacklistMode::Forbidden {
+        return Err("Blacklist mode 'forbidden' is only supported when serving static content");
+    }
 
     // Get logging configuration
     let log_level =
@@ -130,6 +162,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 port,
                 mode: ServerMode::Static,
                 blacklist,
+                blacklist_mode,
                 log_level,
                 log_console,
                 log_file,
@@ -150,6 +183,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 port,
                 mode: ServerMode::Proxy,
                 blacklist,
+                blacklist_mode,
                 log_level,
                 log_console,
                 log_file,
@@ -196,6 +230,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 port,
                 mode: ServerMode::LoadBalancer,
                 blacklist,
+                blacklist_mode,
                 log_level,
                 log_console,
                 log_file,

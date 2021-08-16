@@ -4,11 +4,12 @@ use humphrey::http::{Request, Response, StatusCode};
 use humphrey::App;
 
 use crate::cache::Cache;
-use crate::config::Config;
+use crate::config::{BlacklistMode, Config};
 use crate::logger::Logger;
 use crate::route::try_open_path;
 
 use std::io::Read;
+use std::net::TcpStream;
 use std::sync::{Arc, RwLock};
 
 /// Represents the application state.
@@ -19,6 +20,7 @@ struct AppState {
     cache_limit: usize,
     cache: RwLock<Cache>,
     blacklist: Vec<String>,
+    blacklist_mode: BlacklistMode,
     logger: Logger,
 }
 
@@ -29,6 +31,7 @@ impl From<&Config> for AppState {
             cache_limit: config.cache_limit,
             cache: RwLock::new(Cache::from(config)),
             blacklist: config.blacklist.clone(),
+            blacklist_mode: config.blacklist_mode.clone(),
             logger: Logger::from(config),
         }
     }
@@ -38,6 +41,7 @@ impl From<&Config> for AppState {
 pub fn main(config: Config) {
     let app: App<AppState> = App::new()
         .with_state(AppState::from(&config))
+        .with_connection_condition(verify_connection)
         .with_route("/*", file_handler);
 
     let addr = format!("{}:{}", config.address, config.port);
@@ -48,6 +52,20 @@ pub fn main(config: Config) {
     logger.debug(&format!("Configuration: {:?}", &config));
 
     app.run(addr).unwrap();
+}
+
+/// Verifies that the client is allowed to connect by checking with the blacklist config.
+fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
+    let address = stream.peer_addr().unwrap().ip().to_string();
+    if state.blacklist_mode == BlacklistMode::Block && state.blacklist.contains(&address) {
+        state.logger.warn(&format!(
+            "{}: Blacklisted IP attempted to connect",
+            &address
+        ));
+        return false;
+    }
+
+    true
 }
 
 /// Request handler for every request.
