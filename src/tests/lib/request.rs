@@ -2,7 +2,11 @@
 use crate::http::headers::RequestHeader;
 use crate::http::method::Method;
 use crate::http::Request;
-use std::{collections::BTreeMap, io::Read, net::SocketAddr};
+use std::{
+    collections::BTreeMap,
+    io::Read,
+    net::{SocketAddr, ToSocketAddrs},
+};
 
 struct MockStream {
     data: Vec<u8>,
@@ -48,4 +52,29 @@ fn test_request_from_stream() {
     let mut expected_headers: BTreeMap<RequestHeader, String> = BTreeMap::new();
     expected_headers.insert(RequestHeader::Host, "localhost".to_string());
     assert_eq!(request.headers, expected_headers);
+}
+
+#[test]
+fn test_bytes_from_request() {
+    let mut test_data = Request {
+        method: Method::Get,
+        uri: "/test".into(),
+        version: "HTTP/1.1".into(),
+        headers: BTreeMap::new(),
+        content: Some(b"this is a test".to_vec()),
+        address: "1.2.3.4:5678".to_socket_addrs().unwrap().next().unwrap(),
+    };
+
+    test_data
+        .headers
+        .insert(RequestHeader::ContentLength, "14".into());
+    test_data
+        .headers
+        .insert(RequestHeader::ContentType, "text/plain".into());
+
+    let expected_bytes = b"GET /test HTTP/1.1\r\nContent-Length: 14\r\nContent-Type: text/plain\r\n\r\nthis is a test".to_vec();
+
+    let bytes: Vec<u8> = test_data.into();
+
+    assert_eq!(bytes, expected_bytes);
 }

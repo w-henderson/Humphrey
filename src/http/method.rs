@@ -1,5 +1,7 @@
 use super::request::RequestError;
 
+use std::fmt::Display;
+
 /// Represents an HTTP method.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Method {
@@ -25,5 +27,20 @@ impl Method {
             "DELETE" => Ok(Self::Delete),
             _ => Err(RequestError::Request),
         }
+    }
+}
+
+impl Display for Method {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Method::Get => "GET",
+                Method::Post => "POST",
+                Method::Put => "PUT",
+                Method::Delete => "DELETE",
+            }
+        )
     }
 }

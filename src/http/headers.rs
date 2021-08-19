@@ -29,6 +29,7 @@ pub enum RequestHeader {
     Origin,
     Pragma,
     Referer,
+    Upgrade,
     UserAgent,
     Via,
     Warning,
@@ -104,6 +105,7 @@ impl From<&str> for RequestHeader {
             "Origin" => Self::Origin,
             "Pragma" => Self::Pragma,
             "Referer" => Self::Referer,
+            "Upgrade" => Self::Upgrade,
             "User-Agent" => Self::UserAgent,
             "Via" => Self::Via,
             "Warning" => Self::Warning,
@@ -143,6 +145,44 @@ impl From<&str> for ResponseHeader {
                 name: custom.to_string(),
             },
         }
+    }
+}
+
+impl ToString for RequestHeader {
+    fn to_string(&self) -> String {
+        match self {
+            RequestHeader::Custom { name } => return name.clone(),
+            _ => (),
+        }
+
+        match self {
+            RequestHeader::Accept => "Accept",
+            RequestHeader::AcceptCharset => "Accept-Charset",
+            RequestHeader::AcceptEncoding => "Accept-Encoding",
+            RequestHeader::AcceptLanguage => "Accept-Language",
+            RequestHeader::AccessControlRequestMethod => "Access-Control-Request-Method",
+            RequestHeader::Authorization => "Authorization",
+            RequestHeader::CacheControl => "Cache-Control",
+            RequestHeader::Connection => "Connection",
+            RequestHeader::ContentEncoding => "Content-Encoding",
+            RequestHeader::ContentLength => "Content-Length",
+            RequestHeader::ContentType => "Content-Type",
+            RequestHeader::Cookie => "Cookie",
+            RequestHeader::Date => "Date",
+            RequestHeader::Expect => "Expect",
+            RequestHeader::Forwarded => "Forwarded",
+            RequestHeader::From => "From",
+            RequestHeader::Host => "Host",
+            RequestHeader::Origin => "Origin",
+            RequestHeader::Pragma => "Pragma",
+            RequestHeader::Referer => "Referer",
+            RequestHeader::Upgrade => "Upgrade",
+            RequestHeader::UserAgent => "User-Agent",
+            RequestHeader::Via => "Via",
+            RequestHeader::Warning => "Warning",
+            _ => "",
+        }
+        .to_string()
     }
 }
 

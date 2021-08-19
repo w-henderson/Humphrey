@@ -119,3 +119,27 @@ fn safe_assert(condition: bool) -> Result<(), RequestError> {
         false => Err(RequestError::Request),
     }
 }
+
+impl Into<Vec<u8>> for Request {
+    fn into(self) -> Vec<u8> {
+        let start_line = format!("{} {} {}", self.method, self.uri, self.version);
+        let headers = self
+            .headers
+            .iter()
+            .map(|(k, v)| format!("{}: {}", k.to_string(), v))
+            .collect::<Vec<String>>()
+            .join("\r\n");
+
+        let mut bytes: Vec<u8> = Vec::new();
+        bytes.extend(start_line.as_bytes());
+        bytes.extend(b"\r\n");
+        bytes.extend(headers.as_bytes());
+        bytes.extend(b"\r\n\r\n");
+
+        if let Some(content) = self.content {
+            bytes.extend(content);
+        }
+
+        bytes
+    }
+}
