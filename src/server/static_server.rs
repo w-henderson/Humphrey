@@ -7,10 +7,12 @@ use crate::cache::Cache;
 use crate::config::{BlacklistMode, Config};
 use crate::logger::Logger;
 use crate::route::try_open_path;
+use crate::server::proxy::pipe;
 
-use std::io::Read;
+use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::{Arc, RwLock};
+use std::thread::spawn;
 
 /// Represents the application state.
 /// Includes the target directory, cache state, and the logger.
@@ -19,6 +21,7 @@ struct AppState {
     directory: String,
     cache_limit: usize,
     cache: RwLock<Cache>,
+    websocket_proxy: Option<String>,
     blacklist: Vec<String>,
     blacklist_mode: BlacklistMode,
     logger: Logger,
@@ -30,6 +33,7 @@ impl From<&Config> for AppState {
             directory: config.directory.as_ref().unwrap().clone(),
             cache_limit: config.cache_limit,
             cache: RwLock::new(Cache::from(config)),
+            websocket_proxy: config.websocket_proxy.clone(),
             blacklist: config.blacklist.clone(),
             blacklist_mode: config.blacklist_mode.clone(),
             logger: Logger::from(config),
@@ -42,6 +46,7 @@ pub fn main(config: Config) {
     let app: App<AppState> = App::new()
         .with_state(AppState::from(&config))
         .with_connection_condition(verify_connection)
+        .with_websocket_handler(websocket_handler)
         .with_route("/*", file_handler);
 
     let addr = format!("{}:{}", config.address, config.port);
@@ -151,5 +156,58 @@ fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
             .with_bytes(b"<h1>404 Not Found</h1>".to_vec())
             .with_request_compatibility(request)
             .with_generated_headers()
+    }
+}
+
+fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppState>) {
+    let source_addr = source.peer_addr().unwrap().to_string();
+
+    if let Some(address) = &state.websocket_proxy {
+        let bytes: Vec<u8> = request.into();
+
+        if let Ok(mut destination) = TcpStream::connect(address) {
+            // The target was successfully connected to
+
+            destination.write(&bytes).unwrap();
+
+            let mut source_clone = source.try_clone().unwrap();
+            let mut destination_clone = destination.try_clone().unwrap();
+            state.logger.info(&format!(
+                "{}: WebSocket connected, proxying data",
+                source_addr
+            ));
+
+            // Pipe data in both directions
+            let forward = spawn(move || pipe(&mut source, &mut destination));
+            let backward = spawn(move || pipe(&mut destination_clone, &mut source_clone));
+
+            // Log any errors
+            if let Err(_) = forward.join().unwrap() {
+                state.logger.error(&format!(
+                    "{}: Error proxying WebSocket from client to target, connection closed",
+                    source_addr
+                ));
+            }
+            if let Err(_) = backward.join().unwrap() {
+                state.logger.error(&format!(
+                    "{}: Error proxying WebSocket from target to client, connection closed",
+                    source_addr
+                ));
+            }
+
+            state.logger.info(&format!(
+                "{}: WebSocket session complete, connection closed",
+                source_addr
+            ));
+        } else {
+            state
+                .logger
+                .error(&format!("{}: Could not connect to WebSocket", source_addr));
+        }
+    } else {
+        state.logger.warn(&format!(
+            "{}: WebSocket connection attempted but no handler provided",
+            source_addr
+        ))
     }
 }

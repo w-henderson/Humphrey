@@ -1,4 +1,4 @@
-use humphrey::app::{App, ErrorHandler};
+use humphrey::app::{App, ErrorHandler, WebsocketHandler};
 use humphrey::route::RouteHandler;
 
 use crate::config::{Config, LoadBalancerMode};
@@ -93,6 +93,7 @@ fn handler(
     mut source: TcpStream,
     _: Arc<Vec<RouteHandler<AppState>>>,
     _: Arc<ErrorHandler>,
+    _: Arc<WebsocketHandler<AppState>>,
     state: Arc<AppState>,
 ) {
     // Prevent blacklisted addresses from starting a connection

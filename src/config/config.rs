@@ -32,6 +32,8 @@ pub struct Config {
     pub cache_time_limit: u64,
     /// Root directory to serve files from
     pub directory: Option<String>,
+    /// WebSocket proxy address
+    pub websocket_proxy: Option<String>,
     /// Proxy target address
     pub proxy_target: Option<String>,
     /// Targets for the load balancer
@@ -95,6 +97,7 @@ impl Default for Config {
             cache_limit: 0,
             cache_time_limit: 0,
             directory: Some(String::new()),
+            websocket_proxy: None,
             proxy_target: None,
             load_balancer_targets: None,
             load_balancer_mode: None,
@@ -157,6 +160,9 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
             // Get the root directory
             let directory = hashmap.get_optional("static.directory", String::new());
 
+            // Get the WebSocket proxy address
+            let websocket_proxy = hashmap.get("static.websocket").map(|s| s.to_string());
+
             Ok(Config {
                 address,
                 port,
@@ -169,6 +175,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 cache_limit: cache_size_limit,
                 cache_time_limit,
                 directory: Some(directory),
+                websocket_proxy,
                 proxy_target: None,
                 load_balancer_targets: None,
                 load_balancer_mode: None,
@@ -190,6 +197,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 cache_limit: 0,
                 cache_time_limit: 0,
                 directory: None,
+                websocket_proxy: None,
                 proxy_target: Some(proxy_target.clone()),
                 load_balancer_targets: None,
                 load_balancer_mode: None,
@@ -237,6 +245,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 cache_limit: 0,
                 cache_time_limit: 0,
                 directory: None,
+                websocket_proxy: None,
                 proxy_target: None,
                 load_balancer_targets: Some(targets),
                 load_balancer_mode: Some(load_balancer_mode),

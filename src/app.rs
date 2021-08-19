@@ -23,15 +23,24 @@ where
     state: Arc<State>,
     connection_handler: ConnectionHandler<State>,
     connection_condition: ConnectionCondition<State>,
+    websocket_handler: WebsocketHandler<State>,
 }
 
 /// Represents a function able to handle a connection.
 /// In most cases, the default connection handler should be used.
-pub type ConnectionHandler<State> =
-    fn(TcpStream, Arc<Vec<RouteHandler<State>>>, Arc<ErrorHandler>, Arc<State>);
+pub type ConnectionHandler<State> = fn(
+    TcpStream,
+    Arc<Vec<RouteHandler<State>>>,
+    Arc<ErrorHandler>,
+    Arc<WebsocketHandler<State>>,
+    Arc<State>,
+);
 
 /// Represents a function able to calculate whether a connection will be accepted.
 pub type ConnectionCondition<State> = fn(&mut TcpStream, Arc<State>) -> bool;
+
+/// Represents a function able to handle a WebSocket handshake and consequent data frames.
+pub type WebsocketHandler<State> = fn(Request, TcpStream, Arc<State>);
 
 /// Represents a function able to handle a request.
 /// It is passed a reference to the request as well as the app's state, and must return a response.
@@ -93,6 +102,7 @@ where
             state: Arc::new(State::default()),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
+            websocket_handler: |_, _, _| (),
         }
     }
 
@@ -105,21 +115,28 @@ where
         let socket = TcpListener::bind(addr)?;
         let routes = Arc::new(self.routes);
         let error_handler = Arc::new(self.error_handler);
+        let websocket_handler = Arc::new(self.websocket_handler);
 
         for stream in socket.incoming() {
             match stream {
                 Ok(mut stream) => {
                     let cloned_state = self.state.clone();
+
+                    // Check that the client is allowed to connect
                     if (self.connection_condition)(&mut stream, cloned_state) {
                         let cloned_state = self.state.clone();
                         let cloned_routes = routes.clone();
+                        let cloned_websocket_handler = websocket_handler.clone();
                         let cloned_error_handler = error_handler.clone();
                         let cloned_handler = self.connection_handler.clone();
+
+                        // Spawn a new thread to handle the connection
                         spawn(move || {
                             (cloned_handler)(
                                 stream,
                                 cloned_routes,
                                 cloned_error_handler,
+                                cloned_websocket_handler,
                                 cloned_state,
                             )
                         });
@@ -166,6 +183,13 @@ where
         self
     }
 
+    /// Sets the websocket handler, a function which processes WebSocket handshakes.
+    /// This is passed the stream, state, and the request which triggered its calling.
+    pub fn with_websocket_handler(mut self, handler: WebsocketHandler<State>) -> Self {
+        self.websocket_handler = handler;
+        self
+    }
+
     /// Overrides the default connection handler, allowing for manual control over the TCP requests and responses.
     /// Not recommended as it basically disables most of the server's features.
     pub fn with_custom_connection_handler(mut self, handler: ConnectionHandler<State>) -> Self {
@@ -187,13 +211,25 @@ fn client_handler<State>(
     mut stream: TcpStream,
     routes: Arc<Vec<RouteHandler<State>>>,
     error_handler: Arc<ErrorHandler>,
+    websocket_handler: Arc<WebsocketHandler<State>>,
     state: Arc<State>,
 ) {
+    let addr = stream.peer_addr().unwrap();
+
     loop {
-        let addr = stream.peer_addr().unwrap();
+        // Parses the request from the stream
         let request = Request::from_stream(&mut stream, addr);
         let cloned_state = state.clone();
 
+        // If the request is valid an is a websocket request, call the corresponding handler
+        if let Ok(req) = &request {
+            if req.headers.get(&RequestHeader::Upgrade) == Some(&"websocket".to_string()) {
+                (websocket_handler)(req.clone(), stream, cloned_state);
+                break;
+            }
+        }
+
+        // If the request could not be parsed due to a stream error, close the thread
         if match &request {
             Ok(_) => false,
             Err(e) => e == &RequestError::Stream,
@@ -201,6 +237,7 @@ fn client_handler<State>(
             break;
         }
 
+        // Generate the response based on the handlers
         let response = match &request {
             Ok(request) => match routes.iter().find(|r| r.route.route_matches(&request.uri)) {
                 Some(handler) => (handler.handler)(request, cloned_state),
@@ -209,11 +246,13 @@ fn client_handler<State>(
             Err(_) => error_handler(None, StatusCode::BadRequest),
         };
 
+        // Write the response to the stream
         let response_bytes: Vec<u8> = response.into();
         if let Err(_) = stream.write(&response_bytes) {
             break;
         };
 
+        // If the request specified to keep the connection open, respect this
         if let Ok(request) = request {
             if let Some(connection) = request.headers.get(&RequestHeader::Connection) {
                 if connection.to_ascii_lowercase() != "keep-alive" {

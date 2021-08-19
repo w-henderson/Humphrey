@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 
 /// Represents a request to the server.
 /// Contains parsed information about the request's data.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Request {
     /// The method used in making the request, e.g. "GET".
     pub method: Method,

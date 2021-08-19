@@ -3,7 +3,7 @@ use super::request::RequestError;
 use std::fmt::Display;
 
 /// Represents an HTTP method.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Method {
     Get,
     Post,
