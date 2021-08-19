@@ -38,6 +38,7 @@ mode = "forbidden"
 
 [static]
 directory = "/var/www"
+websocket = "localhost:1234"
 cache = 128M
 cache_time = 60"#;
 
@@ -54,6 +55,7 @@ cache_time = 60"#;
         cache_limit: 128 * 1024 * 1024,
         cache_time_limit: 60,
         directory: Some("/var/www".into()),
+        websocket_proxy: Some("localhost:1234".into()),
         proxy_target: None,
         load_balancer_targets: None,
         load_balancer_mode: None,
