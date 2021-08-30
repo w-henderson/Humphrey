@@ -96,15 +96,18 @@ fn handler(
     _: Arc<WebsocketHandler<AppState>>,
     state: Arc<AppState>,
 ) {
+    let address = source.peer_addr();
+    if address.is_err() {
+        state.logger.warn("Corrupted stream attempted to connect");
+        return;
+    }
+    let address = address.unwrap().ip().to_string();
+
     // Prevent blacklisted addresses from starting a connection
-    if state
-        .blacklist
-        .contains(&source.peer_addr().unwrap().ip().to_string())
-    {
-        state.logger.warn(&format!(
-            "{}: Blacklisted IP tried to connect",
-            source.peer_addr().unwrap().to_string()
-        ));
+    if state.blacklist.contains(&address) {
+        state
+            .logger
+            .warn(&format!("{}: Blacklisted IP tried to connect", &address));
         return;
     }
 
@@ -115,7 +118,6 @@ fn handler(
 
     if let Ok(mut destination) = TcpStream::connect(&target) {
         // Logs the connection's success
-        let address = source.peer_addr().unwrap().to_string();
         state
             .logger
             .info(&format!("{} -> {}: Connection started", &address, &target));

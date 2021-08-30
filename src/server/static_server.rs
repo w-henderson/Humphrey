@@ -61,12 +61,17 @@ pub fn main(config: Config) {
 
 /// Verifies that the client is allowed to connect by checking with the blacklist config.
 fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
-    let address = stream.peer_addr().unwrap().ip().to_string();
-    if state.blacklist_mode == BlacklistMode::Block && state.blacklist.contains(&address) {
-        state.logger.warn(&format!(
-            "{}: Blacklisted IP attempted to connect",
-            &address
-        ));
+    if let Ok(address) = stream.peer_addr() {
+        let address = address.ip().to_string();
+        if state.blacklist_mode == BlacklistMode::Block && state.blacklist.contains(&address) {
+            state.logger.warn(&format!(
+                "{}: Blacklisted IP attempted to connect",
+                &address
+            ));
+            return false;
+        }
+    } else {
+        state.logger.warn("Corrupted stream attempted to connect");
         return false;
     }
 

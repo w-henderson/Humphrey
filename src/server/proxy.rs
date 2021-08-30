@@ -57,13 +57,15 @@ fn handler(
     _: Arc<WebsocketHandler<AppState>>,
     state: Arc<AppState>,
 ) {
-    let address = source.peer_addr().unwrap().to_string();
+    let address = source.peer_addr();
+    if address.is_err() {
+        state.logger.warn("Corrupted stream attempted to connect");
+        return;
+    }
+    let address = address.unwrap().ip().to_string();
 
     // Prevent blacklisted addresses from starting a connection
-    if state
-        .blacklist
-        .contains(&source.peer_addr().unwrap().ip().to_string())
-    {
+    if state.blacklist.contains(&address) {
         state
             .logger
             .warn(&format!("{}: Blacklisted IP tried to connect", &address));
