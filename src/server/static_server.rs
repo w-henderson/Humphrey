@@ -82,7 +82,10 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
 /// Attempts to open a given file relative to the binary and returns error 404 if not found.
 fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
     // Return error 403 if the address was blacklisted
-    if state.blacklist.contains(&request.address.ip().to_string()) {
+    if state
+        .blacklist
+        .contains(&request.address.origin_addr.to_string())
+    {
         state.logger.warn(&format!(
             "{}: Blacklisted IP attempted to request {}",
             request.address, request.uri

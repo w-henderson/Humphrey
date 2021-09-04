@@ -1,5 +1,7 @@
+use crate::http::address::Address;
 use crate::http::headers::{RequestHeader, RequestHeaderMap};
 use crate::http::method::Method;
+
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read};
 use std::net::SocketAddr;
@@ -19,7 +21,7 @@ pub struct Request {
     /// The request body, if supplied.
     pub content: Option<Vec<u8>>,
     /// The address from which the request came
-    pub address: SocketAddr,
+    pub address: Address,
 }
 
 /// An error which occurred during the parsing of a request.
@@ -82,6 +84,8 @@ impl Request {
                 );
             }
         }
+
+        let address = Address::from_headers(&headers, address);
 
         if let Some(content_length) = headers.get(&RequestHeader::ContentLength) {
             let content_length: usize =

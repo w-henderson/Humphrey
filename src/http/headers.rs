@@ -34,7 +34,10 @@ pub enum RequestHeader {
     Via,
     Warning,
 
-    Custom { name: String },
+    /// Custom header with a lowercase name
+    Custom {
+        name: String,
+    },
 }
 
 /// Represents a header sent in a response.
@@ -84,31 +87,31 @@ impl Ord for ResponseHeader {
 
 impl From<&str> for RequestHeader {
     fn from(name: &str) -> Self {
-        match name {
-            "Accept" => Self::Accept,
-            "Accept-Charset" => Self::AcceptCharset,
-            "Accept-Encoding" => Self::AcceptEncoding,
-            "Accept-Language" => Self::AcceptLanguage,
-            "Access-Control-Request-Method" => Self::AccessControlRequestMethod,
-            "Authorization" => Self::Authorization,
-            "Cache-Control" => Self::CacheControl,
-            "Connection" => Self::Connection,
-            "Content-Encoding" => Self::ContentEncoding,
-            "Content-Length" => Self::ContentLength,
-            "Content-Type" => Self::ContentType,
-            "Cookie" => Self::Cookie,
-            "Date" => Self::Date,
-            "Expect" => Self::Expect,
-            "Forwarded" => Self::Forwarded,
-            "From" => Self::From,
-            "Host" => Self::Host,
-            "Origin" => Self::Origin,
-            "Pragma" => Self::Pragma,
-            "Referer" => Self::Referer,
-            "Upgrade" => Self::Upgrade,
-            "User-Agent" => Self::UserAgent,
-            "Via" => Self::Via,
-            "Warning" => Self::Warning,
+        match name.to_ascii_lowercase().as_str() {
+            "accept" => Self::Accept,
+            "accept-charset" => Self::AcceptCharset,
+            "accept-encoding" => Self::AcceptEncoding,
+            "accept-language" => Self::AcceptLanguage,
+            "access-control-request-method" => Self::AccessControlRequestMethod,
+            "authorization" => Self::Authorization,
+            "cache-control" => Self::CacheControl,
+            "connection" => Self::Connection,
+            "content-encoding" => Self::ContentEncoding,
+            "content-length" => Self::ContentLength,
+            "content-type" => Self::ContentType,
+            "cookie" => Self::Cookie,
+            "date" => Self::Date,
+            "expect" => Self::Expect,
+            "forwarded" => Self::Forwarded,
+            "from" => Self::From,
+            "host" => Self::Host,
+            "origin" => Self::Origin,
+            "pragma" => Self::Pragma,
+            "referer" => Self::Referer,
+            "upgrade" => Self::Upgrade,
+            "user-agent" => Self::UserAgent,
+            "via" => Self::Via,
+            "warning" => Self::Warning,
             custom => Self::Custom {
                 name: custom.to_string(),
             },
