@@ -7,6 +7,7 @@ use crate::plugins::plugin::{Plugin, PluginLogger};
 
 use libloading::{Library, Symbol};
 
+/// Encapsulates plugins and their corresponding libraries.
 #[derive(Default)]
 pub struct PluginManager {
     plugins: Vec<Box<dyn Plugin>>,
