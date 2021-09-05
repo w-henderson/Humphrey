@@ -98,12 +98,19 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
 #[cfg(feature = "plugins")]
 fn file_handler_wrapper(mut request: Request, state: Arc<AppState>) -> Response {
     let mut plugins = state.plugin_manager.lock().unwrap();
-    plugins.on_request(&mut request, state.clone());
 
-    let mut response = file_handler(request, state.clone());
-    plugins.on_response(&mut response, state.clone());
+    if let Some(response_override) = plugins.on_request(&mut request, state.clone()) {
+        // If a plugin overrode the response, return it
 
-    response
+        response_override
+    } else {
+        // Otherwise generate a response in the normal way
+
+        let mut response = file_handler(request, state.clone());
+        plugins.on_response(&mut response, state.clone());
+
+        response
+    }
 }
 
 #[cfg(not(feature = "plugins"))]

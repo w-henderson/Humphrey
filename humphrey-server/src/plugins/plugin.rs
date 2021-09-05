@@ -2,6 +2,8 @@
 //!
 //! https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html
 
+#![allow(unused_variables)]
+
 use crate::static_server::AppState;
 use humphrey::http::{Request, Response};
 
@@ -15,13 +17,23 @@ pub trait Plugin: Any + Send + Sync + Debug {
     fn name(&self) -> &'static str;
 
     /// Called when the plugin is first loaded.
-    fn on_load(&mut self);
-    /// Called when a request is received but before it is processed.
-    fn on_request(&mut self, request: &mut Request, state: Arc<AppState>);
+    /// Any set-up that needs to be done before requests are handled should be done here.
+    fn on_load(&mut self) {}
+
+    /// Called when a request is received but before it is processed. May modify the request in-place.
+    /// Should return `None` to indicate that Humphrey should process the request,
+    ///   or the plugin should process the request itself and return `Some(response)`.
+    fn on_request(&mut self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
+        None
+    }
+
     /// Called when a response has been generated but not yet sent.
-    fn on_response(&mut self, response: &mut Response, state: Arc<AppState>);
-    /// Called when the plugin is about to be unloaded, should be used for any cleanup.
-    fn on_unload(&mut self);
+    /// May modify the response in-place.
+    fn on_response(&mut self, response: &mut Response, state: Arc<AppState>) {}
+
+    /// Called when the plugin is about to be unloaded.
+    /// Any clean-up should be done here.
+    fn on_unload(&mut self) {}
 }
 
 /// Declares the required functions for initialising a plugin.
