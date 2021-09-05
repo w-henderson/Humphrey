@@ -4,7 +4,7 @@ use humphrey::http::{Request, Response, StatusCode};
 use humphrey::App;
 
 #[cfg(feature = "plugins")]
-use humphrey::plugins::manager::PluginManager;
+use crate::plugins::manager::PluginManager;
 #[cfg(feature = "plugins")]
 use std::sync::Mutex;
 

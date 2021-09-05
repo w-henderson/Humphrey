@@ -1,8 +1,9 @@
 mod config;
 mod server;
+mod tests;
 
-#[path = "tests/bin/mod.rs"]
-mod bin_tests;
+#[cfg(feature = "plugins")]
+mod plugins;
 
 use config::ServerMode;
 use server::*;

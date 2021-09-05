@@ -2,3 +2,4 @@ target/
 humphrey.ini
 conf/
 humphrey.log
+Cargo.lock

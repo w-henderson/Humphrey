@@ -2,7 +2,7 @@
 //!
 //! https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html
 
-use crate::http::{Request, Response};
+use humphrey::http::{Request, Response};
 
 use std::any::Any;
 use std::fmt::Debug;

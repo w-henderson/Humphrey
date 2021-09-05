@@ -1,0 +1,11 @@
+[package]
+name = "humphrey-server"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+humphrey = { path = "../humphrey" }
+libloading = { version = "0.7", optional = true }
+
+[features]
+plugins = ["libloading"]

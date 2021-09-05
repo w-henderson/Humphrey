@@ -2,8 +2,8 @@
 //!
 //! https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html
 
-use crate::http::{Request, Response};
 use crate::plugins::plugin::{Plugin, PluginLogger};
+use humphrey::http::{Request, Response};
 
 use libloading::{Library, Symbol};
 
