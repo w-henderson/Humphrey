@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Request handler for the `/` path.
-fn index(request: &Request, state: Arc<Mutex<AppState>>) -> Response {
+fn index(request: Request, state: Arc<Mutex<AppState>>) -> Response {
     // Get the number of button presses using the thread-safe `Arc<Mutex<T>>`
     let state_locked = state.lock().unwrap();
     let presses = state_locked.button_presses;
@@ -35,11 +35,11 @@ fn index(request: &Request, state: Arc<Mutex<AppState>>) -> Response {
     // Generate and return the response
     Response::new(StatusCode::OK) // code 200, success
         .with_bytes(html.as_bytes().to_vec()) // add the HTML as the response body
-        .with_request_compatibility(request) // ensure that HTTP versions and `Connection` headers match the request
+        .with_request_compatibility(&request) // ensure that HTTP versions and `Connection` headers match the request
         .with_generated_headers() // automatically add required headers like `Date` and `Content-Length`
 }
 
-fn press(request: &Request, state: Arc<Mutex<AppState>>) -> Response {
+fn press(request: Request, state: Arc<Mutex<AppState>>) -> Response {
     // Increment the number of button presses using the thread-safe `Arc<Mutex<T>>`
     let mut state_locked = state.lock().unwrap();
     state_locked.button_presses += 1;
@@ -47,6 +47,6 @@ fn press(request: &Request, state: Arc<Mutex<AppState>>) -> Response {
     // Generate and return the response
     Response::new(StatusCode::OK)
         .with_bytes(b"OK".to_vec())
-        .with_request_compatibility(request)
+        .with_request_compatibility(&request)
         .with_generated_headers()
 }

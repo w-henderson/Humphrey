@@ -15,16 +15,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn home(request: &Request, _: Arc<AppState>) -> Response {
+fn home(request: Request, _: Arc<AppState>) -> Response {
     let html = include_str!("index.html");
 
     Response::new(StatusCode::OK)
         .with_bytes(html.as_bytes().to_vec())
-        .with_request_compatibility(request)
+        .with_request_compatibility(&request)
         .with_generated_headers()
 }
 
-fn wildcard(request: &Request, _: Arc<AppState>) -> Response {
+fn wildcard(request: Request, _: Arc<AppState>) -> Response {
     let wildcard_path = request
         .uri // get the URI of the request
         .strip_prefix("/wildcard/") // remove the initial slash
@@ -37,6 +37,6 @@ fn wildcard(request: &Request, _: Arc<AppState>) -> Response {
 
     Response::new(StatusCode::OK)
         .with_bytes(html.as_bytes().to_vec())
-        .with_request_compatibility(request)
+        .with_request_compatibility(&request)
         .with_generated_headers()
 }

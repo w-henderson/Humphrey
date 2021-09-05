@@ -1,7 +1,7 @@
-use humphrey::declare_plugin;
 use humphrey::http::headers::ResponseHeader;
 use humphrey::http::{Request, Response};
-use humphrey::plugins::plugin::{Plugin, PluginLogger};
+use humphrey_server::declare_plugin;
+use humphrey_server::plugins::plugin::{Plugin, PluginLogger};
 
 #[derive(Debug, Default)]
 pub struct ExamplePlugin;
