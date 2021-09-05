@@ -54,13 +54,21 @@ pub fn main(config: Config) {
         .with_state(AppState::from(&config))
         .with_connection_condition(verify_connection)
         .with_websocket_handler(websocket_handler)
-        .with_route("/*", file_handler_plugin_wrapper);
+        .with_route("/*", file_handler_wrapper);
 
     let addr = format!("{}:{}", config.address, config.port);
 
     let logger = &app.get_state().logger;
     logger.info("Starting static server");
     logger.info(&format!("Running at {}", addr));
+
+    #[cfg(feature = "plugins")]
+    {
+        let plugin_manager = &app.get_state().plugin_manager.lock().unwrap();
+        let plugins_count = plugin_manager.plugin_count();
+        logger.info(&format!("Running with {} plugins", plugins_count));
+    };
+
     logger.debug(&format!("Configuration: {:?}", &config));
 
     app.run(addr).unwrap();
@@ -85,7 +93,8 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
     true
 }
 
-fn file_handler_plugin_wrapper(mut request: Request, state: Arc<AppState>) -> Response {
+#[cfg(feature = "plugins")]
+fn file_handler_wrapper(mut request: Request, state: Arc<AppState>) -> Response {
     let mut plugins = state.plugin_manager.lock().unwrap();
     plugins.on_request(&mut request, Logger::plugin);
 
@@ -93,6 +102,11 @@ fn file_handler_plugin_wrapper(mut request: Request, state: Arc<AppState>) -> Re
     plugins.on_response(&mut response, Logger::plugin);
 
     response
+}
+
+#[cfg(not(feature = "plugins"))]
+fn file_handler_wrapper(mut request: Request, state: Arc<AppState>) -> Response {
+    file_handler(request, state)
 }
 
 /// Request handler for every request.
@@ -238,13 +252,16 @@ fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppStat
 }
 
 impl From<&Config> for PluginManager {
-    fn from(_: &Config) -> Self {
+    fn from(config: &Config) -> Self {
         let mut manager = PluginManager::default();
 
-        unsafe {
-            manager
-                .load_plugin("examples/plugin/target/release/plugin.dll", Logger::plugin)
-                .unwrap();
+        for path in &config.plugin_libraries {
+            unsafe {
+                if let Err(s) = manager.load_plugin(path, Logger::plugin) {
+                    Logger::plugin(&format!("Could not initialise plugin from {}", path));
+                    Logger::plugin(&format!("Error message: {}", s));
+                };
+            }
         }
 
         manager

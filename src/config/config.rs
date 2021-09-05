@@ -34,6 +34,8 @@ pub struct Config {
     pub directory: Option<String>,
     /// WebSocket proxy address
     pub websocket_proxy: Option<String>,
+    /// Plugin sources
+    pub plugin_libraries: Vec<String>,
     /// Proxy target address
     pub proxy_target: Option<String>,
     /// Targets for the load balancer
@@ -98,6 +100,7 @@ impl Default for Config {
             cache_time_limit: 0,
             directory: Some(String::new()),
             websocket_proxy: None,
+            plugin_libraries: Vec::new(),
             proxy_target: None,
             load_balancer_targets: None,
             load_balancer_mode: None,
@@ -125,7 +128,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
     let port: u16 = hashmap.get_optional_parsed("server.port", 80, "Invalid port")?;
 
     // Get and validate the blacklist file
-    let blacklist = load_blacklist(hashmap.get("blacklist.file".into()).clone())?;
+    let blacklist = load_list_file(hashmap.get("blacklist.file".into()).clone())?;
 
     // Read the blacklist mode
     let blacklist_mode = hashmap.get_optional("blacklist.mode", "block".into());
@@ -163,6 +166,9 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
             // Get the WebSocket proxy address
             let websocket_proxy = hashmap.get("static.websocket").map(|s| s.to_string());
 
+            // Get and validate the plugins file
+            let plugin_libraries = load_list_file(hashmap.get("static.plugins".into()).clone())?;
+
             Ok(Config {
                 address,
                 port,
@@ -176,6 +182,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 cache_time_limit,
                 directory: Some(directory),
                 websocket_proxy,
+                plugin_libraries,
                 proxy_target: None,
                 load_balancer_targets: None,
                 load_balancer_mode: None,
@@ -198,6 +205,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 cache_time_limit: 0,
                 directory: None,
                 websocket_proxy: None,
+                plugin_libraries: Vec::new(),
                 proxy_target: Some(proxy_target.clone()),
                 load_balancer_targets: None,
                 load_balancer_mode: None,
@@ -246,6 +254,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 cache_time_limit: 0,
                 directory: None,
                 websocket_proxy: None,
+                plugin_libraries: Vec::new(),
                 proxy_target: None,
                 load_balancer_targets: Some(targets),
                 load_balancer_mode: Some(load_balancer_mode),
@@ -360,19 +369,19 @@ fn parse_size(size: String) -> Result<usize, &'static str> {
     }
 }
 
-/// Loads the blacklist file.
-fn load_blacklist(path: Option<&String>) -> Result<Vec<String>, &'static str> {
+/// Loads a file which is a list of values.
+fn load_list_file(path: Option<&String>) -> Result<Vec<String>, &'static str> {
     if let Some(path) = path {
         // Try to open and read the file
-        let mut file = File::open(path).map_err(|_| "Blacklist file could not be opened")?;
+        let mut file = File::open(path).map_err(|_| "List file could not be opened")?;
         let mut buf = String::new();
         file.read_to_string(&mut buf)
-            .map_err(|_| "Blacklist file could not be read")?;
+            .map_err(|_| "List file could not be read")?;
 
         // Collect the lines of the file into a `Vec`
-        let blacklist: Vec<String> = buf.lines().map(|s| s.to_string()).collect();
+        let list: Vec<String> = buf.lines().map(|s| s.to_string()).collect();
 
-        Ok(blacklist)
+        Ok(list)
     } else {
         // Return an empty `Vec` if no file was supplied
         Ok(Vec::new())

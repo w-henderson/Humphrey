@@ -31,8 +31,6 @@ impl PluginManager {
         // Load the plugin and store its instance on the heap
         let boxed_raw = init_function();
         let mut plugin = Box::from_raw(boxed_raw);
-        println!("{}", plugin.name());
-        println!("{:?}", plugin);
         plugin.on_load(logger);
 
         self.plugins.push(plugin);
@@ -63,6 +61,11 @@ impl PluginManager {
         for library in self.libraries.drain(..) {
             drop(library);
         }
+    }
+
+    /// Returns the number of currently loaded plugins.
+    pub fn plugin_count(&self) -> usize {
+        self.plugins.len()
     }
 }
 
