@@ -3,6 +3,9 @@ use humphrey::http::mime::MimeType;
 use humphrey::http::{Request, Response, StatusCode};
 use humphrey::App;
 
+#[cfg(feature = "plugins")]
+use humphrey::plugins::manager::PluginManager;
+
 use crate::cache::Cache;
 use crate::config::{BlacklistMode, Config};
 use crate::logger::Logger;
@@ -11,7 +14,7 @@ use crate::server::proxy::pipe;
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread::spawn;
 
 /// Represents the application state.
@@ -25,6 +28,8 @@ struct AppState {
     blacklist: Vec<String>,
     blacklist_mode: BlacklistMode,
     logger: Logger,
+    #[cfg(feature = "plugins")]
+    plugin_manager: Mutex<PluginManager>,
 }
 
 impl From<&Config> for AppState {
@@ -37,6 +42,8 @@ impl From<&Config> for AppState {
             blacklist: config.blacklist.clone(),
             blacklist_mode: config.blacklist_mode.clone(),
             logger: Logger::from(config),
+            #[cfg(feature = "plugins")]
+            plugin_manager: Mutex::new(PluginManager::from(config)),
         }
     }
 }
@@ -47,12 +54,12 @@ pub fn main(config: Config) {
         .with_state(AppState::from(&config))
         .with_connection_condition(verify_connection)
         .with_websocket_handler(websocket_handler)
-        .with_route("/*", file_handler);
+        .with_route("/*", file_handler_plugin_wrapper);
 
     let addr = format!("{}:{}", config.address, config.port);
 
     let logger = &app.get_state().logger;
-    logger.info("Parsed configuration, starting static server");
+    logger.info("Starting static server");
     logger.info(&format!("Running at {}", addr));
     logger.debug(&format!("Configuration: {:?}", &config));
 
@@ -78,9 +85,19 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
     true
 }
 
+fn file_handler_plugin_wrapper(mut request: Request, state: Arc<AppState>) -> Response {
+    let mut plugins = state.plugin_manager.lock().unwrap();
+    plugins.on_request(&mut request, Logger::plugin);
+
+    let mut response = file_handler(request, state.clone());
+    plugins.on_response(&mut response, Logger::plugin);
+
+    response
+}
+
 /// Request handler for every request.
 /// Attempts to open a given file relative to the binary and returns error 404 if not found.
-fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
+fn file_handler(request: Request, state: Arc<AppState>) -> Response {
     // Return error 403 if the address was blacklisted
     if state
         .blacklist
@@ -93,7 +110,7 @@ fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
         return Response::new(StatusCode::Forbidden)
             .with_header(ResponseHeader::ContentType, "text/html".into())
             .with_bytes(b"<h1>403 Forbidden</h1>".to_vec())
-            .with_request_compatibility(request)
+            .with_request_compatibility(&request)
             .with_generated_headers();
     }
 
@@ -109,7 +126,7 @@ fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
             return Response::new(StatusCode::OK)
                 .with_header(ResponseHeader::ContentType, cached.mime_type.into())
                 .with_bytes(cached.data.clone())
-                .with_request_compatibility(request)
+                .with_request_compatibility(&request)
                 .with_generated_headers();
         }
         drop(cache);
@@ -123,7 +140,7 @@ fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
             ));
             return Response::new(StatusCode::MovedPermanently)
                 .with_header(ResponseHeader::Location, format!("{}/", &request.uri))
-                .with_request_compatibility(request)
+                .with_request_compatibility(&request)
                 .with_generated_headers();
         }
 
@@ -152,7 +169,7 @@ fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
         Response::new(StatusCode::OK)
             .with_header(ResponseHeader::ContentType, mime_type.into())
             .with_bytes(contents)
-            .with_request_compatibility(request)
+            .with_request_compatibility(&request)
             .with_generated_headers()
     } else {
         state.logger.warn(&format!(
@@ -162,7 +179,7 @@ fn file_handler(request: &Request, state: Arc<AppState>) -> Response {
         Response::new(StatusCode::NotFound)
             .with_header(ResponseHeader::ContentType, "text/html".into())
             .with_bytes(b"<h1>404 Not Found</h1>".to_vec())
-            .with_request_compatibility(request)
+            .with_request_compatibility(&request)
             .with_generated_headers()
     }
 }
@@ -217,5 +234,19 @@ fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppStat
             "{}: WebSocket connection attempted but no handler provided",
             source_addr
         ))
+    }
+}
+
+impl From<&Config> for PluginManager {
+    fn from(_: &Config) -> Self {
+        let mut manager = PluginManager::default();
+
+        unsafe {
+            manager
+                .load_plugin("examples/plugin/target/release/plugin.dll", Logger::plugin)
+                .unwrap();
+        }
+
+        manager
     }
 }

@@ -51,7 +51,7 @@ impl Default for Logger {
 impl Logger {
     /// Logs an error message.
     pub fn error(&self, message: &str) {
-        let string = format!("{} [ERROR] {}", self.time_format(), message);
+        let string = format!("{} [ERROR] {}", Logger::time_format(), message);
         self.log_to_console(&string);
         self.log_to_file(&string);
     }
@@ -59,7 +59,7 @@ impl Logger {
     /// Logs a warning, provided that the log level allows this.
     pub fn warn(&self, message: &str) {
         if self.level >= LogLevel::Warn {
-            let string = format!("{} [WARN]  {}", self.time_format(), message);
+            let string = format!("{} [WARN]  {}", Logger::time_format(), message);
             self.log_to_console(&string);
             self.log_to_file(&string);
         }
@@ -68,7 +68,7 @@ impl Logger {
     /// Logs information, provided that the log level allows this.
     pub fn info(&self, message: &str) {
         if self.level >= LogLevel::Info {
-            let string = format!("{} [INFO]  {}", self.time_format(), message);
+            let string = format!("{} [INFO]  {}", Logger::time_format(), message);
             self.log_to_console(&string);
             self.log_to_file(&string);
         }
@@ -77,14 +77,19 @@ impl Logger {
     /// Logs debug information, provided that the log level allows this.
     pub fn debug(&self, message: &str) {
         if self.level == LogLevel::Debug {
-            let string = format!("{} [DEBUG] {}", self.time_format(), message);
+            let string = format!("{} [DEBUG] {}", Logger::time_format(), message);
             self.log_to_console(&string);
             self.log_to_file(&string);
         }
     }
 
+    /// Logs plugin information.
+    pub fn plugin(message: &str) {
+        println!("{} [PLUGIN] {}", Logger::time_format(), message);
+    }
+
     /// Formats the current time into the format `YYYY-MM-DD HH:MM:SS`
-    fn time_format(&self) -> String {
+    fn time_format() -> String {
         let time = DateTime::now();
         format!(
             "{}-{:02}-{:02} {:02}:{:02}:{:02}",

@@ -19,13 +19,13 @@ use std::collections::btree_map::Entry;
 #[derive(Debug)]
 pub struct Response {
     /// The HTTP version of the response.
-    version: String,
+    pub version: String,
     /// The status code of the response, for example 200 OK.
-    status_code: StatusCode,
+    pub status_code: StatusCode,
     /// A map of the headers included in the response.
-    headers: ResponseHeaderMap,
+    pub headers: ResponseHeaderMap,
     /// The body of the response.
-    body: Vec<u8>,
+    pub body: Vec<u8>,
 }
 
 impl Response {

@@ -55,7 +55,7 @@ pub type WebsocketHandler<State> = fn(Request, TcpStream, Arc<State>);
 ///         .with_generated_headers() // generate required headers
 /// }
 /// ```
-pub type RequestHandler<State> = fn(&Request, Arc<State>) -> Response;
+pub type RequestHandler<State> = fn(Request, Arc<State>) -> Response;
 
 /// Represents a function able to handle an error.
 /// The first parameter of type `Option<&Request>` will be `Some` if the request could be parsed.
@@ -85,7 +85,7 @@ pub type RequestHandler<State> = fn(&Request, Arc<State>) -> Response;
 ///     }
 /// }
 /// ```
-pub type ErrorHandler = fn(Option<&Request>, StatusCode) -> Response;
+pub type ErrorHandler = fn(Option<Request>, StatusCode) -> Response;
 
 /// Represents a generic error with the program.
 pub type HumphreyError = Box<dyn std::error::Error>;
@@ -237,8 +237,23 @@ fn client_handler<State>(
             break;
         }
 
+        // Get the keep alive information from the request before it is consumed by the handler
+        let keep_alive = if let Ok(request) = &request {
+            if let Some(connection) = request.headers.get(&RequestHeader::Connection) {
+                if connection.to_ascii_lowercase() != "keep-alive" {
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
         // Generate the response based on the handlers
-        let response = match &request {
+        let response = match request {
             Ok(request) => match routes.iter().find(|r| r.route.route_matches(&request.uri)) {
                 Some(handler) => (handler.handler)(request, cloned_state),
                 None => error_handler(Some(request), StatusCode::NotFound),
@@ -253,15 +268,7 @@ fn client_handler<State>(
         };
 
         // If the request specified to keep the connection open, respect this
-        if let Ok(request) = request {
-            if let Some(connection) = request.headers.get(&RequestHeader::Connection) {
-                if connection.to_ascii_lowercase() != "keep-alive" {
-                    break;
-                }
-            } else {
-                break;
-            }
-        } else {
+        if !keep_alive {
             break;
         }
     }
@@ -269,7 +276,7 @@ fn client_handler<State>(
 
 /// The default error handler for every Humphrey app.
 /// This can be overridden by using the `with_error_handler` method when building the app.
-fn error_handler(request: Option<&Request>, status_code: StatusCode) -> Response {
+fn error_handler(request: Option<Request>, status_code: StatusCode) -> Response {
     let body = format!(
         "<html><body><h1>{} {}</h1></body></html>",
         Into::<u16>::into(status_code.clone()),
@@ -279,7 +286,7 @@ fn error_handler(request: Option<&Request>, status_code: StatusCode) -> Response
     if let Some(request) = request {
         Response::new(status_code)
             .with_bytes(body.as_bytes().to_vec())
-            .with_request_compatibility(request)
+            .with_request_compatibility(&request)
             .with_generated_headers()
     } else {
         Response::new(status_code)
