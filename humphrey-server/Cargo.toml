@@ -1,5 +1,5 @@
 [package]
-name = "humphrey-server"
+name = "humphrey_server"
 version = "0.1.0"
 edition = "2018"
 
@@ -8,4 +8,9 @@ humphrey = { path = "../humphrey" }
 libloading = { version = "0.7", optional = true }
 
 [features]
+default = ["plugins"]
 plugins = ["libloading"]
+
+[lib]
+test = false
+doctest = false
