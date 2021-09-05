@@ -18,7 +18,10 @@ pub trait Plugin: Any + Send + Sync + Debug {
 
     /// Called when the plugin is first loaded.
     /// Any set-up that needs to be done before requests are handled should be done here.
-    fn on_load(&mut self) {}
+    /// If the plugin cannot load for any reason, it should return `Err("error message")`.
+    fn on_load(&mut self) -> Result<(), &'static str> {
+        Ok(())
+    }
 
     /// Called when a request is received but before it is processed. May modify the request in-place.
     /// Should return `None` to indicate that Humphrey should process the request,

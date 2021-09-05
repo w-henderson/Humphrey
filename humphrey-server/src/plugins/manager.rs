@@ -34,13 +34,15 @@ impl PluginManager {
         // Load the plugin and store its instance on the heap
         let boxed_raw = init_function();
         let mut plugin = Box::from_raw(boxed_raw);
-        plugin.on_load();
 
-        let name = plugin.name().to_string();
-
-        self.plugins.push(plugin);
-
-        Ok(name)
+        // If the plugin does not load, show the error message
+        if let Err(e) = plugin.on_load() {
+            Err(e)
+        } else {
+            let name = plugin.name().to_string();
+            self.plugins.push(plugin);
+            Ok(name)
+        }
     }
 
     /// Calls the `on_request` function on every plugin.
