@@ -45,7 +45,7 @@ impl From<&Config> for AppState {
             blacklist_mode: config.blacklist_mode.clone(),
             logger: Logger::from(config),
             #[cfg(feature = "plugins")]
-            plugin_manager: Mutex::new(PluginManager::from(config)),
+            plugin_manager: Mutex::new(PluginManager::default()),
         }
     }
 }
@@ -60,17 +60,17 @@ pub fn main(config: Config) {
 
     let addr = format!("{}:{}", config.address, config.port);
 
-    let logger = &app.get_state().logger;
+    let state = app.get_state();
+    let logger = &state.logger;
     logger.info("Starting static server");
-    logger.info(&format!("Running at {}", addr));
 
     #[cfg(feature = "plugins")]
     {
-        let plugin_manager = &app.get_state().plugin_manager.lock().unwrap();
-        let plugins_count = plugin_manager.plugin_count();
-        logger.info(&format!("Running with {} plugins", plugins_count));
+        let plugins_count = load_plugins(&config, state);
+        logger.info(&format!("Loaded {} plugins", plugins_count));
     };
 
+    logger.info(&format!("Running at {}", addr));
     logger.debug(&format!("Configuration: {:?}", &config));
 
     app.run(addr).unwrap();
@@ -254,24 +254,25 @@ fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppStat
 }
 
 #[cfg(feature = "plugins")]
-impl From<&Config> for PluginManager {
-    fn from(config: &Config) -> Self {
-        let mut manager = PluginManager::default();
+fn load_plugins(config: &Config, state: &Arc<AppState>) -> usize {
+    let mut manager = state.plugin_manager.lock().unwrap();
 
-        for path in &config.plugin_libraries {
-            unsafe {
-                match manager.load_plugin(path) {
-                    Ok(name) => {
-                        Logger::init(&format!("Loaded plugin {}", name));
-                    }
-                    Err(e) => {
-                        Logger::init(&format!("Could not initialise plugin from {}", path));
-                        Logger::init(&format!("Error message: {}", e));
-                    }
+    for path in &config.plugin_libraries {
+        unsafe {
+            match manager.load_plugin(path) {
+                Ok(name) => {
+                    state.logger.info(&format!("Loaded plugin {}", name));
+                }
+                Err(e) => {
+                    state
+                        .logger
+                        .error(&format!("Could not initialise plugin from {}", path));
+                    state.logger.error(&format!("Error message: {}", e));
+                    state.logger.error("Ignoring this plugin");
                 }
             }
         }
-
-        manager
     }
+
+    manager.plugin_count()
 }

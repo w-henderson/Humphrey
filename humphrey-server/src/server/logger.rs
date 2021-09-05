@@ -83,12 +83,6 @@ impl Logger {
         }
     }
 
-    /// Logs initialisation information, used for plugins.
-    #[cfg(feature = "plugins")]
-    pub fn init(message: &str) {
-        println!("{} [INIT]  {}", Logger::time_format(), message);
-    }
-
     /// Formats the current time into the format `YYYY-MM-DD HH:MM:SS`
     fn time_format() -> String {
         let time = DateTime::now();
