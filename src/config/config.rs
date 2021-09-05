@@ -35,6 +35,7 @@ pub struct Config {
     /// WebSocket proxy address
     pub websocket_proxy: Option<String>,
     /// Plugin sources
+    #[cfg(feature = "plugins")]
     pub plugin_libraries: Vec<String>,
     /// Proxy target address
     pub proxy_target: Option<String>,
@@ -100,6 +101,7 @@ impl Default for Config {
             cache_time_limit: 0,
             directory: Some(String::new()),
             websocket_proxy: None,
+            #[cfg(feature = "plugins")]
             plugin_libraries: Vec::new(),
             proxy_target: None,
             load_balancer_targets: None,
@@ -167,6 +169,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
             let websocket_proxy = hashmap.get("static.websocket").map(|s| s.to_string());
 
             // Get and validate the plugins file
+            #[cfg(feature = "plugins")]
             let plugin_libraries = load_list_file(hashmap.get("static.plugins".into()).clone())?;
 
             Ok(Config {
@@ -182,6 +185,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 cache_time_limit,
                 directory: Some(directory),
                 websocket_proxy,
+                #[cfg(feature = "plugins")]
                 plugin_libraries,
                 proxy_target: None,
                 load_balancer_targets: None,
@@ -205,6 +209,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 cache_time_limit: 0,
                 directory: None,
                 websocket_proxy: None,
+                #[cfg(feature = "plugins")]
                 plugin_libraries: Vec::new(),
                 proxy_target: Some(proxy_target.clone()),
                 load_balancer_targets: None,
@@ -254,6 +259,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 cache_time_limit: 0,
                 directory: None,
                 websocket_proxy: None,
+                #[cfg(feature = "plugins")]
                 plugin_libraries: Vec::new(),
                 proxy_target: None,
                 load_balancer_targets: Some(targets),

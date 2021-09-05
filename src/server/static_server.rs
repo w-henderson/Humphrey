@@ -5,6 +5,8 @@ use humphrey::App;
 
 #[cfg(feature = "plugins")]
 use humphrey::plugins::manager::PluginManager;
+#[cfg(feature = "plugins")]
+use std::sync::Mutex;
 
 use crate::cache::Cache;
 use crate::config::{BlacklistMode, Config};
@@ -14,7 +16,7 @@ use crate::server::proxy::pipe;
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 use std::thread::spawn;
 
 /// Represents the application state.
@@ -105,7 +107,7 @@ fn file_handler_wrapper(mut request: Request, state: Arc<AppState>) -> Response 
 }
 
 #[cfg(not(feature = "plugins"))]
-fn file_handler_wrapper(mut request: Request, state: Arc<AppState>) -> Response {
+fn file_handler_wrapper(request: Request, state: Arc<AppState>) -> Response {
     file_handler(request, state)
 }
 
@@ -251,6 +253,7 @@ fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppStat
     }
 }
 
+#[cfg(feature = "plugins")]
 impl From<&Config> for PluginManager {
     fn from(config: &Config) -> Self {
         let mut manager = PluginManager::default();

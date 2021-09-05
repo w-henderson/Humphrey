@@ -84,6 +84,7 @@ impl Logger {
     }
 
     /// Logs plugin information.
+    #[cfg(feature = "plugins")]
     pub fn plugin(message: &str) {
         println!("{} [PLUGIN] {}", Logger::time_format(), message);
     }

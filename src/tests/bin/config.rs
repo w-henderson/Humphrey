@@ -56,6 +56,7 @@ cache_time = 60"#;
         cache_time_limit: 60,
         directory: Some("/var/www".into()),
         websocket_proxy: Some("localhost:1234".into()),
+        #[cfg(feature = "plugins")]
         plugin_libraries: Vec::new(),
         proxy_target: None,
         load_balancer_targets: None,

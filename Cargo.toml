@@ -7,7 +7,6 @@ edition = "2018"
 libloading = { version = "0.7", optional = true }
 
 [features]
-default = ["plugins"]
 plugins = ["libloading"]
 
 [lib]
