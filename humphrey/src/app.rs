@@ -12,11 +12,11 @@ use std::thread::spawn;
 /// Represents the Humphrey app.
 ///
 /// The type parameter represents the app state, which is shared between threads.
-/// It must implement the `Send` trait as well as `Default` for setting initial values.
-/// The state is given to every request as an `Arc<Mutex<State>>`.
+/// It must implement the `Send` and `Sync` traits to be sent between threads.
+/// The state is given to every request as an `Arc<State>`.
 pub struct App<State>
 where
-    State: Send + Default + 'static,
+    State: Send + Sync + 'static,
 {
     routes: Vec<RouteHandler<State>>,
     error_handler: ErrorHandler,
@@ -43,22 +43,22 @@ pub type ConnectionCondition<State> = fn(&mut TcpStream, Arc<State>) -> bool;
 pub type WebsocketHandler<State> = fn(Request, TcpStream, Arc<State>);
 
 /// Represents a function able to handle a request.
-/// It is passed a reference to the request as well as the app's state, and must return a response.
+/// It is passed a the request as well as the app's state, and must return a response.
 ///
 /// ## Example
 /// The most basic request handler would be as follows:
 /// ```
-/// fn handler(request: &Request, _: Arc<Mutex<()>>) -> Response {
+/// fn handler(request: Request, _: Arc<()>) -> Response {
 ///     Response::new(StatusCode::OK) // create the response
 ///         .with_bytes(b"<html><body><h1>Success</h1></body></html>".to_vec()) // add the body
-///         .with_request_compatibility(request) // ensure compatibility with the request
+///         .with_request_compatibility(&request) // ensure compatibility with the request
 ///         .with_generated_headers() // generate required headers
 /// }
 /// ```
 pub type RequestHandler<State> = fn(Request, Arc<State>) -> Response;
 
 /// Represents a function able to handle an error.
-/// The first parameter of type `Option<&Request>` will be `Some` if the request could be parsed.
+/// The first parameter of type `Option<Request>` will be `Some` if the request could be parsed.
 /// Otherwise, it will be `None` and the status code will be `StatusCode::BadRequest`.
 ///
 /// Every app has a default error handler, which simply displays the status code.
@@ -66,7 +66,7 @@ pub type RequestHandler<State> = fn(Request, Arc<State>) -> Response;
 ///
 /// ## Example
 /// ```
-/// fn error_handler(request: Option<&Request>, status_code: StatusCode) -> Response {
+/// fn error_handler(request: Option<Request>, status_code: StatusCode) -> Response {
 ///     let body = format!(
 ///         "<html><body><h1>{} {}</h1></body></html>",
 ///         Into::<u16>::into(status_code.clone()),
@@ -76,7 +76,7 @@ pub type RequestHandler<State> = fn(Request, Arc<State>) -> Response;
 ///     if let Some(request) = request {
 ///         Response::new(status_code)
 ///             .with_bytes(body.as_bytes().to_vec())
-///             .with_request_compatibility(request)
+///             .with_request_compatibility(&request)
 ///             .with_generated_headers()
 ///     } else {
 ///         Response::new(status_code)
@@ -92,10 +92,13 @@ pub type HumphreyError = Box<dyn std::error::Error>;
 
 impl<State> App<State>
 where
-    State: Send + Sync + Default + 'static,
+    State: Send + Sync + 'static,
 {
     /// Initialises a new Humphrey app.
-    pub fn new() -> Self {
+    pub fn new() -> Self
+    where
+        State: Default,
+    {
         Self {
             routes: Vec::new(),
             error_handler,
