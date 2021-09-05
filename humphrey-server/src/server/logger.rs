@@ -83,10 +83,10 @@ impl Logger {
         }
     }
 
-    /// Logs plugin information.
+    /// Logs initialisation information, used for plugins.
     #[cfg(feature = "plugins")]
-    pub fn plugin(message: &str) {
-        println!("{} [PLUGIN] {}", Logger::time_format(), message);
+    pub fn init(message: &str) {
+        println!("{} [INIT]  {}", Logger::time_format(), message);
     }
 
     /// Formats the current time into the format `YYYY-MM-DD HH:MM:SS`

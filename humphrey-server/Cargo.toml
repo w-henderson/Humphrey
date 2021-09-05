@@ -8,7 +8,6 @@ humphrey = { path = "../humphrey" }
 libloading = { version = "0.7", optional = true }
 
 [features]
-default = ["plugins"]
 plugins = ["libloading"]
 
 [lib]

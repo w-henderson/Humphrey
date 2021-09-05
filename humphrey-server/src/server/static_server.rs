@@ -22,14 +22,14 @@ use std::thread::spawn;
 /// Represents the application state.
 /// Includes the target directory, cache state, and the logger.
 #[derive(Default)]
-struct AppState {
-    directory: String,
-    cache_limit: usize,
-    cache: RwLock<Cache>,
-    websocket_proxy: Option<String>,
-    blacklist: Vec<String>,
-    blacklist_mode: BlacklistMode,
-    logger: Logger,
+pub struct AppState {
+    pub directory: String,
+    pub cache_limit: usize,
+    pub cache: RwLock<Cache>,
+    pub websocket_proxy: Option<String>,
+    pub blacklist: Vec<String>,
+    pub blacklist_mode: BlacklistMode,
+    pub logger: Logger,
     #[cfg(feature = "plugins")]
     plugin_manager: Mutex<PluginManager>,
 }
@@ -98,10 +98,10 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
 #[cfg(feature = "plugins")]
 fn file_handler_wrapper(mut request: Request, state: Arc<AppState>) -> Response {
     let mut plugins = state.plugin_manager.lock().unwrap();
-    plugins.on_request(&mut request, Logger::plugin);
+    plugins.on_request(&mut request, state.clone());
 
     let mut response = file_handler(request, state.clone());
-    plugins.on_response(&mut response, Logger::plugin);
+    plugins.on_response(&mut response, state.clone());
 
     response
 }
@@ -260,10 +260,15 @@ impl From<&Config> for PluginManager {
 
         for path in &config.plugin_libraries {
             unsafe {
-                if let Err(s) = manager.load_plugin(path, Logger::plugin) {
-                    Logger::plugin(&format!("Could not initialise plugin from {}", path));
-                    Logger::plugin(&format!("Error message: {}", s));
-                };
+                match manager.load_plugin(path) {
+                    Ok(name) => {
+                        Logger::init(&format!("Loaded plugin {}", name));
+                    }
+                    Err(e) => {
+                        Logger::init(&format!("Could not initialise plugin from {}", path));
+                        Logger::init(&format!("Error message: {}", e));
+                    }
+                }
             }
         }
 
