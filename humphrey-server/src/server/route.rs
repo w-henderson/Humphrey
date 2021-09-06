@@ -1,14 +1,15 @@
-use std::fs::{metadata, File};
+use std::fs::metadata;
+use std::path::PathBuf;
 
 pub struct LocatedPath {
-    pub file: File,
+    pub path: PathBuf,
     pub was_redirected: bool,
 }
 
-/// Attemps to open a given path.
-/// If the path itself is not found, attemps to open index files within it.
+/// Attemps to find a given path.
+/// If the path itself is not found, attemps to find index files within it.
 /// If these are not found, returns `None`.
-pub fn try_open_path(path: &str) -> Option<LocatedPath> {
+pub fn try_find_path(path: &str) -> Option<LocatedPath> {
     let paths = if &path.chars().nth(0) == &Some('/') {
         vec![
             path[1..].to_string(),
@@ -26,12 +27,10 @@ pub fn try_open_path(path: &str) -> Option<LocatedPath> {
     for (index, path) in paths.iter().enumerate() {
         if let Ok(meta) = metadata(path) {
             if meta.is_file() {
-                if let Ok(file) = File::open(path) {
-                    return Some(LocatedPath {
-                        file,
-                        was_redirected: index != 0,
-                    });
-                }
+                return Some(LocatedPath {
+                    path: PathBuf::from(path).canonicalize().unwrap(),
+                    was_redirected: index != 0,
+                });
             }
         }
     }

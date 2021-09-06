@@ -11,9 +11,10 @@ use std::sync::Mutex;
 use crate::cache::Cache;
 use crate::config::{BlacklistMode, Config};
 use crate::logger::Logger;
-use crate::route::try_open_path;
+use crate::route::try_find_path;
 use crate::server::proxy::pipe;
 
+use std::fs::File;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::{Arc, RwLock};
@@ -155,7 +156,7 @@ fn file_handler(request: Request, state: Arc<AppState>) -> Response {
         drop(cache);
     }
 
-    if let Some(mut located) = try_open_path(&full_path) {
+    if let Some(located) = try_find_path(&full_path) {
         if located.was_redirected && request.uri.chars().last() != Some('/') {
             state.logger.info(&format!(
                 "{}: 302 Moved Permanently {}",
@@ -167,14 +168,17 @@ fn file_handler(request: Request, state: Arc<AppState>) -> Response {
                 .with_generated_headers();
         }
 
-        let file_extension = if located.was_redirected {
-            "html"
-        } else {
-            request.uri.split(".").last().unwrap_or("")
-        };
+        let file_extension = located
+            .path
+            .extension()
+            .map(|s| s.to_str().unwrap())
+            .unwrap_or("");
+
         let mime_type = MimeType::from_extension(file_extension);
         let mut contents: Vec<u8> = Vec::new();
-        located.file.read_to_end(&mut contents).unwrap();
+
+        let mut file = File::open(located.path).unwrap();
+        file.read_to_end(&mut contents).unwrap();
 
         if state.cache_limit >= contents.len() {
             let mut cache = state.cache.write().unwrap();
