@@ -4,6 +4,7 @@ use crate::fcgi::types::FcgiType;
 
 use std::collections::HashMap;
 
+/// Represents an FCGI request.
 pub struct FcgiRequest<'a> {
     pub params: HashMap<String, String>,
     pub content: &'a [u8],
@@ -11,6 +12,7 @@ pub struct FcgiRequest<'a> {
 }
 
 impl<'a> FcgiRequest<'a> {
+    /// Create a new FCGI request with the given parameters.
     pub fn new(params: HashMap<String, String>, content: &'a [u8], keep_alive: bool) -> Self {
         Self {
             params,
@@ -19,6 +21,7 @@ impl<'a> FcgiRequest<'a> {
         }
     }
 
+    /// Encode an FCGI request into bytes to send.
     pub fn encode(&self) -> Vec<u8> {
         let request_id: u16 = 0;
         let mut request: Vec<u8> = Vec::new();

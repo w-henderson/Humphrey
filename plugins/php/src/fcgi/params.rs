@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
+/// Represents an object able to be encoded into parameters.
+/// This is currently unused and is only implemented for a hashmap of strings.
 pub trait Params {
+    /// Encode the parameters into bytes.
     fn encode(&self) -> Vec<u8>;
 }
 

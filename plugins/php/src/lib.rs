@@ -15,10 +15,11 @@ use crate::fcgi::record::FcgiRecord;
 use crate::fcgi::request::FcgiRequest;
 use crate::fcgi::types::FcgiType;
 
-pub mod fcgi;
+mod fcgi;
 
 #[derive(Debug, Default)]
 pub struct PhpPlugin {
+    /// Represents the TCP stream to the PHP interpreter.
     cgi_stream: Option<Mutex<TcpStream>>,
 }
 
@@ -28,6 +29,7 @@ impl Plugin for PhpPlugin {
     }
 
     fn on_load(&mut self) -> Result<(), &'static str> {
+        // Attemps to connect to the PHP interpreter
         let stream = TcpStream::connect("127.0.0.1:9000")
             .map_err(|_| "Could not connect to the PHP CGI server on port 9000")?;
         self.cgi_stream = Some(Mutex::new(stream));
@@ -37,17 +39,23 @@ impl Plugin for PhpPlugin {
 
     fn on_request(&mut self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
         if request.uri.split('.').last().unwrap() == "php" {
+            // If the requested file is a PHP file, process it
+
             let full_path = format!("{}{}", state.directory, request.uri);
 
+            // Check that the file exists
             if let Some(located) = try_find_path(&full_path) {
                 let stream_mutex = self.cgi_stream.as_ref().unwrap();
                 let mut stream = stream_mutex.lock().unwrap();
 
                 let file_name = located.path.to_str().unwrap().to_string();
 
+                // On Windows, paths generated in this way have "\\?\" at the start
+                // This means the path length limit is bypassed
                 #[cfg(windows)]
                 let file_name = file_name.replace("\\\\?\\", "");
 
+                // Insert the parameters into a hashmap
                 let mut params: HashMap<String, String> = HashMap::new();
                 params.insert("GATEWAY_INTERFACE".into(), "FastCGI/1.0".into());
                 params.insert("REQUEST_METHOD".into(), request.method.to_string());
@@ -69,14 +77,17 @@ impl Plugin for PhpPlugin {
                         .to_string(),
                 );
 
+                // Generate the FCGI request
                 let empty_vec = Vec::new();
                 let fcgi_request =
                     FcgiRequest::new(params, request.content.as_ref().unwrap_or(&empty_vec), true);
 
+                // Send the request to the PHP interpreter
                 stream.write(&fcgi_request.encode()).unwrap();
 
                 let mut records: Vec<FcgiRecord> = Vec::new();
 
+                // Continually read responses until an `FcgiType::End` response is reached
                 loop {
                     let record = FcgiRecord::from(&mut stream);
                     if record.fcgi_type == FcgiType::End {
@@ -85,6 +96,7 @@ impl Plugin for PhpPlugin {
                     records.push(record);
                 }
 
+                // Assume the content to be UTF-8 and parse the headers
                 let content = std::str::from_utf8(&records[0].content_data).unwrap();
                 let mut headers: ResponseHeaderMap = BTreeMap::new();
                 let mut content_split = content.splitn(2, "\r\n\r\n");
@@ -99,9 +111,11 @@ impl Plugin for PhpPlugin {
                     }
                 }
 
+                // Create a response
                 let mut response = Response::new(StatusCode::OK)
                     .with_bytes(content_split.next().unwrap_or("").as_bytes().to_vec());
 
+                // Add the headers
                 response.headers = headers;
 
                 state.logger.info(&format!(
@@ -109,15 +123,20 @@ impl Plugin for PhpPlugin {
                     request.address, request.uri
                 ));
 
+                // Add final headers and return the response
                 Some(
                     response
                         .with_request_compatibility(&request)
                         .with_generated_headers(),
                 )
             } else {
+                // If the file requested was not found, allow Humphrey to handle the error
+
                 None
             }
         } else {
+            // If the file requested was not a PHP file, make no changes and allow Humphrey to handle it
+
             None
         }
     }

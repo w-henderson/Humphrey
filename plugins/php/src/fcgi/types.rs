@@ -3,12 +3,7 @@ use std::convert::TryFrom;
 pub const FCGI_VERSION: u8 = 1;
 pub const FCGI_HEADER_SIZE: usize = 8;
 
-pub enum FcgiRole {
-    Responder = 1,
-    Authorizer,
-    Filter,
-}
-
+/// Represents a type of request.
 #[derive(Debug, PartialEq, Eq)]
 pub enum FcgiType {
     Begin = 1,
@@ -22,12 +17,6 @@ pub enum FcgiType {
     GetValues,
     GetValuesResult,
     UnknownType,
-}
-
-pub enum FcgiState {
-    Send = 1,
-    Error,
-    Success,
 }
 
 impl TryFrom<u8> for FcgiType {

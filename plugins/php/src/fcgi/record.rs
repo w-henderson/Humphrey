@@ -1,11 +1,12 @@
 use crate::fcgi::types::FcgiType;
-use crate::fcgi::types::{FcgiRole, FCGI_HEADER_SIZE, FCGI_VERSION};
+use crate::fcgi::types::{FCGI_HEADER_SIZE, FCGI_VERSION};
 
 use std::convert::TryInto;
 use std::io::Read;
 use std::net::TcpStream;
 use std::sync::MutexGuard;
 
+/// Represents an FCGI record, a component of a transmission.
 #[derive(Debug)]
 pub struct FcgiRecord {
     pub version: u8,
@@ -19,6 +20,7 @@ pub struct FcgiRecord {
 }
 
 impl FcgiRecord {
+    /// Create a new FCGI record with the given parameters and infer the rest.
     pub fn new(fcgi_type: FcgiType, content: &[u8], request_id: u16) -> Self {
         Self {
             version: FCGI_VERSION,
@@ -32,12 +34,13 @@ impl FcgiRecord {
         }
     }
 
+    /// Return a "begin" record
     pub fn begin_record(request_id: u16, keep_alive: bool) -> Self {
         FcgiRecord::new(
             FcgiType::Begin,
             &[
                 0,
-                FcgiRole::Responder as u8,
+                1, // responder
                 keep_alive as u8,
                 0,
                 0,
