@@ -36,7 +36,7 @@ impl Read for MockStream {
 
 #[test]
 fn test_request_from_stream() {
-    let test_data = b"GET /testpath HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    let test_data = b"GET /testpath?foo=bar HTTP/1.1\r\nHost: localhost\r\n\r\n";
     let mut stream = MockStream::with_data(test_data.to_vec());
     let request = Request::from_stream(&mut stream, "1.2.3.4:5678".parse().unwrap());
 
@@ -44,8 +44,10 @@ fn test_request_from_stream() {
 
     let request = request.unwrap();
     let expected_uri: String = "/testpath".into();
+    let expected_query: String = "foo=bar".into();
     assert_eq!(request.method, Method::Get);
     assert_eq!(request.uri, expected_uri);
+    assert_eq!(request.query, expected_query);
     assert_eq!(request.version, "HTTP/1.1");
     assert_eq!(request.content, None);
     assert_eq!(request.address, Address::new("1.2.3.4:5678"));
@@ -60,6 +62,7 @@ fn test_bytes_from_request() {
     let mut test_data = Request {
         method: Method::Get,
         uri: "/test".into(),
+        query: "foo=bar".into(),
         version: "HTTP/1.1".into(),
         headers: BTreeMap::new(),
         content: Some(b"this is a test".to_vec()),
@@ -73,7 +76,7 @@ fn test_bytes_from_request() {
         .headers
         .insert(RequestHeader::ContentType, "text/plain".into());
 
-    let expected_bytes = b"GET /test HTTP/1.1\r\nContent-Length: 14\r\nContent-Type: text/plain\r\n\r\nthis is a test".to_vec();
+    let expected_bytes = b"GET /test?foo=bar HTTP/1.1\r\nContent-Length: 14\r\nContent-Type: text/plain\r\n\r\nthis is a test".to_vec();
 
     let bytes: Vec<u8> = test_data.into();
 

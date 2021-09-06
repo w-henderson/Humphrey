@@ -14,6 +14,8 @@ pub struct Request {
     pub method: Method,
     /// The URI to which the request was made.
     pub uri: String,
+    /// The query string of the request.
+    pub query: String,
     /// The HTTP version of the request.
     pub version: String,
     /// A map of headers included in the request.
@@ -60,8 +62,11 @@ impl Request {
         safe_assert(start_line.len() == 3)?;
 
         let method = Method::from_name(start_line[0])?;
-        let uri = start_line[1].to_string();
         let version = start_line[2].to_string().replace("\r\n", "");
+
+        let mut uri_iter = start_line[1].splitn(2, '?');
+        let uri = uri_iter.next().unwrap().to_string();
+        let query = uri_iter.next().unwrap_or("").to_string();
 
         let mut headers = RequestHeaderMap::new();
 
@@ -98,6 +103,7 @@ impl Request {
             Ok(Self {
                 method,
                 uri,
+                query,
                 version,
                 headers,
                 content: Some(content_buf),
@@ -107,6 +113,7 @@ impl Request {
             Ok(Self {
                 method,
                 uri,
+                query,
                 version,
                 headers,
                 content: None,
@@ -126,7 +133,15 @@ fn safe_assert(condition: bool) -> Result<(), RequestError> {
 
 impl Into<Vec<u8>> for Request {
     fn into(self) -> Vec<u8> {
-        let start_line = format!("{} {} {}", self.method, self.uri, self.version);
+        let start_line = if self.query.len() == 0 {
+            format!("{} {} {}", self.method, self.uri, self.version)
+        } else {
+            format!(
+                "{} {}?{} {}",
+                self.method, self.uri, self.query, self.version
+            )
+        };
+
         let headers = self
             .headers
             .iter()
