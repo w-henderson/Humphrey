@@ -43,6 +43,8 @@ pub struct Config {
     pub load_balancer_targets: Option<Vec<String>>,
     /// Algorithm for load balancing
     pub load_balancer_mode: Option<LoadBalancerMode>,
+    /// Raw configuration hashmap
+    pub raw: HashMap<String, String>,
 }
 
 // Represents a hosting mode.
@@ -106,6 +108,7 @@ impl Default for Config {
             proxy_target: None,
             load_balancer_targets: None,
             load_balancer_mode: None,
+            raw: HashMap::new(),
         }
     }
 }
@@ -190,6 +193,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 proxy_target: None,
                 load_balancer_targets: None,
                 load_balancer_mode: None,
+                raw: hashmap,
             })
         }
         "proxy" => {
@@ -214,6 +218,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 proxy_target: Some(proxy_target.clone()),
                 load_balancer_targets: None,
                 load_balancer_mode: None,
+                raw: hashmap,
             })
         }
         "load_balancer" => {
@@ -264,6 +269,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 proxy_target: None,
                 load_balancer_targets: Some(targets),
                 load_balancer_mode: Some(load_balancer_mode),
+                raw: hashmap,
             })
         }
         _ => Err("The server mode was invalid"),

@@ -43,6 +43,20 @@ cache = 128M
 cache_time = 60"#;
 
     let config = load_config(Some(config_string.into())).unwrap();
+
+    let mut expected_hashmap: HashMap<String, String> = HashMap::new();
+    expected_hashmap.insert("server.address".into(), "127.0.0.1".into());
+    expected_hashmap.insert("server.port".into(), "8000".into());
+    expected_hashmap.insert("server.mode".into(), "static".into());
+    expected_hashmap.insert("log.level".into(), "info".into());
+    expected_hashmap.insert("log.console".into(), "false".into());
+    expected_hashmap.insert("log.file".into(), "humphrey.log".into());
+    expected_hashmap.insert("blacklist.mode".into(), "forbidden".into());
+    expected_hashmap.insert("static.directory".into(), "/var/www".into());
+    expected_hashmap.insert("static.websocket".into(), "localhost:1234".into());
+    expected_hashmap.insert("static.cache".into(), "128M".into());
+    expected_hashmap.insert("static.cache_time".into(), "60".into());
+
     let expected_config = Config {
         address: "127.0.0.1".into(),
         port: 8000,
@@ -61,6 +75,7 @@ cache_time = 60"#;
         proxy_target: None,
         load_balancer_targets: None,
         load_balancer_mode: None,
+        raw: expected_hashmap,
     };
 
     assert_eq!(config, expected_config);

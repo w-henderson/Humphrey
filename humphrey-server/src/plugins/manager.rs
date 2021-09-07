@@ -2,6 +2,7 @@
 //!
 //! https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html
 
+use crate::config::Config;
 use crate::plugins::plugin::{Plugin, PluginLoadResult};
 use crate::static_server::AppState;
 use humphrey::http::{Request, Response};
@@ -18,7 +19,12 @@ pub struct PluginManager {
 
 impl PluginManager {
     /// Loads a plugin library.
-    pub unsafe fn load_plugin(&mut self, path: &str) -> PluginLoadResult<String, &'static str> {
+    pub unsafe fn load_plugin(
+        &mut self,
+        path: &str,
+        config: &Config,
+        state: Arc<AppState>,
+    ) -> PluginLoadResult<String, &'static str> {
         type PluginInitFunction = unsafe extern "C" fn() -> *mut dyn Plugin;
 
         // Load the plugin library, store it on the heap, and use a reference to the heap allocated instance
@@ -35,7 +41,7 @@ impl PluginManager {
                 let mut plugin = Box::from_raw(boxed_raw);
 
                 // Run the plugin's load function
-                let result = plugin.on_load();
+                let result = plugin.on_load(config, state);
 
                 // If the result is ok, add the plugin to the list and return its name
                 // Otherwise return the error message

@@ -275,9 +275,10 @@ fn load_plugins(config: &Config, state: &Arc<AppState>) -> Result<usize, ()> {
 
     for path in &config.plugin_libraries {
         unsafe {
-            match manager.load_plugin(path) {
+            let app_state = state.clone();
+            match manager.load_plugin(path, config, app_state) {
                 PluginLoadResult::Ok(name) => {
-                    state.logger.info(&format!("Loaded plugin {}", name));
+                    state.logger.info(&format!("Initialised plugin {}", name));
                 }
                 PluginLoadResult::NonFatal(e) => {
                     state
@@ -289,7 +290,7 @@ fn load_plugins(config: &Config, state: &Arc<AppState>) -> Result<usize, ()> {
                 PluginLoadResult::Fatal(e) => {
                     state
                         .logger
-                        .error(&format!("Could not load plugin from {}", path));
+                        .error(&format!("Could not initialise plugin from {}", path));
                     state.logger.error(&format!("Error message: {}", e));
 
                     return Err(());

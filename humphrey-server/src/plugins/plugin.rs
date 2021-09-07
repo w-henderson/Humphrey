@@ -5,6 +5,7 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
+use crate::config::Config;
 use crate::static_server::AppState;
 use humphrey::http::{Request, Response};
 
@@ -24,7 +25,11 @@ pub trait Plugin: Any + Send + Sync + Debug {
     ///   if the error is not fatal, for example configuration could not be loaded and defaults must be used, or
     ///   `PluginLoadResult::Fatal("error message")` if the error is fatal and will prevent the plugin from
     ///   working at all.
-    fn on_load(&mut self) -> PluginLoadResult<(), &'static str> {
+    fn on_load(
+        &mut self,
+        config: &Config,
+        state: Arc<AppState>,
+    ) -> PluginLoadResult<(), &'static str> {
         PluginLoadResult::Ok(())
     }
 
@@ -63,8 +68,11 @@ macro_rules! declare_plugin {
 /// It is based on the standard library's result, but with two error options for fatal and non-fatal errors.
 #[must_use = "this `PluginLoadResult` may be a `NonFatal` or `Fatal` variant, which should be handled"]
 pub enum PluginLoadResult<T, E> {
+    /// A successful result
     Ok(T),
+    /// A non-fatal error which can be worked around
     NonFatal(E),
+    /// A fatal error
     Fatal(E),
 }
 
