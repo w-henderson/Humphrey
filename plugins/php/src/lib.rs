@@ -2,13 +2,13 @@ use humphrey::http::headers::ResponseHeaderMap;
 use humphrey::http::{Request, Response, StatusCode};
 
 use humphrey_server::declare_plugin;
-use humphrey_server::plugins::plugin::Plugin;
+use humphrey_server::plugins::plugin::{Plugin, PluginLoadResult};
 use humphrey_server::route::try_find_path;
 use humphrey_server::static_server::AppState;
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
-use std::net::TcpStream;
+use std::net::{Shutdown, TcpStream};
 use std::sync::{Arc, Mutex};
 
 use crate::fcgi::record::FcgiRecord;
@@ -28,13 +28,15 @@ impl Plugin for PhpPlugin {
         "PHP Plugin"
     }
 
-    fn on_load(&mut self) -> Result<(), &'static str> {
+    fn on_load(&mut self) -> PluginLoadResult<(), &'static str> {
         // Attemps to connect to the PHP interpreter
-        let stream = TcpStream::connect("127.0.0.1:9000")
-            .map_err(|_| "Could not connect to the PHP CGI server on port 9000")?;
-        self.cgi_stream = Some(Mutex::new(stream));
-
-        Ok(())
+        if let Ok(stream) = TcpStream::connect("127.0.0.1:9000") {
+            self.cgi_stream = Some(Mutex::new(stream));
+            PluginLoadResult::Ok(())
+        } else {
+            // Fatal error, shut down Humphrey
+            PluginLoadResult::Fatal("Could not connect to the PHP CGI server on port 9000")
+        }
     }
 
     fn on_request(&mut self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
@@ -139,6 +141,15 @@ impl Plugin for PhpPlugin {
 
             None
         }
+    }
+
+    fn on_unload(&mut self) {
+        let stream_mutex = self.cgi_stream.as_ref().unwrap();
+        let stream = stream_mutex.lock().unwrap();
+        stream.shutdown(Shutdown::Both).unwrap();
+        drop(stream);
+
+        self.cgi_stream = None;
     }
 }
 
