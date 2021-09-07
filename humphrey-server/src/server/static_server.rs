@@ -6,6 +6,8 @@ use humphrey::App;
 #[cfg(feature = "plugins")]
 use crate::plugins::manager::PluginManager;
 #[cfg(feature = "plugins")]
+use crate::plugins::plugin::PluginLoadResult;
+#[cfg(feature = "plugins")]
 use std::sync::Mutex;
 
 use crate::cache::Cache;
@@ -67,8 +69,11 @@ pub fn main(config: Config) {
 
     #[cfg(feature = "plugins")]
     {
-        let plugins_count = load_plugins(&config, state);
-        logger.info(&format!("Loaded {} plugins", plugins_count));
+        if let Ok(plugins_count) = load_plugins(&config, state) {
+            logger.info(&format!("Loaded {} plugins", plugins_count))
+        } else {
+            return;
+        }
     };
 
     logger.info(&format!("Running at {}", addr));
@@ -265,25 +270,33 @@ fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppStat
 }
 
 #[cfg(feature = "plugins")]
-fn load_plugins(config: &Config, state: &Arc<AppState>) -> usize {
+fn load_plugins(config: &Config, state: &Arc<AppState>) -> Result<usize, ()> {
     let mut manager = state.plugin_manager.lock().unwrap();
 
     for path in &config.plugin_libraries {
         unsafe {
             match manager.load_plugin(path) {
-                Ok(name) => {
+                PluginLoadResult::Ok(name) => {
                     state.logger.info(&format!("Loaded plugin {}", name));
                 }
-                Err(e) => {
+                PluginLoadResult::NonFatal(e) => {
                     state
                         .logger
-                        .error(&format!("Could not initialise plugin from {}", path));
+                        .warn(&format!("Non-fatal plugin error from {}", path));
+                    state.logger.warn(&format!("Error message: {}", e));
+                    state.logger.warn("Ignoring this plugin");
+                }
+                PluginLoadResult::Fatal(e) => {
+                    state
+                        .logger
+                        .error(&format!("Could not load plugin from {}", path));
                     state.logger.error(&format!("Error message: {}", e));
-                    state.logger.error("Ignoring this plugin");
+
+                    return Err(());
                 }
             }
         }
     }
 
-    manager.plugin_count()
+    Ok(manager.plugin_count())
 }

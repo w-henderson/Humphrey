@@ -2,11 +2,11 @@
 //!
 //! https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html
 
-use crate::plugins::plugin::Plugin;
+use crate::plugins::plugin::{Plugin, PluginLoadResult};
 use crate::static_server::AppState;
 use humphrey::http::{Request, Response};
 
-use libloading::{Library, Symbol};
+use libloading::Library;
 use std::sync::Arc;
 
 /// Encapsulates plugins and their corresponding libraries.
@@ -18,30 +18,39 @@ pub struct PluginManager {
 
 impl PluginManager {
     /// Loads a plugin library.
-    pub unsafe fn load_plugin(&mut self, path: &str) -> Result<String, &str> {
+    pub unsafe fn load_plugin(&mut self, path: &str) -> PluginLoadResult<String, &'static str> {
         type PluginInitFunction = unsafe extern "C" fn() -> *mut dyn Plugin;
 
         // Load the plugin library, store it on the heap, and use a reference to the heap allocated instance
-        let library = Library::new(path).map_err(|_| "Couldn't load library")?;
-        self.libraries.push(library);
-        let library = self.libraries.last().unwrap();
+        // If the library doesn't load, return an error
+        if let Ok(library) = Library::new(path) {
+            self.libraries.push(library);
+            let library = self.libraries.last().unwrap();
 
-        // Get the initialisation function from the library
-        let init_function: Symbol<PluginInitFunction> = library
-            .get(b"_plugin_init")
-            .map_err(|_| "Initialisation function not found")?;
+            // Get the initialisation function from the library
+            // If the function can't be found, return an error
+            if let Ok(init_function) = library.get::<PluginInitFunction>(b"_plugin_init") {
+                // Load the plugin and store its instance on the heap
+                let boxed_raw = init_function();
+                let mut plugin = Box::from_raw(boxed_raw);
 
-        // Load the plugin and store its instance on the heap
-        let boxed_raw = init_function();
-        let mut plugin = Box::from_raw(boxed_raw);
+                // Run the plugin's load function
+                let result = plugin.on_load();
 
-        // If the plugin does not load, show the error message
-        if let Err(e) = plugin.on_load() {
-            Err(e)
+                // If the result is ok, add the plugin to the list and return its name
+                // Otherwise return the error message
+                result.map(|_| {
+                    let name = plugin.name().to_string();
+                    self.plugins.push(plugin);
+                    name
+                })
+            } else {
+                PluginLoadResult::Fatal(
+                    "Couldn't find plugin initialisation function in the library",
+                )
+            }
         } else {
-            let name = plugin.name().to_string();
-            self.plugins.push(plugin);
-            Ok(name)
+            PluginLoadResult::Fatal("Couldn't load dynamic library")
         }
     }
 
