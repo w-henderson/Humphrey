@@ -1,6 +1,8 @@
 use humphrey::http::headers::ResponseHeaderMap;
 use humphrey::http::{Request, Response, StatusCode};
 
+use humphrey_server::config::extended_hashmap::ExtendedMap;
+use humphrey_server::config::Config;
 use humphrey_server::declare_plugin;
 use humphrey_server::plugins::plugin::{Plugin, PluginLoadResult};
 use humphrey_server::route::try_find_path;
@@ -28,14 +30,29 @@ impl Plugin for PhpPlugin {
         "PHP Plugin"
     }
 
-    fn on_load(&mut self) -> PluginLoadResult<(), &'static str> {
+    fn on_load(
+        &mut self,
+        config: &Config,
+        state: Arc<AppState>,
+    ) -> PluginLoadResult<(), &'static str> {
+        // Parses the configuration
+        let php_address = config.raw.get_optional("php.address", "127.0.0.1".into());
+        let php_port = config.raw.get_optional("php.port", "9000".into());
+        let php_target = format!("{}:{}", php_address, php_port);
+
         // Attemps to connect to the PHP interpreter
-        if let Ok(stream) = TcpStream::connect("127.0.0.1:9000") {
+        if let Ok(stream) = TcpStream::connect(&php_target) {
             self.cgi_stream = Some(Mutex::new(stream));
+
+            state.logger.info(&format!(
+                "PHP Plugin connected to FCGI server at {}",
+                php_target
+            ));
+
             PluginLoadResult::Ok(())
         } else {
             // Fatal error, shut down Humphrey
-            PluginLoadResult::Fatal("Could not connect to the PHP CGI server on port 9000")
+            PluginLoadResult::Fatal("Could not connect to the PHP CGI server")
         }
     }
 
