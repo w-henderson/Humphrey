@@ -3,8 +3,6 @@ use crate::fcgi::types::{FCGI_HEADER_SIZE, FCGI_VERSION};
 
 use std::convert::TryInto;
 use std::io::Read;
-use std::net::TcpStream;
-use std::sync::MutexGuard;
 
 /// Represents an FCGI record, a component of a transmission.
 #[derive(Debug)]
@@ -71,8 +69,11 @@ impl Into<Vec<u8>> for FcgiRecord {
     }
 }
 
-impl<'a> From<&mut MutexGuard<'a, TcpStream>> for FcgiRecord {
-    fn from(stream: &mut MutexGuard<'a, TcpStream>) -> Self {
+impl<T> From<T> for FcgiRecord
+where
+    T: Read,
+{
+    fn from(mut stream: T) -> Self {
         let mut header: [u8; FCGI_HEADER_SIZE] = [0; FCGI_HEADER_SIZE];
         stream.read_exact(&mut header).unwrap();
 

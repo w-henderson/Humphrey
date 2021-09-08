@@ -11,7 +11,7 @@ use humphrey_server::static_server::AppState;
 use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
 use std::net::{Shutdown, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::fcgi::record::FcgiRecord;
 use crate::fcgi::request::FcgiRequest;
@@ -22,7 +22,7 @@ mod fcgi;
 #[derive(Debug, Default)]
 pub struct PhpPlugin {
     /// Represents the TCP stream to the PHP interpreter.
-    cgi_stream: Option<Mutex<TcpStream>>,
+    cgi_stream: Option<TcpStream>,
 }
 
 impl Plugin for PhpPlugin {
@@ -42,7 +42,7 @@ impl Plugin for PhpPlugin {
 
         // Attemps to connect to the PHP interpreter
         if let Ok(stream) = TcpStream::connect(&php_target) {
-            self.cgi_stream = Some(Mutex::new(stream));
+            self.cgi_stream = Some(stream);
 
             state.logger.info(&format!(
                 "PHP Plugin connected to FCGI server at {}",
@@ -64,9 +64,6 @@ impl Plugin for PhpPlugin {
 
             // Check that the file exists
             if let Some(located) = try_find_path(&full_path) {
-                let stream_mutex = self.cgi_stream.as_ref().unwrap();
-                let mut stream = stream_mutex.lock().unwrap();
-
                 let file_name = located.path.to_str().unwrap().to_string();
 
                 // On Windows, paths generated in this way have "\\?\" at the start
@@ -102,13 +99,17 @@ impl Plugin for PhpPlugin {
                     FcgiRequest::new(params, request.content.as_ref().unwrap_or(&empty_vec), true);
 
                 // Send the request to the PHP interpreter
-                stream.write(&fcgi_request.encode()).unwrap();
+                self.cgi_stream
+                    .as_mut()
+                    .unwrap()
+                    .write(&fcgi_request.encode())
+                    .unwrap();
 
                 let mut records: Vec<FcgiRecord> = Vec::new();
 
                 // Continually read responses until an `FcgiType::End` response is reached
                 loop {
-                    let record = FcgiRecord::from(&mut stream);
+                    let record = FcgiRecord::from(self.cgi_stream.as_mut().unwrap());
                     if record.fcgi_type == FcgiType::End {
                         break;
                     }
@@ -161,11 +162,11 @@ impl Plugin for PhpPlugin {
     }
 
     fn on_unload(&mut self) {
-        let stream_mutex = self.cgi_stream.as_ref().unwrap();
-        let stream = stream_mutex.lock().unwrap();
-        stream.shutdown(Shutdown::Both).unwrap();
-        drop(stream);
-
+        self.cgi_stream
+            .as_mut()
+            .unwrap()
+            .shutdown(Shutdown::Both)
+            .unwrap();
         self.cgi_stream = None;
     }
 }
