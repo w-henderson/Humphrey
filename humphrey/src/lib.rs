@@ -4,6 +4,7 @@ pub mod app;
 pub mod http;
 pub mod krauss;
 pub mod route;
+pub mod thread;
 
 mod tests;
 

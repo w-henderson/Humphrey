@@ -3,11 +3,11 @@ use crate::http::request::{Request, RequestError};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
 use crate::route::{Route, RouteHandler};
+use crate::thread::pool::ThreadPool;
 
 use std::io::Write;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
-use std::thread::spawn;
 
 /// Represents the Humphrey app.
 ///
@@ -18,6 +18,7 @@ pub struct App<State>
 where
     State: Send + Sync + 'static,
 {
+    thread_pool: ThreadPool,
     routes: Vec<RouteHandler<State>>,
     error_handler: ErrorHandler,
     state: Arc<State>,
@@ -100,9 +101,23 @@ where
         State: Default,
     {
         Self {
+            thread_pool: ThreadPool::new(32),
             routes: Vec::new(),
             error_handler,
             state: Arc::new(State::default()),
+            connection_handler: client_handler,
+            connection_condition: |_, _| true,
+            websocket_handler: |_, _, _| (),
+        }
+    }
+
+    /// Initialises a new Humphrey app with the given configuration options.
+    pub fn new_with_config(threads: usize, state: State) -> Self {
+        Self {
+            thread_pool: ThreadPool::new(threads),
+            routes: Vec::new(),
+            error_handler,
+            state: Arc::new(state),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
             websocket_handler: |_, _, _| (),
@@ -134,7 +149,7 @@ where
                         let cloned_handler = self.connection_handler.clone();
 
                         // Spawn a new thread to handle the connection
-                        spawn(move || {
+                        self.thread_pool.execute(move || {
                             (cloned_handler)(
                                 stream,
                                 cloned_routes,
@@ -243,7 +258,7 @@ fn client_handler<State>(
         // Get the keep alive information from the request before it is consumed by the handler
         let keep_alive = if let Ok(request) = &request {
             if let Some(connection) = request.headers.get(&RequestHeader::Connection) {
-                if connection.to_ascii_lowercase() != "keep-alive" {
+                if connection.to_ascii_lowercase() == "keep-alive" {
                     true
                 } else {
                     false
