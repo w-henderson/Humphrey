@@ -143,11 +143,9 @@ fn file_handler(request: Request, state: Arc<AppState>) -> Response {
             .with_generated_headers();
     }
 
-    let full_path = format!("{}{}", state.directory, request.uri);
-
     if state.cache_limit > 0 {
         let cache = state.cache.read().unwrap();
-        if let Some(cached) = cache.get(&full_path) {
+        if let Some(cached) = cache.get(&request.uri) {
             state.logger.info(&format!(
                 "{}: 200 OK (cached) {}",
                 request.address, request.uri
@@ -161,7 +159,7 @@ fn file_handler(request: Request, state: Arc<AppState>) -> Response {
         drop(cache);
     }
 
-    if let Some(located) = try_find_path(&full_path) {
+    if let Some(located) = try_find_path(&state.directory, &request.uri) {
         if located.was_redirected && request.uri.chars().last() != Some('/') {
             state.logger.info(&format!(
                 "{}: 302 Moved Permanently {}",
@@ -187,7 +185,7 @@ fn file_handler(request: Request, state: Arc<AppState>) -> Response {
 
         if state.cache_limit >= contents.len() {
             let mut cache = state.cache.write().unwrap();
-            cache.set(&full_path, contents.clone(), mime_type);
+            cache.set(&request.uri, contents.clone(), mime_type);
             state.logger.debug(&format!("Cached route {}", request.uri));
         } else if state.cache_limit > 0 {
             state
