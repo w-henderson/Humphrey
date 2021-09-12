@@ -2,6 +2,7 @@ use crate::fcgi::types::FcgiType;
 use crate::fcgi::types::{FCGI_HEADER_SIZE, FCGI_VERSION};
 
 use std::convert::TryInto;
+use std::error::Error;
 use std::io::Read;
 
 /// Represents an FCGI record, a component of a transmission.
@@ -49,6 +50,39 @@ impl FcgiRecord {
             request_id,
         )
     }
+
+    /// Reads a record from a readable type.
+    pub fn read_from<T>(mut stream: T) -> Result<Self, Box<dyn Error>>
+    where
+        T: Read,
+    {
+        let mut header: [u8; FCGI_HEADER_SIZE] = [0; FCGI_HEADER_SIZE];
+        stream.read_exact(&mut header)?;
+
+        let version = header[0];
+        let fcgi_type: FcgiType = header[1].try_into().unwrap();
+        let request_id = u16::from_be_bytes(header[2..4].try_into()?);
+        let content_length = u16::from_be_bytes(header[4..6].try_into()?);
+        let padding_length = header[6];
+        let reserved = header[7];
+
+        let mut content: Vec<u8> = vec![0; content_length as usize];
+        stream.read_exact(&mut content)?;
+
+        let mut padding: Vec<u8> = vec![0; padding_length as usize];
+        stream.read_exact(&mut padding)?;
+
+        Ok(Self {
+            version,
+            fcgi_type,
+            request_id,
+            content_length,
+            padding_length,
+            reserved,
+            content_data: content,
+            padding_data: padding,
+        })
+    }
 }
 
 impl Into<Vec<u8>> for FcgiRecord {
@@ -66,39 +100,5 @@ impl Into<Vec<u8>> for FcgiRecord {
         result.extend(self.padding_data);
 
         result
-    }
-}
-
-impl<T> From<T> for FcgiRecord
-where
-    T: Read,
-{
-    fn from(mut stream: T) -> Self {
-        let mut header: [u8; FCGI_HEADER_SIZE] = [0; FCGI_HEADER_SIZE];
-        stream.read_exact(&mut header).unwrap();
-
-        let version = header[0];
-        let fcgi_type: FcgiType = header[1].try_into().unwrap();
-        let request_id = u16::from_be_bytes(header[2..4].try_into().unwrap());
-        let content_length = u16::from_be_bytes(header[4..6].try_into().unwrap());
-        let padding_length = header[6];
-        let reserved = header[7];
-
-        let mut content: Vec<u8> = vec![0; content_length as usize];
-        stream.read_exact(&mut content).unwrap();
-
-        let mut padding: Vec<u8> = vec![0; padding_length as usize];
-        stream.read_exact(&mut padding).unwrap();
-
-        Self {
-            version,
-            fcgi_type,
-            request_id,
-            content_length,
-            padding_length,
-            reserved,
-            content_data: content,
-            padding_data: padding,
-        }
     }
 }

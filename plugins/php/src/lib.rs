@@ -11,7 +11,8 @@ use humphrey_server::static_server::AppState;
 use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
 use std::net::{Shutdown, TcpStream};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use crate::fcgi::record::FcgiRecord;
 use crate::fcgi::request::FcgiRequest;
@@ -21,8 +22,10 @@ mod fcgi;
 
 #[derive(Debug, Default)]
 pub struct PhpPlugin {
-    /// Represents the TCP stream to the PHP interpreter.
-    cgi_stream: Option<TcpStream>,
+    /// Acts as a thread pool of open streams to the interpreter.
+    streams: Vec<Mutex<TcpStream>>,
+    /// Keeps track of which streams are available.
+    next_stream: AtomicUsize,
 }
 
 impl Plugin for PhpPlugin {
@@ -39,31 +42,40 @@ impl Plugin for PhpPlugin {
         let php_address = config.raw.get_optional("php.address", "127.0.0.1".into());
         let php_port = config.raw.get_optional("php.port", "9000".into());
         let php_target = format!("{}:{}", php_address, php_port);
+        let stream_count = config.raw.get_optional_parsed("php.threads", 8_usize, "");
 
-        // Attemps to connect to the PHP interpreter
-        if let Ok(stream) = TcpStream::connect(&php_target) {
-            self.cgi_stream = Some(stream);
+        if let Ok(threads) = stream_count {
+            // If the thread count could be parsed, start that many streams
+
+            for _ in 0..threads {
+                if let Ok(stream) = TcpStream::connect(&php_target) {
+                    // If the stream successfully connected, add it to the list
+
+                    self.streams.push(Mutex::new(stream));
+                } else {
+                    // Otherwise return a fatal error
+
+                    return PluginLoadResult::Fatal("Could not connect to the PHP CGI server");
+                }
+            }
 
             state.logger.info(&format!(
-                "PHP Plugin connected to FCGI server at {}",
-                php_target
+                "PHP Plugin connected to FCGI server at {} with {} threads",
+                php_target, threads
             ));
 
             PluginLoadResult::Ok(())
         } else {
-            // Fatal error, shut down Humphrey
-            PluginLoadResult::Fatal("Could not connect to the PHP CGI server")
+            // If the configuration could not be parsed, return an error
+
+            PluginLoadResult::Fatal("Could not parse the PHP plugin threads count")
         }
     }
 
-    fn on_request(&mut self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
+    fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
         if request.uri.split('.').last().unwrap() == "php" {
-            // If the requested file is a PHP file, process it
-
-            let full_path = format!("{}{}", state.directory, request.uri);
-
-            // Check that the file exists
-            if let Some(located) = try_find_path(&full_path) {
+            // If the requested file is a PHP file, check that the file exists then process it
+            if let Some(located) = try_find_path(&state.directory, &request.uri) {
                 let file_name = located.path.to_str().unwrap().to_string();
 
                 // On Windows, paths generated in this way have "\\?\" at the start
@@ -99,21 +111,37 @@ impl Plugin for PhpPlugin {
                     FcgiRequest::new(params, request.content.as_ref().unwrap_or(&empty_vec), true);
 
                 // Send the request to the PHP interpreter
-                self.cgi_stream
-                    .as_mut()
-                    .unwrap()
-                    .write(&fcgi_request.encode())
-                    .unwrap();
+                let stream_index =
+                    self.next_stream.fetch_add(1, Ordering::SeqCst) % self.streams.len();
+                let mut stream = self.streams[stream_index].lock().unwrap();
+
+                if let Err(e) = stream.write(&fcgi_request.encode()) {
+                    state
+                        .logger
+                        .error("PHP Plugin lost connection with the PHP server");
+                    state.logger.error(&format!("Error: {}", e));
+                    std::process::exit(0);
+                }
 
                 let mut records: Vec<FcgiRecord> = Vec::new();
 
                 // Continually read responses until an `FcgiType::End` response is reached
                 loop {
-                    let record = FcgiRecord::from(self.cgi_stream.as_mut().unwrap());
-                    if record.fcgi_type == FcgiType::End {
-                        break;
+                    match FcgiRecord::read_from(&*stream) {
+                        Ok(record) => {
+                            if record.fcgi_type != FcgiType::Stdout {
+                                break;
+                            }
+                            records.push(record);
+                        }
+                        Err(e) => {
+                            state
+                                .logger
+                                .error("PHP Plugin lost connection with the PHP server");
+                            state.logger.error(&format!("Error: {}", e));
+                            std::process::exit(0);
+                        }
                     }
-                    records.push(record);
                 }
 
                 // Assume the content to be UTF-8 and parse the headers
@@ -162,12 +190,11 @@ impl Plugin for PhpPlugin {
     }
 
     fn on_unload(&mut self) {
-        self.cgi_stream
-            .as_mut()
-            .unwrap()
-            .shutdown(Shutdown::Both)
-            .unwrap();
-        self.cgi_stream = None;
+        // Drain the streams iterator, shutting down every stream.
+        for stream in self.streams.drain(..) {
+            let stream = stream.lock().unwrap();
+            stream.shutdown(Shutdown::Both).unwrap();
+        }
     }
 }
 
