@@ -7,8 +7,6 @@ use humphrey::App;
 use crate::plugins::manager::PluginManager;
 #[cfg(feature = "plugins")]
 use crate::plugins::plugin::PluginLoadResult;
-#[cfg(feature = "plugins")]
-use std::sync::Mutex;
 
 use crate::cache::Cache;
 use crate::config::{BlacklistMode, Config};
@@ -34,7 +32,7 @@ pub struct AppState {
     pub blacklist_mode: BlacklistMode,
     pub logger: Logger,
     #[cfg(feature = "plugins")]
-    plugin_manager: Mutex<PluginManager>,
+    plugin_manager: RwLock<PluginManager>,
 }
 
 impl From<&Config> for AppState {
@@ -48,7 +46,7 @@ impl From<&Config> for AppState {
             blacklist_mode: config.blacklist_mode.clone(),
             logger: Logger::from(config),
             #[cfg(feature = "plugins")]
-            plugin_manager: Mutex::new(PluginManager::default()),
+            plugin_manager: RwLock::new(PluginManager::default()),
         }
     }
 }
@@ -103,7 +101,7 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
 
 #[cfg(feature = "plugins")]
 fn file_handler_wrapper(mut request: Request, state: Arc<AppState>) -> Response {
-    let mut plugins = state.plugin_manager.lock().unwrap();
+    let plugins = state.plugin_manager.read().unwrap();
 
     if let Some(response_override) = plugins.on_request(&mut request, state.clone()) {
         // If a plugin overrode the response, return it
@@ -269,7 +267,7 @@ fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppStat
 
 #[cfg(feature = "plugins")]
 fn load_plugins(config: &Config, state: &Arc<AppState>) -> Result<usize, ()> {
-    let mut manager = state.plugin_manager.lock().unwrap();
+    let mut manager = state.plugin_manager.write().unwrap();
 
     for path in &config.plugin_libraries {
         unsafe {

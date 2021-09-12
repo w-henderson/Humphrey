@@ -62,8 +62,8 @@ impl PluginManager {
 
     /// Calls the `on_request` function on every plugin.
     /// If a plugin overrides the response, this is immediately returned.
-    pub fn on_request(&mut self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
-        for plugin in &mut self.plugins {
+    pub fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
+        for plugin in &self.plugins {
             if let Some(response) = plugin.on_request(request, state.clone()) {
                 return Some(response);
             }
@@ -73,8 +73,8 @@ impl PluginManager {
     }
 
     /// Calls the `on_response` function on every plugin.
-    pub fn on_response(&mut self, response: &mut Response, state: Arc<AppState>) {
-        for plugin in &mut self.plugins {
+    pub fn on_response(&self, response: &mut Response, state: Arc<AppState>) {
+        for plugin in &self.plugins {
             plugin.on_response(response, state.clone());
         }
     }

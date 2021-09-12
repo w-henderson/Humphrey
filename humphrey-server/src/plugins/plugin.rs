@@ -36,13 +36,13 @@ pub trait Plugin: Any + Send + Sync + Debug {
     /// Called when a request is received but before it is processed. May modify the request in-place.
     /// Should return `None` to indicate that Humphrey should process the request,
     ///   or the plugin should process the request itself and return `Some(response)`.
-    fn on_request(&mut self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
+    fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
         None
     }
 
     /// Called when a response has been generated but not yet sent.
     /// May modify the response in-place.
-    fn on_response(&mut self, response: &mut Response, state: Arc<AppState>) {}
+    fn on_response(&self, response: &mut Response, state: Arc<AppState>) {}
 
     /// Called when the plugin is about to be unloaded.
     /// Any clean-up should be done here.
