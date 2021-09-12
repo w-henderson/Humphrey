@@ -27,6 +27,7 @@ fn test_parse_config() {
 address = "127.0.0.1"      ; address to host the server on
 port = 8000                ; port to host the server on
 mode = "static"            ; server routing mode
+threads = 123              ; threads to start
 
 [log]
 level = "info"
@@ -48,6 +49,7 @@ cache_time = 60"#;
     expected_hashmap.insert("server.address".into(), "127.0.0.1".into());
     expected_hashmap.insert("server.port".into(), "8000".into());
     expected_hashmap.insert("server.mode".into(), "static".into());
+    expected_hashmap.insert("server.threads".into(), "123".into());
     expected_hashmap.insert("log.level".into(), "info".into());
     expected_hashmap.insert("log.console".into(), "false".into());
     expected_hashmap.insert("log.file".into(), "humphrey.log".into());
@@ -60,6 +62,7 @@ cache_time = 60"#;
     let expected_config = Config {
         address: "127.0.0.1".into(),
         port: 8000,
+        threads: 123,
         mode: ServerMode::Static,
         blacklist: Vec::new(),
         blacklist_mode: BlacklistMode::Forbidden,
