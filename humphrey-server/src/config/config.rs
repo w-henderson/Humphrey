@@ -14,6 +14,8 @@ pub struct Config {
     pub address: String,
     /// Port to host the server on
     pub port: u16,
+    /// Threads to host the server using
+    pub threads: usize,
     /// Routing mode of the server
     pub mode: ServerMode,
     /// Blacklisted IP addresses
@@ -93,6 +95,7 @@ impl Default for Config {
         Self {
             address: "0.0.0.0".into(),
             port: 80,
+            threads: 32,
             mode: ServerMode::Static,
             blacklist: Vec::new(),
             blacklist_mode: BlacklistMode::Block,
@@ -128,9 +131,11 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
     let hashmap = parse_ini(&config).map_err(|_| "The configuration file could not be parsed")?;
     let mode = hashmap.get_compulsory("server.mode", "The mode was not specified")?;
 
-    // Get and validate the specified address and port
+    // Get and validate the specified address, port and threads
     let address = hashmap.get_optional("server.address", "0.0.0.0".into());
     let port: u16 = hashmap.get_optional_parsed("server.port", 80, "Invalid port")?;
+    let threads: usize =
+        hashmap.get_optional_parsed("server.threads", 32, "Invalid number of threads")?;
 
     // Get and validate the blacklist file
     let blacklist = load_list_file(hashmap.get("blacklist.file".into()).clone())?;
@@ -178,6 +183,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
             Ok(Config {
                 address,
                 port,
+                threads,
                 mode: ServerMode::Static,
                 blacklist,
                 blacklist_mode,
@@ -203,6 +209,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
             Ok(Config {
                 address,
                 port,
+                threads,
                 mode: ServerMode::Proxy,
                 blacklist,
                 blacklist_mode,
@@ -254,6 +261,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
             Ok(Config {
                 address,
                 port,
+                threads,
                 mode: ServerMode::LoadBalancer,
                 blacklist,
                 blacklist_mode,

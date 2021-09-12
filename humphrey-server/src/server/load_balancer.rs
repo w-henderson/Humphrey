@@ -31,8 +31,7 @@ impl From<&Config> for AppState {
 
 /// Main function for the load balancer.
 pub fn main(config: Config) {
-    let app: App<AppState> = App::new()
-        .with_state(AppState::from(&config))
+    let app: App<AppState> = App::new_with_config(config.threads, AppState::from(&config))
         .with_custom_connection_handler(handler);
 
     let addr = format!("{}:{}", config.address, config.port);

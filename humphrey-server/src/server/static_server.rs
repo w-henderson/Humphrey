@@ -53,8 +53,7 @@ impl From<&Config> for AppState {
 
 /// Main function for the static server.
 pub fn main(config: Config) {
-    let app: App<AppState> = App::new()
-        .with_state(AppState::from(&config))
+    let app: App<AppState> = App::new_with_config(config.threads, AppState::from(&config))
         .with_connection_condition(verify_connection)
         .with_websocket_handler(websocket_handler)
         .with_route("/*", file_handler_wrapper);
