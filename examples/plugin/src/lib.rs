@@ -15,7 +15,7 @@ impl Plugin for ExamplePlugin {
         "Example Plugin"
     }
 
-    fn on_request(&mut self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
+    fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
         state.logger.info(&format!(
             "Example plugin read a request from {}",
             request.address
@@ -37,7 +37,7 @@ impl Plugin for ExamplePlugin {
         None
     }
 
-    fn on_response(&mut self, response: &mut Response, state: Arc<AppState>) {
+    fn on_response(&self, response: &mut Response, state: Arc<AppState>) {
         // Insert a header to the response
         response.headers.insert(
             ResponseHeader::Custom {
