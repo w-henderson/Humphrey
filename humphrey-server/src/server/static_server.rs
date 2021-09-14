@@ -102,18 +102,14 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
 fn file_handler_wrapper(mut request: Request, state: Arc<AppState>) -> Response {
     let plugins = state.plugin_manager.read().unwrap();
 
-    if let Some(response_override) = plugins.on_request(&mut request, state.clone()) {
-        // If a plugin overrode the response, return it
+    let mut response = plugins
+        .on_request(&mut request, state.clone()) // If the plugin overrides the response, return it
+        .unwrap_or_else(|| file_handler(request, state.clone())); // If no plugin overrides the response, generate it in the normal way
 
-        response_override
-    } else {
-        // Otherwise generate a response in the normal way
+    // Pass the response to plugins before it is sent to the client
+    plugins.on_response(&mut response, state.clone());
 
-        let mut response = file_handler(request, state.clone());
-        plugins.on_response(&mut response, state.clone());
-
-        response
-    }
+    response
 }
 
 #[cfg(not(feature = "plugins"))]
