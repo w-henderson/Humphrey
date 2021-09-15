@@ -13,3 +13,7 @@ plugins = ["libloading"]
 [lib]
 test = false
 doctest = false
+
+[[bin]]
+name = "humphrey"
+path = "src/main.rs"
