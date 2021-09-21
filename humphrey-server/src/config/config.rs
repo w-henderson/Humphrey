@@ -171,7 +171,7 @@ pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str
                 hashmap.get_optional_parsed("static.cache_time", 60, "Invalid cache time limit")?;
 
             // Get the root directory
-            let directory = hashmap.get_optional("static.directory", String::new());
+            let directory = hashmap.get_optional("static.directory", ".".into());
 
             // Get the WebSocket proxy address
             let websocket_proxy = hashmap.get("static.websocket").map(|s| s.to_string());
