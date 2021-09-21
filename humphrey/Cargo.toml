@@ -2,6 +2,13 @@
 name = "humphrey"
 version = "0.1.0"
 edition = "2018"
+license = "MIT"
+homepage = "https://github.com/w-henderson/Humphrey"
+repository = "https://github.com/w-henderson/Humphrey"
+readme = "../README.md"
+description = "A Performance-Focused, Dependency-Free Web Server."
+keywords = ["http", "server", "http-server"]
+categories = ["web-programming::http-server", "network-programming"]
 
 [lib]
 doctest = false
