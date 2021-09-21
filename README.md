@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" width=250><br><br>
+  <img src="https://raw.githubusercontent.com/w-henderson/Humphrey/master/assets/logo.png" width=250><br><br>
   <img src="https://img.shields.io/badge/language-rust-b07858?style=for-the-badge&logo=rust" style="margin-right:5px">
   <img src="https://img.shields.io/github/workflow/status/w-henderson/Humphrey/CI?style=for-the-badge" style="margin-right:5px">
   <img src="https://img.shields.io/crates/v/humphrey?style=for-the-badge" style="margin-right:5px">
@@ -75,6 +75,17 @@ target = "localhost:8000"  ; The address to proxy traffic to, required if the mo
 [load_balancer]
 targets = "conf/targets.txt"  ; A text file containing one target on each line to balance traffic between, required if the mode is set to load_balancer
 mode = "round-robin"          ; The algorithm for load balancing, either "round-robin" (default) or "random"
+```
+
+## Using with PHP
+To use Humphrey with PHP, compile the [PHP plugin in the plugins folder](https://github.com/w-henderson/Humphrey/tree/master/plugins/php) and add the path to the output file to your plugins list as specified in the static configuration. You'll need Humphrey installed with plugins enabled (using `cargo install humphrey_server --features plugins`) and you'll also need PHP-CGI or PHP-FPM. Start the PHP server first, and specify its address in the Humphrey configuration file as specified below. Ensure your PHP configuration allows for multithreading if you set more than one thread in the configuration. Finally, you can start Humphrey in the normal way and it will work with PHP.
+
+```ini
+; Additional PHP configuration
+[php]
+address = "127.0.0.1"
+port = 9000
+threads = 8
 ```
 
 ## Creating a Plugin
