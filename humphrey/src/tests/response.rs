@@ -2,6 +2,8 @@
 use crate::http::headers::{ResponseHeader, ResponseHeaderMap};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
+use crate::tests::mock_stream::MockStream;
+use std::collections::BTreeMap;
 
 #[test]
 fn test_response() {
@@ -37,4 +39,23 @@ fn test_response() {
     let bytes: Vec<u8> = response.into();
 
     assert_eq!(bytes, expected_bytes);
+}
+
+#[test]
+fn test_response_from_stream() {
+    let test_data = b"HTTP/1.1 404 Not Found\r\nContent-Length: 51\r\n\r\nThe requested resource was not found on the server.\r\n";
+    let mut stream = MockStream::with_data(test_data.to_vec());
+    let response = Response::from_stream(&mut stream);
+
+    assert!(response.is_ok());
+
+    let response = response.unwrap();
+    let expected_body = b"The requested resource was not found on the server.".to_vec();
+    assert_eq!(response.body, expected_body);
+    assert_eq!(response.version, "HTTP/1.1".to_string());
+    assert_eq!(response.status_code, StatusCode::NotFound);
+
+    let mut expected_headers: BTreeMap<ResponseHeader, String> = BTreeMap::new();
+    expected_headers.insert(ResponseHeader::ContentLength, "51".into());
+    assert_eq!(response.headers, expected_headers);
 }

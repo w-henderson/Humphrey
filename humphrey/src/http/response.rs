@@ -3,6 +3,9 @@ use crate::http::headers::{RequestHeader, ResponseHeader, ResponseHeaderMap};
 use crate::http::request::Request;
 use crate::http::status::StatusCode;
 use std::collections::btree_map::Entry;
+use std::convert::TryFrom;
+use std::error::Error;
+use std::io::{BufRead, BufReader, Read};
 
 /// Represents a response from the server.
 /// Implements `Into<Vec<u8>>` so can be serialised into bytes to transmit.
@@ -27,6 +30,23 @@ pub struct Response {
     /// The body of the response.
     pub body: Vec<u8>,
 }
+
+/// An error which occurred during the parsing of a response.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ResponseError {
+    /// The response could not be parsed due to invalid data.
+    Response,
+    /// The response could not be parsed due to an issue with the stream.
+    Stream,
+}
+
+impl std::fmt::Display for ResponseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "ResponseError")
+    }
+}
+
+impl Error for ResponseError {}
 
 impl Response {
     /// Creates a new response object with the given status code.
@@ -122,6 +142,74 @@ impl Response {
     pub fn get_headers(&self) -> &ResponseHeaderMap {
         &self.headers
     }
+
+    /// Attemps to read and parse one HTTP response from the given stream.
+    pub fn from_stream<T>(stream: &mut T) -> Result<Self, ResponseError>
+    where
+        T: Read,
+    {
+        let mut reader = BufReader::new(stream);
+        let mut start_line_buf: Vec<u8> = Vec::new();
+        reader
+            .read_until(0xA, &mut start_line_buf)
+            .map_err(|_| ResponseError::Stream)?;
+
+        let start_line_string =
+            String::from_utf8(start_line_buf).map_err(|_| ResponseError::Response)?;
+        let start_line: Vec<&str> = start_line_string.splitn(3, " ").collect();
+
+        safe_assert(start_line.len() == 3)?;
+
+        let version = start_line[0].to_string();
+        let status_code: u16 = start_line[1].parse().map_err(|_| ResponseError::Response)?;
+        let status = StatusCode::try_from(status_code).map_err(|_| ResponseError::Response)?;
+
+        let mut headers = ResponseHeaderMap::new();
+
+        loop {
+            let mut line_buf: Vec<u8> = Vec::new();
+            reader
+                .read_until(0xA, &mut line_buf)
+                .map_err(|_| ResponseError::Stream)?;
+            let line = String::from_utf8(line_buf).map_err(|_| ResponseError::Response)?;
+
+            if line == "\r\n" {
+                break;
+            } else {
+                safe_assert(line.len() >= 2)?;
+                let line_without_crlf = &line[0..line.len() - 2];
+                let line_parts: Vec<&str> = line_without_crlf.splitn(2, ':').collect();
+                headers.insert(
+                    ResponseHeader::from(line_parts[0]),
+                    line_parts[1].trim_start().to_string(),
+                );
+            }
+        }
+
+        if let Some(content_length) = headers.get(&ResponseHeader::ContentLength) {
+            let content_length: usize = content_length
+                .parse()
+                .map_err(|_| ResponseError::Response)?;
+            let mut content_buf: Vec<u8> = vec![0u8; content_length];
+            reader
+                .read_exact(&mut content_buf)
+                .map_err(|_| ResponseError::Stream)?;
+
+            Ok(Self {
+                version,
+                status_code: status,
+                headers,
+                body: content_buf,
+            })
+        } else {
+            Ok(Self {
+                version,
+                status_code: status,
+                headers,
+                body: Vec::new(),
+            })
+        }
+    }
 }
 
 impl Into<Vec<u8>> for Response {
@@ -151,5 +239,13 @@ impl Into<Vec<u8>> for Response {
         }
 
         bytes
+    }
+}
+
+/// Asserts that the condition is true, returning a `Result`.
+fn safe_assert(condition: bool) -> Result<(), ResponseError> {
+    match condition {
+        true => Ok(()),
+        false => Err(ResponseError::Response),
     }
 }
