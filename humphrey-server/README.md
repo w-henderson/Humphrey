@@ -39,7 +39,7 @@ cache_time = 60               ; Maximium time to cache content for in seconds, d
 plugins = "conf/plugins.txt"  ; A text file containing one plugin library file path on each line
 
 [proxy]
-target = "localhost:8000"  ; The address to proxy traffic to, required if the mode is set to proxy
+target = "127.0.0.1:8000"     ; The address to proxy traffic to, required if the mode is set to proxy
 
 [load_balancer]
 targets = "conf/targets.txt"  ; A text file containing one target on each line to balance traffic between, required if the mode is set to load_balancer
