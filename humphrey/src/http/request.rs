@@ -95,7 +95,7 @@ impl Request {
         if let Some(content_length) = headers.get(&RequestHeader::ContentLength) {
             let content_length: usize =
                 content_length.parse().map_err(|_| RequestError::Request)?;
-            let mut content_buf: Vec<u8> = Vec::with_capacity(content_length);
+            let mut content_buf: Vec<u8> = vec![0u8; content_length];
             reader
                 .read_exact(&mut content_buf)
                 .map_err(|_| RequestError::Stream)?;

@@ -1,37 +1,46 @@
-use humphrey::app::{App, ErrorHandler, WebsocketHandler};
-use humphrey::route::RouteHandler;
+use humphrey::app::App;
+use humphrey::http::headers::ResponseHeader;
+use humphrey::http::proxy::proxy_request;
+use humphrey::http::{Request, Response, StatusCode};
 
 use crate::config::Config;
 use crate::logger::Logger;
 
-use std::io::{Read, Write};
-use std::net::{Shutdown, TcpStream};
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
-use std::thread::spawn;
+use std::time::Duration;
 
 /// Represents the application state.
 /// Includes the proxy target and the logger.
-#[derive(Default)]
 struct AppState {
-    target: String,
+    target: SocketAddr,
     blacklist: Vec<String>,
     logger: Logger,
+    timeout: Duration,
 }
 
 impl From<&Config> for AppState {
     fn from(config: &Config) -> Self {
         Self {
-            target: config.proxy_target.as_ref().unwrap().clone(),
+            target: config
+                .proxy_target
+                .as_ref()
+                .unwrap()
+                .to_socket_addrs()
+                .unwrap()
+                .next()
+                .unwrap(),
             blacklist: config.blacklist.clone(),
             logger: Logger::from(config),
+            timeout: Duration::from_secs(5),
         }
     }
 }
 
 /// Main function for the proxy server.
 pub fn main(config: Config) {
-    let app: App<AppState> = App::new_with_config(config.threads, AppState::from(&config))
-        .with_custom_connection_handler(handler);
+    let app: App<AppState> =
+        App::new_with_config(config.threads, AppState::from(&config)).with_route("/*", handler);
 
     let addr = format!("{}:{}", config.address, config.port);
 
@@ -48,79 +57,31 @@ pub fn main(config: Config) {
 }
 
 /// Handles individual connections to the server.
-/// Ignores the server's specified routes and error handler.
-fn handler(
-    mut source: TcpStream,
-    _: Arc<Vec<RouteHandler<AppState>>>,
-    _: Arc<ErrorHandler>,
-    _: Arc<WebsocketHandler<AppState>>,
-    state: Arc<AppState>,
-) {
-    let address = source.peer_addr();
-    if address.is_err() {
-        state.logger.warn("Corrupted stream attempted to connect");
-        return;
-    }
-    let address = address.unwrap().ip().to_string();
-
-    // Prevent blacklisted addresses from starting a connection
-    if state.blacklist.contains(&address) {
-        state
-            .logger
-            .warn(&format!("{}: Blacklisted IP tried to connect", &address));
-        return;
-    }
-
-    if let Ok(mut destination) = TcpStream::connect(&*state.target) {
-        // The target was successfully connected to
-        let mut source_clone = source.try_clone().unwrap();
-        let mut destination_clone = destination.try_clone().unwrap();
-        state
-            .logger
-            .info(&format!("{}: Connected, proxying data", &address));
-
-        // Pipe data in both directions
-        let forward = spawn(move || pipe(&mut source, &mut destination));
-        let backward = spawn(move || pipe(&mut destination_clone, &mut source_clone));
-
-        // Log any errors
-        if let Err(_) = forward.join().unwrap() {
-            state.logger.error(&format!(
-                "{}: Error proxying data from client to target, connection closed",
-                &address
-            ));
-        }
-        if let Err(_) = backward.join().unwrap() {
-            state.logger.error(&format!(
-                "{}: Error proxying data from target to client, connection closed",
-                &address
-            ));
-        }
+fn handler(request: Request, state: Arc<AppState>) -> Response {
+    // Return error 403 if the address was blacklisted
+    if state
+        .blacklist
+        .contains(&request.address.origin_addr.to_string())
+    {
+        state.logger.warn(&format!(
+            "{}: Blacklisted IP attempted to request {}",
+            request.address, request.uri
+        ));
+        Response::new(StatusCode::Forbidden)
+            .with_header(ResponseHeader::ContentType, "text/html".into())
+            .with_bytes(b"<h1>403 Forbidden</h1>".to_vec())
+            .with_request_compatibility(&request)
+            .with_generated_headers()
+    } else {
+        let response = proxy_request(&request, state.target, state.timeout);
+        let status: u16 = response.status_code.clone().into();
+        let status_string: &str = response.status_code.clone().into();
 
         state.logger.info(&format!(
-            "{}: Session complete, connection closed",
-            &address
+            "{}: {} {} {}",
+            request.address, status, status_string, request.uri
         ));
-    } else {
-        state.logger.error("Could not connect to target");
+
+        response
     }
-}
-
-/// Pipe bytes from one stream to another, up to 1KiB at a time.
-pub fn pipe(source: &mut TcpStream, destination: &mut TcpStream) -> Result<(), ()> {
-    let mut buf: [u8; 1024] = [0; 1024];
-
-    loop {
-        let length = source.read(&mut buf).map_err(|_| ())?;
-
-        if length == 0 {
-            destination.shutdown(Shutdown::Both).map_err(|_| ())?;
-            break;
-        }
-
-        if let Ok(_) = destination.write(&buf[..length]) {
-            destination.flush().map_err(|_| ())?;
-        }
-    }
-    Ok(())
 }
