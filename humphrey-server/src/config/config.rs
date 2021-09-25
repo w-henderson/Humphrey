@@ -1,161 +1,107 @@
-use crate::config::error::ConfigError;
-use crate::config::traceback::TracebackIterator;
-use humphrey::krauss::wildcard_match;
+use crate::config::tree::ConfigNode;
+use crate::logger::LogLevel;
 
-use std::str::Lines;
+use std::collections::HashMap;
 
-/// Represents a configuration value.
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub enum ConfigValue {
-    Number(String, i64),
-    Boolean(String, bool),
-    String(String, String),
-    FilePath(String, String),
-    Section(String, Vec<ConfigValue>),
-    Route(String, Vec<ConfigValue>),
+/// Represents the parsed and validated configuration.
+pub struct Config {
+    /// The address to host the server on
+    address: String,
+    /// The port to host the server on
+    port: u16,
+    /// The number of threads to host the server on
+    threads: usize,
+    /// The configuration for different routes
+    routes: Vec<RouteConfig>,
+    /// The configuration for any plugins
+    #[cfg(feature = "plugins")]
+    plugins: Vec<PluginConfig>,
+    /// Logging configuration
+    logging: LoggingConfig,
+    /// Cache configuration
+    cache: Option<CacheConfig>,
+    /// Blacklist configuration
+    blacklist: Option<BlacklistConfig>,
 }
 
-/// Parses an entire configuration string.
-pub fn parse_conf(conf: &str) -> Result<ConfigValue, ConfigError> {
-    let mut lines = TracebackIterator::from(conf.lines());
-
-    // Attemps to find the start of the configuration
-    let mut line_content = "";
-    while line_content != "server {" {
-        if let Some(line) = lines.next() {
-            line_content = clean_up(line);
-        } else {
-            return Err(ConfigError::new("Could not find `server` section", 0));
-        }
-    }
-
-    // Parses the main section
-    parse_section("server", &mut lines)
+/// Represents configuration for a specific route.
+pub enum RouteConfig {
+    /// Serve files from a directory
+    Serve {
+        /// Wildcard string specifying what URIs to match
+        matches: String,
+        /// Directory to serve files from
+        directory: String,
+        /// Address to forward WebSocket connections to
+        websocket_proxy: Option<String>,
+    },
+    /// Proxy connections to the specified target(s), load balancing if necessary
+    Proxy {
+        /// Wildcard string specifying what URIs to match
+        matches: String,
+        /// Proxy targets
+        targets: Vec<String>,
+        /// Algorithm for load balancing
+        load_balancer_mode: LoadBalancerMode,
+    },
 }
 
-/// Recursively parses a section of the configuration.
-fn parse_section(
-    name: &str,
-    lines: &mut TracebackIterator<Lines>,
-) -> Result<ConfigValue, ConfigError> {
-    let mut section_open: bool = true;
-    let mut values: Vec<ConfigValue> = Vec::new();
-
-    // While this section has not been closed
-    while section_open {
-        // Attempt to read a line
-
-        if let Some(line) = lines.next() {
-            let line = clean_up(line);
-
-            if line.ends_with('{') {
-                // If the line indicates the start of a section, recursively parse that section
-
-                let section_name = line[..line.len() - 1].trim();
-                if section_name.starts_with("route ") && section_name != "route {" {
-                    // If the section is a route section, parse it as such
-                    let route_name = section_name.splitn(2, ' ').last().unwrap().trim();
-                    let section = parse_section(route_name, lines)?;
-                    if let ConfigValue::Section(route_name, inner_values) = section {
-                        values.push(ConfigValue::Route(route_name, inner_values));
-                    }
-                } else {
-                    // If the section is just a regular section, parse it in the normal way
-                    values.push(parse_section(section_name, lines)?);
-                }
-            } else if line == "}" {
-                // If the line indicates the end of this section, return the parsed section
-
-                section_open = false;
-            } else if line != "" {
-                // If the line is not empty, attempt to parse the value
-
-                let parts: Vec<&str> = line.splitn(2, ' ').collect();
-                quiet_assert(parts.len() == 2, "Syntax error", lines)?;
-
-                let key = parts[0].trim();
-                let value = parts[1].trim();
-
-                if wildcard_match("\"*\"", value) {
-                    if key == "file" {
-                        values.push(ConfigValue::FilePath(
-                            key.into(),
-                            value[1..value.len() - 1].into(),
-                        ))
-                    } else {
-                        values.push(ConfigValue::String(
-                            key.into(),
-                            value[1..value.len() - 1].into(),
-                        ))
-                    }
-                } else if let Ok(number) = value.parse::<i64>() {
-                    values.push(ConfigValue::Number(key.into(), number))
-                } else if let Ok(boolean) = value.parse::<bool>() {
-                    values.push(ConfigValue::Boolean(key.into(), boolean))
-                } else if let Ok(size) = parse_size(value) {
-                    values.push(ConfigValue::Number(key.into(), size))
-                } else {
-                    return Err(ConfigError::new(
-                        "Could not parse value",
-                        lines.current_line(),
-                    ));
-                }
-            }
-        } else {
-            // If the line could not be read, return an error
-
-            return Err(ConfigError::new(
-                "Unexpected end of file, expected `}`",
-                lines.current_line(),
-            ));
-        }
-    }
-
-    Ok(ConfigValue::Section(name.into(), values))
+/// Represents configuration for the logger.
+pub struct LoggingConfig {
+    /// The level of logging
+    level: LogLevel,
+    /// Whether to log to the console
+    console: bool,
+    /// The path to the log file
+    file: Option<String>,
 }
 
-/// Cleans up a line by removing comments and trailing whitespace.
-fn clean_up(line: &str) -> &str {
-    line.splitn(2, "#").next().unwrap().trim()
+/// Represents configuration for the cache.
+pub struct CacheConfig {
+    /// The maximum size of the cache, in bytes
+    size_limit: usize,
+    /// The maximum time to cache an item for, in seconds
+    time_limit: usize,
 }
 
-/// Parses a size string into its corresponding number of bytes.
-/// For example, 4K => 4096, 1M => 1048576.
-/// If no letter is provided at the end, assumes the number to be in bytes.
-fn parse_size(size: &str) -> Result<i64, ()> {
-    if size.len() == 0 {
-        // Empty string
-
-        Err(())
-    } else if size.len() == 1 {
-        // One character so cannot possibly be valid
-
-        size.parse::<i64>().map_err(|_| ())
-    } else {
-        let last_char = size.chars().last().unwrap().to_ascii_uppercase();
-        let number: i64 = size[0..size.len() - 1].parse().map_err(|_| ())?;
-
-        match last_char {
-            'K' => Ok(number * 1024),
-            'M' => Ok(number * 1024 * 1024),
-            'G' => Ok(number * 1024 * 1024 * 1024),
-            '0'..='9' => size.parse::<i64>().map_err(|_| ()),
-            _ => Err(()),
-        }
-    }
+/// Represents configuration for the blacklist.
+pub struct BlacklistConfig {
+    /// The list of addresses to block
+    list: Vec<String>,
+    /// The way in which the blacklist is enforced
+    mode: BlacklistMode,
 }
 
-/// Asserts a condition, returning a `Result` rather than panicking like the `assert!` macro.
-fn quiet_assert<T>(
-    condition: bool,
-    message: &'static str,
-    iter: &mut TracebackIterator<T>,
-) -> Result<(), ConfigError>
-where
-    T: Iterator,
-{
-    match condition {
-        true => Ok(()),
-        false => Err(ConfigError::new(message, iter.current_line())),
+/// Represents an algorithm for load balancing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LoadBalancerMode {
+    /// Evenly distributes load in a repeating pattern
+    RoundRobin,
+    /// Randomly distributes load
+    Random,
+}
+
+/// Represents a method of applying the blacklist.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BlacklistMode {
+    /// Does not allow any access from blacklisted addresses
+    Block,
+    /// Returns 400 Forbidden to every request, only available in static mode
+    Forbidden,
+}
+
+impl Config {
+    pub fn from_tree(tree: ConfigNode) -> Result<Self, &'static str> {
+        let mut hashmap: HashMap<String, ConfigNode> = HashMap::new();
+        tree.flatten(&mut hashmap, &Vec::new());
+
+        Err("sadge")
+
+        /*let address = tree
+        .get_children()
+        .unwrap()
+        .iter()
+        .find(|n| &n.get_key() == "address")?
+        .get_string()?;*/
     }
 }
