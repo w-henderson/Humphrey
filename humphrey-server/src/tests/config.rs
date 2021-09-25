@@ -1,85 +1,88 @@
-#![allow(unused_imports)]
-use crate::config::{load_config, parse_ini, BlacklistMode, Config, ServerMode};
-use crate::logger::LogLevel;
-use std::collections::HashMap;
+#[allow(unused_imports)]
+use crate::config::config::*;
 
 #[test]
-fn test_parse_ini() {
-    let testcase =
-        "[s1]\nkey1=value \nkey2 = value2   ; comment\nkey3 = \"value\"\n\n[s2]\nkey1=value";
+fn test_conf_parse() {
+    let conf = r#"server {
+        address   "0.0.0.0"
+        port      80
+        threads   32
 
-    let mut expected_hashmap: HashMap<String, String> = HashMap::new();
-    expected_hashmap.insert("s1.key1".into(), "value".into());
-    expected_hashmap.insert("s1.key2".into(), "value2".into());
-    expected_hashmap.insert("s1.key3".into(), "value".into());
-    expected_hashmap.insert("s2.key1".into(), "value".into());
+        plugins { # this is a comment on a section header
+            php {
+                library   "plugins/php/target/release/php.dll"
+                address   "127.0.0.1"
+                port      9000
+                threads   8
+            }
+        }
 
-    let hashmap = parse_ini(testcase).unwrap();
-    assert_eq!(hashmap, expected_hashmap);
-}
+        # this is a comment on an empty line
 
-#[test]
-fn test_parse_config() {
-    let config_string = r#"
-; Humphrey Configuration File
+        blacklist {
+            file   "conf/blacklist.txt"
+            mode   "block"
+        }
 
-[server]
-address = "127.0.0.1"      ; address to host the server on
-port = 8000                ; port to host the server on
-mode = "static"            ; server routing mode
-threads = 123              ; threads to start
+        log {
+            level     "info"
+            console   true
+            file      "humphrey.log"
+        }
 
-[log]
-level = "info"
-console = false
-file = "humphrey.log"
+        cache {
+            size   128M # this is a comment on a value
+            time   60
+        }
 
-[blacklist]
-mode = "forbidden"
+        route /static/* { # this is a comment on a route header
+            directory   "/var/www"
+            websocket   "localhost:1234"
+        }
 
-[static]
-directory = "/var/www"
-websocket = "localhost:1234"
-cache = 128M
-cache_time = 60"#;
+        route /* {
+            proxy               "http://127.0.0.1:8000,http://127.0.0.1:8080"
+            load_balance_mode   "round-robin"
+        }
+    }"#;
 
-    let config = load_config(Some(config_string.into())).unwrap();
+    #[rustfmt::skip]
+    let expected_parsed_conf = ConfigValue::Section("server".into(), vec![
+        ConfigValue::String("address".into(), "0.0.0.0".into()),
+        ConfigValue::Number("port".into(), 80),
+        ConfigValue::Number("threads".into(), 32),
+        ConfigValue::Section("plugins".into(), vec![
+            ConfigValue::Section("php".into(), vec![
+                ConfigValue::String("library".into(), "plugins/php/target/release/php.dll".into()),
+                ConfigValue::String("address".into(), "127.0.0.1".into()),
+                ConfigValue::Number("port".into(), 9000),
+                ConfigValue::Number("threads".into(), 8)
+            ])
+        ]),
+        ConfigValue::Section("blacklist".into(), vec![
+            ConfigValue::FilePath("file".into(), "conf/blacklist.txt".into()),
+            ConfigValue::String("mode".into(), "block".into()),
+        ]),
+        ConfigValue::Section("log".into(), vec![
+            ConfigValue::String("level".into(), "info".into()),
+            ConfigValue::Boolean("console".into(), true),
+            ConfigValue::FilePath("file".into(), "humphrey.log".into()),
+        ]),
+        ConfigValue::Section("cache".into(), vec![
+            ConfigValue::Number("size".into(), 0x8000000),
+            ConfigValue::Number("time".into(), 60)
+        ]),
+        ConfigValue::Route("/static/*".into(), vec![
+            ConfigValue::String("directory".into(), "/var/www".into()),
+            ConfigValue::String("websocket".into(), "localhost:1234".into()),
+        ]),
+        ConfigValue::Route("/*".into(), vec![
+            ConfigValue::String("proxy".into(), "http://127.0.0.1:8000,http://127.0.0.1:8080".into()),
+            ConfigValue::String("load_balance_mode".into(), "round-robin".into())
+        ])
+    ]);
 
-    let mut expected_hashmap: HashMap<String, String> = HashMap::new();
-    expected_hashmap.insert("server.address".into(), "127.0.0.1".into());
-    expected_hashmap.insert("server.port".into(), "8000".into());
-    expected_hashmap.insert("server.mode".into(), "static".into());
-    expected_hashmap.insert("server.threads".into(), "123".into());
-    expected_hashmap.insert("log.level".into(), "info".into());
-    expected_hashmap.insert("log.console".into(), "false".into());
-    expected_hashmap.insert("log.file".into(), "humphrey.log".into());
-    expected_hashmap.insert("blacklist.mode".into(), "forbidden".into());
-    expected_hashmap.insert("static.directory".into(), "/var/www".into());
-    expected_hashmap.insert("static.websocket".into(), "localhost:1234".into());
-    expected_hashmap.insert("static.cache".into(), "128M".into());
-    expected_hashmap.insert("static.cache_time".into(), "60".into());
+    let parsed_conf = parse_conf(conf).unwrap();
 
-    let expected_config = Config {
-        address: "127.0.0.1".into(),
-        port: 8000,
-        threads: 123,
-        mode: ServerMode::Static,
-        blacklist: Vec::new(),
-        blacklist_mode: BlacklistMode::Forbidden,
-        log_level: LogLevel::Info,
-        log_console: false,
-        log_file: Some("humphrey.log".into()),
-        cache_limit: 128 * 1024 * 1024,
-        cache_time_limit: 60,
-        directory: Some("/var/www".into()),
-        websocket_proxy: Some("localhost:1234".into()),
-        #[cfg(feature = "plugins")]
-        plugin_libraries: Vec::new(),
-        proxy_target: None,
-        load_balancer_targets: None,
-        load_balancer_mode: None,
-        raw: expected_hashmap,
-    };
-
-    assert_eq!(config, expected_config);
+    assert_eq!(parsed_conf, expected_parsed_conf);
 }
