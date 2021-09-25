@@ -12,7 +12,7 @@ use crate::cache::Cache;
 use crate::config::{BlacklistMode, Config};
 use crate::logger::Logger;
 use crate::route::try_find_path;
-use crate::server::proxy::pipe;
+use crate::server::pipe::pipe;
 
 use std::fs::File;
 use std::io::{Read, Write};

@@ -1,14 +1,15 @@
-use humphrey::app::{App, ErrorHandler, WebsocketHandler};
-use humphrey::route::RouteHandler;
+use humphrey::app::App;
+use humphrey::http::headers::ResponseHeader;
+use humphrey::http::proxy::proxy_request;
+use humphrey::http::{Request, Response, StatusCode};
 
 use crate::config::{Config, LoadBalancerMode};
 use crate::logger::Logger;
-use crate::proxy::pipe;
 use crate::server::rand::{Choose, Lcg};
 
-use std::net::TcpStream;
+use std::net::ToSocketAddrs;
 use std::sync::{Arc, Mutex};
-use std::thread::spawn;
+use std::time::Duration;
 
 /// Represents the load balancer application state.
 /// Includes the load balancer instance as well as the logger.
@@ -17,6 +18,7 @@ struct AppState {
     load_balancer: Mutex<LoadBalancer>,
     blacklist: Vec<String>,
     logger: Logger,
+    timeout: Duration,
 }
 
 impl From<&Config> for AppState {
@@ -25,14 +27,15 @@ impl From<&Config> for AppState {
             load_balancer: Mutex::new(LoadBalancer::from(config)),
             blacklist: config.blacklist.clone(),
             logger: Logger::from(config),
+            timeout: Duration::from_secs(5),
         }
     }
 }
 
 /// Main function for the load balancer.
 pub fn main(config: Config) {
-    let app: App<AppState> = App::new_with_config(config.threads, AppState::from(&config))
-        .with_custom_connection_handler(handler);
+    let app: App<AppState> =
+        App::new_with_config(config.threads, AppState::from(&config)).with_route("/*", handler);
 
     let addr = format!("{}:{}", config.address, config.port);
 
@@ -88,68 +91,37 @@ impl From<&Config> for LoadBalancer {
 
 /// Handles individual connections to the server.
 /// Ignores the server's specified routes and error handler.
-fn handler(
-    mut source: TcpStream,
-    _: Arc<Vec<RouteHandler<AppState>>>,
-    _: Arc<ErrorHandler>,
-    _: Arc<WebsocketHandler<AppState>>,
-    state: Arc<AppState>,
-) {
-    let address = source.peer_addr();
-    if address.is_err() {
-        state.logger.warn("Corrupted stream attempted to connect");
-        return;
-    }
-    let address = address.unwrap().ip().to_string();
+fn handler(request: Request, state: Arc<AppState>) -> Response {
+    // Return error 403 if the address was blacklisted
+    if state
+        .blacklist
+        .contains(&request.address.origin_addr.to_string())
+    {
+        state.logger.warn(&format!(
+            "{}: Blacklisted IP attempted to request {}",
+            request.address, request.uri
+        ));
+        Response::new(StatusCode::Forbidden)
+            .with_header(ResponseHeader::ContentType, "text/html".into())
+            .with_bytes(b"<h1>403 Forbidden</h1>".to_vec())
+            .with_request_compatibility(&request)
+            .with_generated_headers()
+    } else {
+        // Gets a load balancer target using the thread-safe `Mutex`
+        let mut load_balancer_lock = state.load_balancer.lock().unwrap();
+        let target = load_balancer_lock.select_target();
+        drop(load_balancer_lock);
 
-    // Prevent blacklisted addresses from starting a connection
-    if state.blacklist.contains(&address) {
-        state
-            .logger
-            .warn(&format!("{}: Blacklisted IP tried to connect", &address));
-        return;
-    }
-
-    // Gets a load balancer target using the thread-safe `Mutex`
-    let mut load_balancer_lock = state.load_balancer.lock().unwrap();
-    let target = load_balancer_lock.select_target();
-    drop(load_balancer_lock);
-
-    if let Ok(mut destination) = TcpStream::connect(&target) {
-        // Logs the connection's success
-        state
-            .logger
-            .info(&format!("{} -> {}: Connection started", &address, &target));
-
-        let mut source_clone = source.try_clone().unwrap();
-        let mut destination_clone = destination.try_clone().unwrap();
-
-        // Pipe data in both directions
-        let forward = spawn(move || pipe(&mut source, &mut destination));
-        let backward = spawn(move || pipe(&mut destination_clone, &mut source_clone));
-
-        // Log any errors
-        if let Err(_) = forward.join().unwrap() {
-            state.logger.error(&format!(
-                "{}: Error proxying data from client to target, connection closed",
-                &address
-            ));
-        }
-        if let Err(_) = backward.join().unwrap() {
-            state.logger.error(&format!(
-                "{}: Error proxying data from target to client, connection closed",
-                &address
-            ));
-        }
+        let target_sock = target.to_socket_addrs().unwrap().next().unwrap();
+        let response = proxy_request(&request, target_sock, state.timeout);
+        let status: u16 = response.status_code.clone().into();
+        let status_string: &str = response.status_code.clone().into();
 
         state.logger.info(&format!(
-            "{} -> {}: Session complete, connection closed",
-            &address, &target
+            "{}: {} {} {}",
+            request.address, status, status_string, request.uri
         ));
-    } else {
-        state.logger.error(&format!(
-            "Could not connect to load balancer target {}",
-            target
-        ))
+
+        response
     }
 }
