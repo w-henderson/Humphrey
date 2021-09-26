@@ -1,3 +1,5 @@
+use crate::config::tree::ConfigNode;
+
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -59,5 +61,68 @@ impl ExtendedMap<&'static str, String> for HashMap<String, String> {
     {
         self.get(key)
             .map_or(Err(error), |s| s.parse::<T>().map_err(|_| error))
+    }
+}
+
+impl ExtendedMap<&'static str, String> for HashMap<String, ConfigNode> {
+    fn get_owned(&self, key: &'static str) -> Option<String> {
+        self.get(key.into()).and_then(|n| n.get_string())
+    }
+
+    fn get_optional(&self, key: &'static str, default: String) -> String {
+        self.get(key.into())
+            .and_then(|n| n.get_string())
+            .unwrap_or(default)
+    }
+
+    fn get_compulsory(
+        &self,
+        key: &'static str,
+        error: &'static str,
+    ) -> Result<String, &'static str> {
+        self.get(key.into())
+            .and_then(|n| n.get_string())
+            .map_or(Err(error), |s| Ok(s))
+    }
+
+    fn get_optional_parsed<T>(
+        &self,
+        key: &'static str,
+        default: T,
+        error: &'static str,
+    ) -> Result<T, &'static str>
+    where
+        T: FromStr,
+    {
+        self.get(key.into())
+            .map(|n| match n {
+                ConfigNode::String(_, s) => s.parse().map_err(|_| ()),
+                ConfigNode::Boolean(_, b) => b.parse().map_err(|_| ()),
+                ConfigNode::Number(_, n) => n.parse().map_err(|_| ()),
+                ConfigNode::Section(_, _) => Err(()),
+                ConfigNode::Route(_, _) => Err(()),
+            })
+            .unwrap_or(Ok(default))
+            .map_err(|_| error)
+    }
+
+    fn get_compulsory_parsed<T>(
+        &self,
+        key: &'static str,
+        error: &'static str,
+    ) -> Result<T, &'static str>
+    where
+        T: FromStr,
+    {
+        self.get(key.into())
+            .map(|n| match n {
+                ConfigNode::String(_, s) => s.parse().map_err(|_| ()),
+                ConfigNode::Boolean(_, b) => b.parse().map_err(|_| ()),
+                ConfigNode::Number(_, n) => n.parse().map_err(|_| ()),
+                ConfigNode::Section(_, _) => Err(()),
+                ConfigNode::Route(_, _) => Err(()),
+            })
+            .unwrap_or(Err(()))
+            .map_err(|_| error)
     }
 }

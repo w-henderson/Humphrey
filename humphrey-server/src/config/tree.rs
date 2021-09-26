@@ -8,8 +8,8 @@ use std::str::Lines;
 /// Represents a node in the configuration syntax tree.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum ConfigNode {
-    Number(String, i64),
-    Boolean(String, bool),
+    Number(String, String),
+    Boolean(String, String),
     String(String, String),
     Section(String, Vec<ConfigNode>),
     Route(String, Vec<ConfigNode>),
@@ -19,53 +19,72 @@ impl ConfigNode {
     pub fn flatten(&self, hashmap: &mut HashMap<String, Self>, level: &Vec<&str>) {
         match self {
             ConfigNode::Section(k, v) => {
-                let mut new_level = level.clone();
-                new_level.push(k);
-                for child in v {
-                    child.flatten(hashmap, &new_level);
+                if k != "plugins" {
+                    let mut new_level = level.clone();
+                    new_level.push(k);
+                    for child in v {
+                        child.flatten(hashmap, &new_level);
+                    }
                 }
             }
             ConfigNode::Number(k, _) | ConfigNode::Boolean(k, _) | ConfigNode::String(k, _) => {
-                hashmap.insert(format!("{}.{}", level.join("."), k), self.clone());
+                let mut new_level = level.clone();
+                new_level.push(k);
+                hashmap.insert(new_level.join("."), self.clone());
             }
             _ => (),
         }
     }
 
-    pub fn get_key(&self) -> String {
-        match self {
-            ConfigNode::Number(k, _)
-            | ConfigNode::Boolean(k, _)
-            | ConfigNode::String(k, _)
-            | ConfigNode::Section(k, _)
-            | ConfigNode::Route(k, _) => k.clone(),
+    pub fn get_routes(&self) -> Vec<(String, HashMap<String, Self>)> {
+        let mut routes: Vec<(String, HashMap<String, Self>)> = Vec::new();
+        if let ConfigNode::Section(_, children) = self {
+            for child in children {
+                if let ConfigNode::Route(wild, inner_children) = child {
+                    let mut inner_hashmap: HashMap<String, Self> = HashMap::new();
+                    for inner_child in inner_children {
+                        inner_child.flatten(&mut inner_hashmap, &Vec::new());
+                    }
+
+                    routes.push((wild.clone(), inner_hashmap));
+                }
+            }
         }
+
+        routes
+    }
+
+    pub fn get_plugins(&self) -> Vec<(String, HashMap<String, Self>)> {
+        let mut plugins: Vec<(String, HashMap<String, Self>)> = Vec::new();
+        if let ConfigNode::Section(_, children) = self {
+            for child in children {
+                if let ConfigNode::Section(name, inner_children) = child {
+                    if name == "plugins" {
+                        for inner_child in inner_children {
+                            if let ConfigNode::Section(inner_name, inner_inner_children) =
+                                inner_child
+                            {
+                                let mut inner_hashmap: HashMap<String, Self> = HashMap::new();
+                                for inner_inner_child in inner_inner_children {
+                                    inner_inner_child.flatten(&mut inner_hashmap, &Vec::new());
+                                }
+
+                                plugins.push((inner_name.clone(), inner_hashmap));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        plugins
     }
 
     pub fn get_string(&self) -> Option<String> {
         match self {
             ConfigNode::String(_, s) => Some(s.clone()),
-            _ => None,
-        }
-    }
-
-    pub fn get_number(&self) -> Option<i64> {
-        match self {
             ConfigNode::Number(_, n) => Some(n.clone()),
-            _ => None,
-        }
-    }
-
-    pub fn get_boolean(&self) -> Option<bool> {
-        match self {
             ConfigNode::Boolean(_, b) => Some(b.clone()),
-            _ => None,
-        }
-    }
-
-    pub fn get_children(&self) -> Option<&Vec<ConfigNode>> {
-        match self {
-            ConfigNode::Section(_, c) | ConfigNode::Route(_, c) => Some(c),
             _ => None,
         }
     }
@@ -137,12 +156,12 @@ fn parse_section(
                         key.into(),
                         value[1..value.len() - 1].into(),
                     ))
-                } else if let Ok(number) = value.parse::<i64>() {
-                    values.push(ConfigNode::Number(key.into(), number))
-                } else if let Ok(boolean) = value.parse::<bool>() {
-                    values.push(ConfigNode::Boolean(key.into(), boolean))
+                } else if let Ok(_) = value.parse::<i64>() {
+                    values.push(ConfigNode::Number(key.into(), value.into()))
+                } else if let Ok(_) = value.parse::<bool>() {
+                    values.push(ConfigNode::Boolean(key.into(), value.into()))
                 } else if let Ok(size) = parse_size(value) {
-                    values.push(ConfigNode::Number(key.into(), size))
+                    values.push(ConfigNode::Number(key.into(), size.to_string()))
                 } else {
                     return Err(ConfigError::new(
                         "Could not parse value",
