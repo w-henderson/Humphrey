@@ -20,6 +20,7 @@ use crate::server::pipe::pipe;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::process::exit;
 use std::sync::{Arc, RwLock};
 use std::thread::spawn;
 
@@ -30,7 +31,7 @@ pub struct AppState {
     pub cache: RwLock<Cache>,
     pub logger: Logger,
     #[cfg(feature = "plugins")]
-    plugin_manager: RwLock<PluginManager>,
+    pub plugin_manager: RwLock<PluginManager>,
 }
 
 impl From<Config> for AppState {
@@ -52,7 +53,7 @@ pub fn main(config: Config) {
     let app: App<AppState> = App::new_with_config(config.threads, AppState::from(config))
         .with_connection_condition(verify_connection)
         .with_websocket_handler(websocket_handler)
-        .with_route("/*", request_handler_wrapper);
+        .with_route("/*", request_handler);
 
     let state = app.get_state();
 
@@ -62,10 +63,10 @@ pub fn main(config: Config) {
 
     #[cfg(feature = "plugins")]
     {
-        if let Ok(plugins_count) = load_plugins(&config, state) {
+        if let Ok(plugins_count) = load_plugins(&state.config, state) {
             logger.info(&format!("Loaded {} plugins", plugins_count))
         } else {
-            return;
+            exit(1);
         }
     };
 
@@ -94,25 +95,6 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
     }
 
     true
-}
-
-#[cfg(feature = "plugins")]
-fn request_handler_wrapper(mut request: Request, state: Arc<AppState>) -> Response {
-    let plugins = state.plugin_manager.read().unwrap();
-
-    let mut response = plugins
-        .on_request(&mut request, state.clone()) // If the plugin overrides the response, return it
-        .unwrap_or_else(|| request_handler(request, state.clone())); // If no plugin overrides the response, generate it in the normal way
-
-    // Pass the response to plugins before it is sent to the client
-    plugins.on_response(&mut response, state.clone());
-
-    response
-}
-
-#[cfg(not(feature = "plugins"))]
-fn request_handler_wrapper(request: Request, state: Arc<AppState>) -> Response {
-    request_handler(request, state)
 }
 
 fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
@@ -144,6 +126,11 @@ fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
                             break;
                         }
                     }
+
+                    if !request.uri.starts_with('/') {
+                        request.uri.insert(0, '/');
+                    }
+
                     return proxy_handler(request, state.clone(), load_balancer);
                 }
             }
@@ -210,24 +197,24 @@ fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppStat
 fn load_plugins(config: &Config, state: &Arc<AppState>) -> Result<usize, ()> {
     let mut manager = state.plugin_manager.write().unwrap();
 
-    for path in &config.plugin_libraries {
+    for plugin in &config.plugins {
         unsafe {
             let app_state = state.clone();
-            match manager.load_plugin(path, config, app_state) {
+            match manager.load_plugin(&plugin.library, &plugin.config, app_state) {
                 PluginLoadResult::Ok(name) => {
                     state.logger.info(&format!("Initialised plugin {}", name));
                 }
                 PluginLoadResult::NonFatal(e) => {
                     state
                         .logger
-                        .warn(&format!("Non-fatal plugin error from {}", path));
+                        .warn(&format!("Non-fatal plugin error in {}", plugin.name));
                     state.logger.warn(&format!("Error message: {}", e));
                     state.logger.warn("Ignoring this plugin");
                 }
                 PluginLoadResult::Fatal(e) => {
                     state
                         .logger
-                        .error(&format!("Could not initialise plugin from {}", path));
+                        .error(&format!("Could not initialise plugin {}", plugin.name));
                     state.logger.error(&format!("Error message: {}", e));
 
                     return Err(());

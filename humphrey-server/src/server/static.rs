@@ -9,9 +9,28 @@ use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
 
+#[cfg(feature = "plugins")]
+pub fn file_handler(mut request: Request, state: Arc<AppState>, directory: &str) -> Response {
+    let plugins = state.plugin_manager.read().unwrap();
+
+    let mut response = plugins
+        .on_request(&mut request, state.clone(), directory) // If the plugin overrides the response, return it
+        .unwrap_or_else(|| inner_file_handler(request, state.clone(), directory)); // If no plugin overrides the response, generate it in the normal way
+
+    // Pass the response to plugins before it is sent to the client
+    plugins.on_response(&mut response, state.clone());
+
+    response
+}
+
+#[cfg(not(feature = "plugins"))]
+pub fn file_handler(request: Request, state: Arc<AppState>, directory: &str) -> Response {
+    inner_file_handler(request, state, directory)
+}
+
 /// Request handler for every request.
 /// Attempts to open a given file relative to the binary and returns error 404 if not found.
-pub fn file_handler(request: Request, state: Arc<AppState>, directory: &str) -> Response {
+fn inner_file_handler(request: Request, state: Arc<AppState>, directory: &str) -> Response {
     // Return error 403 if the address was blacklisted
     if state
         .config
