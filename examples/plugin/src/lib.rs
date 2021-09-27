@@ -3,7 +3,7 @@ use humphrey::http::{Request, Response, StatusCode};
 
 use humphrey_server::declare_plugin;
 use humphrey_server::plugins::plugin::Plugin;
-use humphrey_server::static_server::AppState;
+use humphrey_server::server::server::AppState;
 
 use std::sync::Arc;
 
@@ -15,14 +15,14 @@ impl Plugin for ExamplePlugin {
         "Example Plugin"
     }
 
-    fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
+    fn on_request(&self, request: &mut Request, state: Arc<AppState>, _: &str) -> Option<Response> {
         state.logger.info(&format!(
             "Example plugin read a request from {}",
             request.address
         ));
 
         // If the requested resource is "/override" then override the response (which would ordinarily be 404).
-        if &request.uri == "/override" {
+        if &request.uri == "override" {
             state.logger.info("Example plugin overrode a response");
 
             return Some(
