@@ -1,13 +1,16 @@
 use crate::config::extended_hashmap::ExtendedMap;
-use crate::config::tree::ConfigNode;
+use crate::config::tree::{parse_conf, ConfigNode};
 use crate::logger::LogLevel;
+use crate::proxy::{EqMutex, LoadBalancer};
+use crate::rand::Lcg;
 
 use std::collections::HashMap;
+use std::env::args;
 use std::fs::File;
 use std::io::Read;
 
 /// Represents the parsed and validated configuration.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct Config {
     /// The address to host the server on
     pub address: String,
@@ -15,6 +18,8 @@ pub struct Config {
     pub port: u16,
     /// The number of threads to host the server on
     pub threads: usize,
+    /// Address to forward WebSocket connections to
+    pub websocket_proxy: Option<String>,
     /// The configuration for different routes
     pub routes: Vec<RouteConfig>,
     /// The configuration for any plugins
@@ -29,7 +34,7 @@ pub struct Config {
 }
 
 /// Represents configuration for a specific route.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub enum RouteConfig {
     /// Serve files from a directory
     Serve {
@@ -37,17 +42,13 @@ pub enum RouteConfig {
         matches: String,
         /// Directory to serve files from
         directory: String,
-        /// Address to forward WebSocket connections to
-        websocket_proxy: Option<String>,
     },
     /// Proxy connections to the specified target(s), load balancing if necessary
     Proxy {
         /// Wildcard string specifying what URIs to match
         matches: String,
-        /// Proxy targets
-        targets: Vec<String>,
-        /// Algorithm for load balancing
-        load_balancer_mode: LoadBalancerMode,
+        /// Load balancer instance
+        load_balancer: EqMutex<LoadBalancer>,
     },
 }
 
@@ -108,6 +109,16 @@ pub enum BlacklistMode {
 }
 
 impl Config {
+    /// Attempts to load the configuration.
+    pub fn load() -> Result<Self, String> {
+        let config_string = load_config_file()
+            .map_err(|_| "Could not open the specified config file or default `humphrey.conf`")?;
+        let tree = parse_conf(&config_string).map_err(|e| e.to_string())?;
+        let config = Self::from_tree(tree)?;
+
+        Ok(config)
+    }
+
     /// Parses the config from the config tree.
     pub fn from_tree(tree: ConfigNode) -> Result<Self, &'static str> {
         let mut hashmap: HashMap<String, ConfigNode> = HashMap::new();
@@ -118,6 +129,7 @@ impl Config {
         let port: u16 = hashmap.get_optional_parsed("server.port", 80, "Invalid port")?;
         let threads: usize =
             hashmap.get_optional_parsed("server.threads", 32, "Invalid number of threads")?;
+        let websocket_proxy = hashmap.get_owned("server.websocket");
 
         // Get and validate the blacklist file and mode
         let blacklist = {
@@ -179,12 +191,10 @@ impl Config {
                     // This is a regular file-serving route
 
                     let directory = conf.get_compulsory("directory", "").unwrap();
-                    let websocket_proxy = conf.get_owned("websocket");
 
                     routes.push(RouteConfig::Serve {
                         matches: wild,
                         directory,
-                        websocket_proxy,
                     });
                 } else if conf.contains_key("proxy".into()) {
                     // This is a proxy route
@@ -206,8 +216,12 @@ impl Config {
 
                     routes.push(RouteConfig::Proxy {
                         matches: wild,
-                        targets,
-                        load_balancer_mode,
+                        load_balancer: EqMutex::new(LoadBalancer {
+                            targets,
+                            mode: load_balancer_mode,
+                            lcg: Lcg::new(),
+                            index: 0,
+                        }),
                     })
                 } else {
                     return Err("Invalid route configuration, every route must contain either the `directory` or `proxy` field");
@@ -246,6 +260,7 @@ impl Config {
             address,
             port,
             threads,
+            websocket_proxy,
             routes,
             #[cfg(feature = "plugins")]
             plugins,
@@ -253,6 +268,26 @@ impl Config {
             cache,
             blacklist,
         })
+    }
+}
+
+/// Loads the configuration file.
+fn load_config_file() -> Result<String, ()> {
+    let path = args().nth(1).unwrap_or("humphrey.conf".into());
+
+    if let Ok(mut file) = File::open(path) {
+        // The file can be opened
+
+        let mut string = String::new();
+        if let Ok(_) = file.read_to_string(&mut string) {
+            // The file can be read
+
+            Ok(string)
+        } else {
+            Err(())
+        }
+    } else {
+        Err(())
     }
 }
 

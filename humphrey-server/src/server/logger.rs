@@ -15,7 +15,7 @@ pub struct Logger {
 
 impl From<&Config> for Logger {
     fn from(config: &Config) -> Self {
-        let file = if let Some(path) = &config.log_file {
+        let file = if let Some(path) = &config.logging.file {
             // If the log file can be opened, wrap it in a `Mutex`
             Some(Mutex::new(
                 OpenOptions::new()
@@ -31,8 +31,8 @@ impl From<&Config> for Logger {
         };
 
         Self {
-            level: config.log_level.clone(),
-            console: config.log_console,
+            level: config.logging.level.clone(),
+            console: config.logging.console,
             file,
         }
     }

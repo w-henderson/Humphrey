@@ -1,13 +1,14 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 
-use crate::config::tree::*;
+use humphrey_server::config::tree::*;
 use std::collections::{BTreeMap, HashMap};
 
 pub const CONF: &'static str = r#"server {
-    address   "0.0.0.0"
-    port      80
-    threads   32
+    address    "0.0.0.0"
+    port       80
+    threads    32
+    websocket  "localhost:1234"
 
     plugins { # this is a comment on a section header
         php {
@@ -38,7 +39,6 @@ pub const CONF: &'static str = r#"server {
 
     route /static/* { # this is a comment on a route header
         directory   "/var/www"
-        websocket   "localhost:1234"
     }
 
     route /* {
@@ -54,6 +54,7 @@ fn test_build_tree() {
         ConfigNode::String("address".into(), "0.0.0.0".into()),
         ConfigNode::Number("port".into(), "80".into()),
         ConfigNode::Number("threads".into(), "32".into()),
+        ConfigNode::String("websocket".into(), "localhost:1234".into()),
         ConfigNode::Section("plugins".into(), vec![
             ConfigNode::Section("php".into(), vec![
                 ConfigNode::String("library".into(), "plugins/php/target/release/php.dll".into()),
@@ -76,7 +77,6 @@ fn test_build_tree() {
         ]),
         ConfigNode::Route("/static/*".into(), vec![
             ConfigNode::String("directory".into(), "/var/www".into()),
-            ConfigNode::String("websocket".into(), "localhost:1234".into()),
         ]),
         ConfigNode::Route("/*".into(), vec![
             ConfigNode::String("proxy".into(), "127.0.0.1:8000,127.0.0.1:8080".into()),
@@ -98,6 +98,7 @@ fn test_flatten_config() {
     expected_hashmap.insert("server.address".into(), ConfigNode::String("address".into(), "0.0.0.0".into()));
     expected_hashmap.insert("server.port".into(), ConfigNode::Number("port".into(), "80".into()));
     expected_hashmap.insert("server.threads".into(), ConfigNode::Number("threads".into(), "32".into()));
+    expected_hashmap.insert("server.websocket".into(), ConfigNode::String("websocket".into(), "localhost:1234".into()));
     expected_hashmap.insert("server.blacklist.mode".into(), ConfigNode::String("mode".into(), "block".into()));
     expected_hashmap.insert("server.log.level".into(), ConfigNode::String("level".into(), "info".into()));
     expected_hashmap.insert("server.log.console".into(), ConfigNode::Boolean("console".into(), "true".into()));
@@ -120,7 +121,6 @@ fn test_get_routes() {
 
     let mut static_hashmap: HashMap<String, ConfigNode> = HashMap::new();
     static_hashmap.insert("directory".into(), ConfigNode::String("directory".into(), "/var/www".into()));
-    static_hashmap.insert("websocket".into(), ConfigNode::String("websocket".into(), "localhost:1234".into()));
     expected_map.push(("/static/*".into(), static_hashmap));
 
     let mut proxy_hashmap: HashMap<String, ConfigNode> = HashMap::new();
