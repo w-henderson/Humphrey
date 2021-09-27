@@ -1,4 +1,4 @@
-use crate::config::{Config, LoadBalancerMode};
+use crate::config::LoadBalancerMode;
 use crate::rand::{Choose, Lcg};
 use crate::server::server::AppState;
 

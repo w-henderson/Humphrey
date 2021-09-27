@@ -1,4 +1,3 @@
-use humphrey_server::config::tree::parse_conf;
 use humphrey_server::config::Config;
 use humphrey_server::logger::Logger;
 use humphrey_server::server::server;

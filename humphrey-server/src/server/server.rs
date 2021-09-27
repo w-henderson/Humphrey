@@ -1,6 +1,4 @@
-use humphrey::http::headers::ResponseHeader;
-use humphrey::http::mime::MimeType;
-use humphrey::http::{Request, Response, StatusCode};
+use humphrey::http::{Request, Response};
 use humphrey::krauss::wildcard_match;
 use humphrey::App;
 
@@ -8,19 +6,18 @@ use humphrey::App;
 use crate::plugins::manager::PluginManager;
 #[cfg(feature = "plugins")]
 use crate::plugins::plugin::PluginLoadResult;
+#[cfg(feature = "plugins")]
+use std::process::exit;
 
 use crate::cache::Cache;
 use crate::config::{BlacklistMode, Config, RouteConfig};
 use crate::logger::Logger;
-use crate::proxy::{proxy_handler, LoadBalancer};
+use crate::proxy::proxy_handler;
 use crate::r#static::{file_handler, not_found};
-use crate::route::try_find_path;
 use crate::server::pipe::pipe;
 
-use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::net::TcpStream;
-use std::process::exit;
 use std::sync::{Arc, RwLock};
 use std::thread::spawn;
 
@@ -39,7 +36,7 @@ impl From<Config> for AppState {
         let cache = RwLock::new(Cache::from(&config));
         let logger = Logger::from(&config);
         Self {
-            config: config,
+            config,
             cache,
             logger,
             #[cfg(feature = "plugins")]
@@ -149,7 +146,7 @@ fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppStat
         if let Ok(mut destination) = TcpStream::connect(address) {
             // The target was successfully connected to
 
-            destination.write(&bytes).unwrap();
+            destination.write_all(&bytes).unwrap();
 
             let mut source_clone = source.try_clone().unwrap();
             let mut destination_clone = destination.try_clone().unwrap();
@@ -163,13 +160,13 @@ fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppStat
             let backward = spawn(move || pipe(&mut destination_clone, &mut source_clone));
 
             // Log any errors
-            if let Err(_) = forward.join().unwrap() {
+            if forward.join().unwrap().is_err() {
                 state.logger.error(&format!(
                     "{}: Error proxying WebSocket from client to target, connection closed",
                     source_addr
                 ));
             }
-            if let Err(_) = backward.join().unwrap() {
+            if backward.join().unwrap().is_err() {
                 state.logger.error(&format!(
                     "{}: Error proxying WebSocket from target to client, connection closed",
                     source_addr

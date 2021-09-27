@@ -187,7 +187,7 @@ impl Config {
             let mut routes: Vec<RouteConfig> = Vec::with_capacity(routes_map.len());
 
             for (wild, conf) in routes_map {
-                if conf.contains_key("directory".into()) {
+                if conf.contains_key("directory") {
                     // This is a regular file-serving route
 
                     let directory = conf.get_compulsory("directory", "").unwrap();
@@ -196,7 +196,7 @@ impl Config {
                         matches: wild,
                         directory,
                     });
-                } else if conf.contains_key("proxy".into()) {
+                } else if conf.contains_key("proxy") {
                     // This is a proxy route
 
                     let targets: Vec<String> = conf
@@ -273,13 +273,13 @@ impl Config {
 
 /// Loads the configuration file.
 fn load_config_file() -> Result<String, ()> {
-    let path = args().nth(1).unwrap_or("humphrey.conf".into());
+    let path = args().nth(1).unwrap_or_else(|| "humphrey.conf".into());
 
     if let Ok(mut file) = File::open(path) {
         // The file can be opened
 
         let mut string = String::new();
-        if let Ok(_) = file.read_to_string(&mut string) {
+        if file.read_to_string(&mut string).is_ok() {
             // The file can be read
 
             Ok(string)

@@ -1,3 +1,5 @@
+#![allow(clippy::module_inception)]
+
 pub mod config;
 pub mod error;
 pub mod extended_hashmap;

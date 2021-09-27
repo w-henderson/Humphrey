@@ -16,11 +16,11 @@ pub enum ConfigNode {
 }
 
 impl ConfigNode {
-    pub fn flatten(&self, hashmap: &mut HashMap<String, Self>, level: &Vec<&str>) {
+    pub fn flatten(&self, hashmap: &mut HashMap<String, Self>, level: &[&str]) {
         match self {
             ConfigNode::Section(k, v) => {
                 if k != "plugins" {
-                    let mut new_level = level.clone();
+                    let mut new_level = level.to_vec();
                     new_level.push(k);
                     for child in v {
                         child.flatten(hashmap, &new_level);
@@ -28,7 +28,7 @@ impl ConfigNode {
                 }
             }
             ConfigNode::Number(k, _) | ConfigNode::Boolean(k, _) | ConfigNode::String(k, _) => {
-                let mut new_level = level.clone();
+                let mut new_level = level.to_vec();
                 new_level.push(k);
                 hashmap.insert(new_level.join("."), self.clone());
             }
@@ -123,10 +123,10 @@ fn parse_section(
         if let Some(line) = lines.next() {
             let line = clean_up(line);
 
-            if line.ends_with('{') {
+            if let Some(section_name) = line.strip_suffix('{') {
                 // If the line indicates the start of a section, recursively parse that section
 
-                let section_name = line[..line.len() - 1].trim();
+                let section_name = section_name.trim();
                 if section_name.starts_with("route ") && section_name != "route {" {
                     // If the section is a route section, parse it as such
                     let route_name = section_name.splitn(2, ' ').last().unwrap().trim();
@@ -142,7 +142,7 @@ fn parse_section(
                 // If the line indicates the end of this section, return the parsed section
 
                 section_open = false;
-            } else if line != "" {
+            } else if !line.is_empty() {
                 // If the line is not empty, attempt to parse the value
 
                 let parts: Vec<&str> = line.splitn(2, ' ').collect();
@@ -156,9 +156,9 @@ fn parse_section(
                         key.into(),
                         value[1..value.len() - 1].into(),
                     ))
-                } else if let Ok(_) = value.parse::<i64>() {
+                } else if value.parse::<i64>().is_ok() {
                     values.push(ConfigNode::Number(key.into(), value.into()))
-                } else if let Ok(_) = value.parse::<bool>() {
+                } else if value.parse::<bool>().is_ok() {
                     values.push(ConfigNode::Boolean(key.into(), value.into()))
                 } else if let Ok(size) = parse_size(value) {
                     values.push(ConfigNode::Number(key.into(), size.to_string()))
@@ -184,14 +184,14 @@ fn parse_section(
 
 /// Cleans up a line by removing comments and trailing whitespace.
 fn clean_up(line: &str) -> &str {
-    line.splitn(2, "#").next().unwrap().trim()
+    line.splitn(2, '#').next().unwrap().trim()
 }
 
 /// Parses a size string into its corresponding number of bytes.
 /// For example, 4K => 4096, 1M => 1048576.
 /// If no letter is provided at the end, assumes the number to be in bytes.
 fn parse_size(size: &str) -> Result<i64, ()> {
-    if size.len() == 0 {
+    if size.is_empty() {
         // Empty string
 
         Err(())

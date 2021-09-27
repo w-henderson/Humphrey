@@ -1,3 +1,5 @@
+#![allow(clippy::result_unit_err)]
+
 use std::io::{Read, Write};
 use std::net::{Shutdown, TcpStream};
 
@@ -13,7 +15,7 @@ pub fn pipe(source: &mut TcpStream, destination: &mut TcpStream) -> Result<(), (
             break;
         }
 
-        if let Ok(_) = destination.write(&buf[..length]) {
+        if destination.write(&buf[..length]).is_ok() {
             destination.flush().map_err(|_| ())?;
         }
     }

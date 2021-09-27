@@ -66,11 +66,11 @@ impl ExtendedMap<&'static str, String> for HashMap<String, String> {
 
 impl ExtendedMap<&'static str, String> for HashMap<String, ConfigNode> {
     fn get_owned(&self, key: &'static str) -> Option<String> {
-        self.get(key.into()).and_then(|n| n.get_string())
+        self.get(key).and_then(|n| n.get_string())
     }
 
     fn get_optional(&self, key: &'static str, default: String) -> String {
-        self.get(key.into())
+        self.get(key)
             .and_then(|n| n.get_string())
             .unwrap_or(default)
     }
@@ -80,9 +80,9 @@ impl ExtendedMap<&'static str, String> for HashMap<String, ConfigNode> {
         key: &'static str,
         error: &'static str,
     ) -> Result<String, &'static str> {
-        self.get(key.into())
+        self.get(key)
             .and_then(|n| n.get_string())
-            .map_or(Err(error), |s| Ok(s))
+            .map_or(Err(error), Ok)
     }
 
     fn get_optional_parsed<T>(
@@ -94,7 +94,7 @@ impl ExtendedMap<&'static str, String> for HashMap<String, ConfigNode> {
     where
         T: FromStr,
     {
-        self.get(key.into())
+        self.get(key)
             .map(|n| match n {
                 ConfigNode::String(_, s) => s.parse().map_err(|_| ()),
                 ConfigNode::Boolean(_, b) => b.parse().map_err(|_| ()),
@@ -114,7 +114,7 @@ impl ExtendedMap<&'static str, String> for HashMap<String, ConfigNode> {
     where
         T: FromStr,
     {
-        self.get(key.into())
+        self.get(key)
             .map(|n| match n {
                 ConfigNode::String(_, s) => s.parse().map_err(|_| ()),
                 ConfigNode::Boolean(_, b) => b.parse().map_err(|_| ()),

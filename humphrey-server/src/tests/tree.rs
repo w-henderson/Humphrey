@@ -4,7 +4,7 @@
 use humphrey_server::config::tree::*;
 use std::collections::{BTreeMap, HashMap};
 
-pub const CONF: &'static str = r#"server {
+pub const CONF: &str = r#"server {
     address    "0.0.0.0"
     port       80
     threads    32
