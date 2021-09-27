@@ -6,7 +6,7 @@ use humphrey_server::config::Config;
 use humphrey_server::declare_plugin;
 use humphrey_server::plugins::plugin::{Plugin, PluginLoadResult};
 use humphrey_server::route::try_find_path;
-use humphrey_server::static_server::AppState;
+use humphrey_server::server::server::AppState;
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
@@ -35,14 +35,14 @@ impl Plugin for PhpPlugin {
 
     fn on_load(
         &mut self,
-        config: &Config,
+        config: &HashMap<String, String>,
         state: Arc<AppState>,
     ) -> PluginLoadResult<(), &'static str> {
         // Parses the configuration
-        let php_address = config.raw.get_optional("php.address", "127.0.0.1".into());
-        let php_port = config.raw.get_optional("php.port", "9000".into());
+        let php_address = config.get_optional("address", "127.0.0.1".into());
+        let php_port = config.get_optional("port", "9000".into());
         let php_target = format!("{}:{}", php_address, php_port);
-        let stream_count = config.raw.get_optional_parsed("php.threads", 8_usize, "");
+        let stream_count = config.get_optional_parsed("threads", 8_usize, "");
 
         if let Ok(threads) = stream_count {
             // If the thread count could be parsed, start that many streams
@@ -72,12 +72,16 @@ impl Plugin for PhpPlugin {
         }
     }
 
-    fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
-        if request.uri.split('.').last().unwrap() == "php" {
+    fn on_request(
+        &self,
+        request: &mut Request,
+        state: Arc<AppState>,
+        directory: &str,
+    ) -> Option<Response> {
+        if let Some(located) = try_find_path(directory, &request.uri) {
             // If the requested file is a PHP file, check that the file exists then process it
-            if let Some(located) = try_find_path(&state.directory, &request.uri) {
-                let file_name = located.path.to_str().unwrap().to_string();
-
+            let file_name = located.path.to_str().unwrap().to_string();
+            if file_name.ends_with(".php") {
                 // On Windows, paths generated in this way have "\\?\" at the start
                 // This means the path length limit is bypassed
                 #[cfg(windows)]
