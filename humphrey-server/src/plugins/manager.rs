@@ -19,6 +19,12 @@ pub struct PluginManager {
 
 impl PluginManager {
     /// Loads a plugin library.
+    ///
+    /// # Safety
+    /// Calls foreign code.
+    ///
+    /// If the plugin that is being loaded is memory safe, then this function is memory safe.
+    /// For example, if the plugin was written in Rust using the provided plugin API, it will be safe.
     pub unsafe fn load_plugin(
         &mut self,
         path: &str,

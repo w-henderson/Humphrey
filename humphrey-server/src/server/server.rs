@@ -59,12 +59,10 @@ pub fn main(config: Config) {
     logger.info("Starting server");
 
     #[cfg(feature = "plugins")]
-    {
-        if let Ok(plugins_count) = load_plugins(&state.config, state) {
-            logger.info(&format!("Loaded {} plugins", plugins_count))
-        } else {
-            exit(1);
-        }
+    if let Ok(plugins_count) = load_plugins(&state.config, state) {
+        logger.info(&format!("Loaded {} plugins", plugins_count))
+    } else {
+        exit(1);
     };
 
     logger.info(&format!("Running at {}", addr));

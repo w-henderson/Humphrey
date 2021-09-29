@@ -5,7 +5,6 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-use crate::config::Config;
 use crate::server::server::AppState;
 use humphrey::http::{Request, Response};
 
@@ -85,10 +84,7 @@ pub enum PluginLoadResult<T, E> {
 impl<T, E> PluginLoadResult<T, E> {
     /// Returns `true` if the result is ok, and `false` if not.
     pub const fn is_ok(&self) -> bool {
-        match self {
-            Self::Ok(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Ok(_))
     }
 
     /// Returns `true` if the result is either of the two errors, and `false` if it is ok.
@@ -98,10 +94,7 @@ impl<T, E> PluginLoadResult<T, E> {
 
     /// Returns `true` if the result is a fatal error, and `false` if it is non-fatal or ok.
     pub const fn is_fatal(&self) -> bool {
-        match self {
-            Self::Fatal(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Fatal(_))
     }
 
     /// Maps a `PluginLoadResult<T, E>` to `PluginLoadResult<U, E>` by applying a function to the contained `Ok` value.
