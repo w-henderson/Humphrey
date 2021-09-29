@@ -2,7 +2,8 @@ use humphrey_server::config::Config;
 use humphrey_server::logger::Logger;
 use humphrey_server::server::server;
 
-pub mod tests;
+#[cfg(test)]
+mod tests;
 
 fn main() {
     match Config::load() {

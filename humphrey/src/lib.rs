@@ -45,6 +45,7 @@ pub mod krauss;
 pub mod route;
 pub mod thread;
 
+#[cfg(test)]
 mod tests;
 
 pub use app::App;
