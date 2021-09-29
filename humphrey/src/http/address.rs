@@ -35,11 +35,11 @@ impl Address {
             name: "x-forwarded-for".into(),
         }) {
             let mut proxies: Vec<IpAddr> = forwarded
-                .split(",")
+                .split(',')
                 .map(|s| IpAddr::from_str(s).unwrap())
                 .collect();
 
-            let origin_addr = proxies.last().unwrap().clone();
+            let origin_addr = *proxies.last().unwrap();
             proxies.remove(proxies.len() - 1);
             proxies.push(addr.to_socket_addrs().unwrap().next().unwrap().ip());
 
@@ -56,7 +56,7 @@ impl Address {
 
 impl Display for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.proxies.len() > 0 {
+        if !self.proxies.is_empty() {
             write!(f, "{} (proxied)", self.origin_addr)
         } else {
             write!(f, "{}", self.origin_addr)

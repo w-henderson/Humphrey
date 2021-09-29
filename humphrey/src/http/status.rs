@@ -109,9 +109,9 @@ impl TryFrom<u16> for StatusCode {
     type Error = StatusCodeError;
 }
 
-impl Into<u16> for StatusCode {
-    fn into(self) -> u16 {
-        match self {
+impl From<StatusCode> for u16 {
+    fn from(val: StatusCode) -> Self {
+        match val {
             StatusCode::Continue => 100,
             StatusCode::SwitchingProtocols => 101,
             StatusCode::OK => 200,
@@ -155,9 +155,9 @@ impl Into<u16> for StatusCode {
     }
 }
 
-impl Into<&str> for StatusCode {
-    fn into(self) -> &'static str {
-        match self {
+impl From<StatusCode> for &str {
+    fn from(val: StatusCode) -> Self {
+        match val {
             StatusCode::Continue => "Continue",
             StatusCode::SwitchingProtocols => "Switching Protocols",
             StatusCode::OK => "OK",

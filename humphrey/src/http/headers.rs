@@ -153,9 +153,8 @@ impl From<&str> for ResponseHeader {
 
 impl ToString for RequestHeader {
     fn to_string(&self) -> String {
-        match self {
-            RequestHeader::Custom { name } => return name.clone(),
-            _ => (),
+        if let RequestHeader::Custom { name } = self {
+            return name.clone();
         }
 
         match self {
@@ -191,9 +190,8 @@ impl ToString for RequestHeader {
 
 impl ToString for ResponseHeader {
     fn to_string(&self) -> String {
-        match self {
-            ResponseHeader::Custom { name } => return name.clone(),
-            _ => (),
+        if let ResponseHeader::Custom { name } = self {
+            return name.clone();
         }
 
         match self {

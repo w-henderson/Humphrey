@@ -1,3 +1,5 @@
+#![allow(clippy::new_without_default)]
+
 use crate::http::headers::RequestHeader;
 use crate::http::request::{Request, RequestError};
 use crate::http::response::Response;
@@ -135,32 +137,27 @@ where
         let error_handler = Arc::new(self.error_handler);
         let websocket_handler = Arc::new(self.websocket_handler);
 
-        for stream in socket.incoming() {
-            match stream {
-                Ok(mut stream) => {
-                    let cloned_state = self.state.clone();
+        for mut stream in socket.incoming().flatten() {
+            let cloned_state = self.state.clone();
 
-                    // Check that the client is allowed to connect
-                    if (self.connection_condition)(&mut stream, cloned_state) {
-                        let cloned_state = self.state.clone();
-                        let cloned_routes = routes.clone();
-                        let cloned_websocket_handler = websocket_handler.clone();
-                        let cloned_error_handler = error_handler.clone();
-                        let cloned_handler = self.connection_handler.clone();
+            // Check that the client is allowed to connect
+            if (self.connection_condition)(&mut stream, cloned_state) {
+                let cloned_state = self.state.clone();
+                let cloned_routes = routes.clone();
+                let cloned_websocket_handler = websocket_handler.clone();
+                let cloned_error_handler = error_handler.clone();
+                let cloned_handler = self.connection_handler;
 
-                        // Spawn a new thread to handle the connection
-                        self.thread_pool.execute(move || {
-                            (cloned_handler)(
-                                stream,
-                                cloned_routes,
-                                cloned_error_handler,
-                                cloned_websocket_handler,
-                                cloned_state,
-                            )
-                        });
-                    }
-                }
-                Err(_) => (),
+                // Spawn a new thread to handle the connection
+                self.thread_pool.execute(move || {
+                    (cloned_handler)(
+                        stream,
+                        cloned_routes,
+                        cloned_error_handler,
+                        cloned_websocket_handler,
+                        cloned_state,
+                    )
+                });
             }
         }
 
@@ -258,11 +255,7 @@ fn client_handler<State>(
         // Get the keep alive information from the request before it is consumed by the handler
         let keep_alive = if let Ok(request) = &request {
             if let Some(connection) = request.headers.get(&RequestHeader::Connection) {
-                if connection.to_ascii_lowercase() == "keep-alive" {
-                    true
-                } else {
-                    false
-                }
+                connection.to_ascii_lowercase() == "keep-alive"
             } else {
                 false
             }
@@ -281,7 +274,7 @@ fn client_handler<State>(
 
         // Write the response to the stream
         let response_bytes: Vec<u8> = response.into();
-        if let Err(_) = stream.write(&response_bytes) {
+        if stream.write(&response_bytes).is_err() {
             break;
         };
 
