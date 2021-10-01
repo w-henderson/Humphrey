@@ -10,7 +10,6 @@ fn main() {
         Ok(config) => server::main(config),
         Err(error) => {
             let logger = Logger::default();
-            logger.error("Configuration error:");
             logger.error(&error);
         }
     }

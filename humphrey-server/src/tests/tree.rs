@@ -4,48 +4,7 @@
 use humphrey_server::config::tree::*;
 use std::collections::{BTreeMap, HashMap};
 
-pub const CONF: &str = r#"server {
-    address    "0.0.0.0"
-    port       80
-    threads    32
-    websocket  "localhost:1234"
-
-    plugins { # this is a comment on a section header
-        php {
-            library   "plugins/php/target/release/php.dll"
-            address   "127.0.0.1"
-            port      9000
-            threads   8
-        }
-    }
-
-    # this is a comment on an empty line
-
-    blacklist {
-        # no blacklist file because it's easier for testing
-        mode   "block"
-    }
-
-    log {
-        level     "info"
-        console   true
-        file      "humphrey.log"
-    }
-
-    cache {
-        size   128M # this is a comment on a value
-        time   60
-    }
-
-    route /static/* { # this is a comment on a route header
-        directory   "/var/www"
-    }
-
-    route /* {
-        proxy               "127.0.0.1:8000,127.0.0.1:8080"
-        load_balancer_mode  "round-robin"
-    }
-}"#;
+pub const CONF: &str = include_str!("./testcases/valid.conf");
 
 #[test]
 fn test_build_tree() {

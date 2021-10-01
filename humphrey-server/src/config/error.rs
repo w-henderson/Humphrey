@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fmt::Display;
 
 /// Represents an error encountered during configuration parsing.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ConfigError {
     message: &'static str,
     line: i64,
