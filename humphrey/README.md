@@ -12,7 +12,7 @@ Humphrey is a very fast, robust and flexible HTTP/1.1 web server crate which all
 The Humphrey crate can be installed by adding `humphrey` to your Cargo.toml file.
 
 ## Documentation
-The Humphrey documentation can be found at [docs.rs](https://docs.rs/humphrey/0.1.0/humphrey/).
+The Humphrey documentation can be found at [docs.rs](https://docs.rs/humphrey).
 
 ## Basic Example
 ```rs
