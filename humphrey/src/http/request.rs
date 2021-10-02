@@ -37,7 +37,7 @@ pub enum RequestError {
 
 impl std::fmt::Display for RequestError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", "RequestError")
+        write!(f, "RequestError")
     }
 }
 
@@ -57,7 +57,7 @@ impl Request {
 
         let start_line_string =
             String::from_utf8(start_line_buf).map_err(|_| RequestError::Request)?;
-        let start_line: Vec<&str> = start_line_string.split(" ").collect();
+        let start_line: Vec<&str> = start_line_string.split(' ').collect();
 
         safe_assert(start_line.len() == 3)?;
 
@@ -131,18 +131,15 @@ fn safe_assert(condition: bool) -> Result<(), RequestError> {
     }
 }
 
-impl Into<Vec<u8>> for Request {
-    fn into(self) -> Vec<u8> {
-        let start_line = if self.query.len() == 0 {
-            format!("{} {} {}", self.method, self.uri, self.version)
+impl From<Request> for Vec<u8> {
+    fn from(req: Request) -> Self {
+        let start_line = if req.query.is_empty() {
+            format!("{} {} {}", req.method, req.uri, req.version)
         } else {
-            format!(
-                "{} {}?{} {}",
-                self.method, self.uri, self.query, self.version
-            )
+            format!("{} {}?{} {}", req.method, req.uri, req.query, req.version)
         };
 
-        let headers = self
+        let headers = req
             .headers
             .iter()
             .map(|(k, v)| format!("{}: {}", k.to_string(), v))
@@ -155,7 +152,7 @@ impl Into<Vec<u8>> for Request {
         bytes.extend(headers.as_bytes());
         bytes.extend(b"\r\n\r\n");
 
-        if let Some(content) = self.content {
+        if let Some(content) = req.content {
             bytes.extend(content);
         }
 

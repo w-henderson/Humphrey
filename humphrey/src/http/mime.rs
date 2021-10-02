@@ -58,9 +58,9 @@ impl MimeType {
     }
 }
 
-impl Into<String> for MimeType {
-    fn into(self) -> String {
-        match self {
+impl From<MimeType> for String {
+    fn from(val: MimeType) -> Self {
+        match val {
             MimeType::TextCss => "text/css",
             MimeType::TextHtml => "text/html",
             MimeType::TextJavaScript => "text/javascript",

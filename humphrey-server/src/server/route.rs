@@ -1,7 +1,7 @@
 use std::fs::metadata;
 use std::path::PathBuf;
 
-const INDEX_FILES: [&'static str; 3] = ["index.html", "index.htm", "index.php"];
+const INDEX_FILES: [&str; 3] = ["index.html", "index.htm", "index.php"];
 
 pub struct LocatedPath {
     pub path: PathBuf,
@@ -12,12 +12,12 @@ pub struct LocatedPath {
 /// If the path itself is not found, attemps to find index files within it.
 /// If these are not found, returns `None`.
 pub fn try_find_path(directory: &str, request_path: &str) -> Option<LocatedPath> {
-    if request_path.contains("..") || request_path.contains(":") {
+    if request_path.contains("..") || request_path.contains(':') {
         return None;
     }
 
-    let request_path = request_path.trim_start_matches("/");
-    let directory = directory.trim_end_matches("/");
+    let request_path = request_path.trim_start_matches('/');
+    let directory = directory.trim_end_matches('/');
 
     let mut paths: Vec<String> = INDEX_FILES
         .iter()

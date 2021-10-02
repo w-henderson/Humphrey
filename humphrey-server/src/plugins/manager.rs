@@ -2,12 +2,12 @@
 //!
 //! https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html
 
-use crate::config::Config;
 use crate::plugins::plugin::{Plugin, PluginLoadResult};
-use crate::static_server::AppState;
+use crate::server::server::AppState;
 use humphrey::http::{Request, Response};
 
 use libloading::Library;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Encapsulates plugins and their corresponding libraries.
@@ -19,10 +19,16 @@ pub struct PluginManager {
 
 impl PluginManager {
     /// Loads a plugin library.
+    ///
+    /// # Safety
+    /// Calls foreign code.
+    ///
+    /// If the plugin that is being loaded is memory safe, then this function is memory safe.
+    /// For example, if the plugin was written in Rust using the provided plugin API, it will be safe.
     pub unsafe fn load_plugin(
         &mut self,
         path: &str,
-        config: &Config,
+        config: &HashMap<String, String>,
         state: Arc<AppState>,
     ) -> PluginLoadResult<String, &'static str> {
         type PluginInitFunction = unsafe extern "C" fn() -> *mut dyn Plugin;
@@ -62,9 +68,14 @@ impl PluginManager {
 
     /// Calls the `on_request` function on every plugin.
     /// If a plugin overrides the response, this is immediately returned.
-    pub fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
+    pub fn on_request(
+        &self,
+        request: &mut Request,
+        state: Arc<AppState>,
+        directory: &str,
+    ) -> Option<Response> {
         for plugin in &self.plugins {
-            if let Some(response) = plugin.on_request(request, state.clone()) {
+            if let Some(response) = plugin.on_request(request, state.clone(), directory) {
                 return Some(response);
             }
         }

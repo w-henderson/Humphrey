@@ -73,8 +73,8 @@ impl Cache {
 impl From<&Config> for Cache {
     fn from(config: &Config) -> Self {
         Self {
-            cache_limit: config.cache_limit,
-            cache_time_limit: config.cache_time_limit,
+            cache_limit: config.cache.size_limit,
+            cache_time_limit: config.cache.time_limit as u64,
             cache_size: 0,
             data: VecDeque::new(),
         }

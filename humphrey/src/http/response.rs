@@ -42,7 +42,7 @@ pub enum ResponseError {
 
 impl std::fmt::Display for ResponseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", "ResponseError")
+        write!(f, "ResponseError")
     }
 }
 
@@ -126,7 +126,7 @@ impl Response {
             }
         }
 
-        if self.body.len() > 0 {
+        if !self.body.is_empty() {
             match self.headers.entry(ResponseHeader::ContentLength) {
                 Entry::Occupied(_) => (),
                 Entry::Vacant(v) => {
@@ -156,7 +156,7 @@ impl Response {
 
         let start_line_string =
             String::from_utf8(start_line_buf).map_err(|_| ResponseError::Response)?;
-        let start_line: Vec<&str> = start_line_string.splitn(3, " ").collect();
+        let start_line: Vec<&str> = start_line_string.splitn(3, ' ').collect();
 
         safe_assert(start_line.len() == 3)?;
 
@@ -212,19 +212,19 @@ impl Response {
     }
 }
 
-impl Into<Vec<u8>> for Response {
-    fn into(self) -> Vec<u8> {
+impl From<Response> for Vec<u8> {
+    fn from(val: Response) -> Self {
         let status_line = format!(
             "{} {} {}",
-            self.version,
-            Into::<u16>::into(self.status_code.clone()),
-            Into::<&str>::into(self.status_code.clone())
+            val.version,
+            Into::<u16>::into(val.status_code.clone()),
+            Into::<&str>::into(val.status_code.clone())
         );
 
         let mut bytes: Vec<u8> = Vec::with_capacity(status_line.len());
         bytes.extend(status_line.as_bytes());
 
-        for (header, value) in self.headers {
+        for (header, value) in val.headers {
             bytes.extend(b"\r\n");
             bytes.extend(header.to_string().as_bytes());
             bytes.extend(b": ");
@@ -233,8 +233,8 @@ impl Into<Vec<u8>> for Response {
 
         bytes.extend(b"\r\n\r\n");
 
-        if self.body.len() != 0 {
-            bytes.extend(self.body);
+        if !val.body.is_empty() {
+            bytes.extend(val.body);
             bytes.extend(b"\r\n");
         }
 

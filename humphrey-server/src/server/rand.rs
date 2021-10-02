@@ -1,6 +1,7 @@
 use std::time::SystemTime;
 
 /// Represents a linear congruential generator, used to generate random `u32` numbers.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lcg {
     modulus: usize,
     multiplier: usize,

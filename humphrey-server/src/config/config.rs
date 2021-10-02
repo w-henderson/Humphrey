@@ -1,63 +1,93 @@
+use crate::config::extended_hashmap::ExtendedMap;
+use crate::config::tree::{parse_conf, ConfigNode};
+use crate::logger::LogLevel;
+use crate::proxy::{EqMutex, LoadBalancer};
+use crate::rand::Lcg;
+
 use std::collections::HashMap;
 use std::env::args;
 use std::fs::File;
 use std::io::Read;
 
-use crate::config::extended_hashmap::ExtendedMap;
-use crate::logger::LogLevel;
-use humphrey::krauss::wildcard_match;
-
-/// Stores the server configuration.
-#[derive(Debug, PartialEq, Eq)]
+/// Represents the parsed and validated configuration.
+#[derive(Debug, PartialEq)]
 pub struct Config {
-    /// Address to host the server on
+    /// The address to host the server on
     pub address: String,
-    /// Port to host the server on
+    /// The port to host the server on
     pub port: u16,
-    /// Threads to host the server using
+    /// The number of threads to host the server on
     pub threads: usize,
-    /// Routing mode of the server
-    pub mode: ServerMode,
-    /// Blacklisted IP addresses
-    pub blacklist: Vec<String>,
-    /// Mode of blacklisting
-    pub blacklist_mode: BlacklistMode,
-    /// Log level of the server
-    pub log_level: LogLevel,
-    /// Whether to log to the console
-    pub log_console: bool,
-    /// Logging output file
-    pub log_file: Option<String>,
-    /// Size limit of the in-memory file cache, measured in bytes
-    pub cache_limit: usize,
-    /// Time limit for cached items
-    pub cache_time_limit: u64,
-    /// Root directory to serve files from
-    pub directory: Option<String>,
-    /// WebSocket proxy address
+    /// Address to forward WebSocket connections to
     pub websocket_proxy: Option<String>,
-    /// Plugin sources
+    /// The configuration for different routes
+    pub routes: Vec<RouteConfig>,
+    /// The configuration for any plugins
     #[cfg(feature = "plugins")]
-    pub plugin_libraries: Vec<String>,
-    /// Proxy target address
-    pub proxy_target: Option<String>,
-    /// Targets for the load balancer
-    pub load_balancer_targets: Option<Vec<String>>,
-    /// Algorithm for load balancing
-    pub load_balancer_mode: Option<LoadBalancerMode>,
-    /// Raw configuration hashmap
-    pub raw: HashMap<String, String>,
+    pub plugins: Vec<PluginConfig>,
+    /// Logging configuration
+    pub logging: LoggingConfig,
+    /// Cache configuration
+    pub cache: CacheConfig,
+    /// Blacklist configuration
+    pub blacklist: BlacklistConfig,
 }
 
-// Represents a hosting mode.
-#[derive(Debug, PartialEq, Eq)]
-pub enum ServerMode {
-    /// Host static content from a directory
-    Static,
-    /// Proxy requests to another server
-    Proxy,
-    /// Distribute requests to a number of different servers
-    LoadBalancer,
+/// Represents configuration for a specific route.
+#[derive(Debug, PartialEq)]
+pub enum RouteConfig {
+    /// Serve files from a directory
+    Serve {
+        /// Wildcard string specifying what URIs to match
+        matches: String,
+        /// Directory to serve files from
+        directory: String,
+    },
+    /// Proxy connections to the specified target(s), load balancing if necessary
+    Proxy {
+        /// Wildcard string specifying what URIs to match
+        matches: String,
+        /// Load balancer instance
+        load_balancer: EqMutex<LoadBalancer>,
+    },
+}
+
+/// Represents configuration for the logger.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LoggingConfig {
+    /// The level of logging
+    pub level: LogLevel,
+    /// Whether to log to the console
+    pub console: bool,
+    /// The path to the log file
+    pub file: Option<String>,
+}
+
+/// Represents configuration for the cache.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CacheConfig {
+    /// The maximum size of the cache, in bytes
+    pub size_limit: usize,
+    /// The maximum time to cache an item for, in seconds
+    pub time_limit: usize,
+}
+
+/// Represents configuration for the blacklist.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BlacklistConfig {
+    /// The list of addresses to block
+    pub list: Vec<String>,
+    /// The way in which the blacklist is enforced
+    pub mode: BlacklistMode,
+}
+
+/// Represents configuration for a plugin.
+#[cfg(feature = "plugins")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PluginConfig {
+    pub name: String,
+    pub library: String,
+    pub config: HashMap<String, String>,
 }
 
 /// Represents an algorithm for load balancing.
@@ -78,223 +108,178 @@ pub enum BlacklistMode {
     Forbidden,
 }
 
-impl Default for LoadBalancerMode {
-    fn default() -> Self {
-        Self::RoundRobin
-    }
-}
+impl Config {
+    /// Attempts to load the configuration.
+    pub fn load() -> Result<Self, String> {
+        let config_string = load_config_file()
+            .map_err(|_| "Could not open the specified config file or default `humphrey.conf`")?;
+        let tree = parse_conf(&config_string).map_err(|e| e.to_string())?;
+        let config = Self::from_tree(tree)?;
 
-impl Default for BlacklistMode {
-    fn default() -> Self {
-        Self::Block
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            address: "0.0.0.0".into(),
-            port: 80,
-            threads: 32,
-            mode: ServerMode::Static,
-            blacklist: Vec::new(),
-            blacklist_mode: BlacklistMode::Block,
-            log_level: LogLevel::Warn,
-            log_console: true,
-            log_file: None,
-            cache_limit: 0,
-            cache_time_limit: 0,
-            directory: Some(String::new()),
-            websocket_proxy: None,
-            #[cfg(feature = "plugins")]
-            plugin_libraries: Vec::new(),
-            proxy_target: None,
-            load_balancer_targets: None,
-            load_balancer_mode: None,
-            raw: HashMap::new(),
-        }
-    }
-}
-
-/// Locates, parses and returns the server configuration.
-/// Returns `Err` if any part of this process fails.
-pub fn load_config(config_string: Option<String>) -> Result<Config, &'static str> {
-    // Load and parse the configuration
-    let config = if config_string.is_some() {
-        config_string.unwrap()
-    } else if let Ok(config) = read_config() {
-        config
-    } else {
-        return Err("The configuration file could not be found");
-    };
-
-    let hashmap = parse_ini(&config).map_err(|_| "The configuration file could not be parsed")?;
-    let mode = hashmap.get_compulsory("server.mode", "The mode was not specified")?;
-
-    // Get and validate the specified address, port and threads
-    let address = hashmap.get_optional("server.address", "0.0.0.0".into());
-    let port: u16 = hashmap.get_optional_parsed("server.port", 80, "Invalid port")?;
-    let threads: usize =
-        hashmap.get_optional_parsed("server.threads", 32, "Invalid number of threads")?;
-
-    // Get and validate the blacklist file
-    let blacklist = load_list_file(hashmap.get("blacklist.file".into()).clone())?;
-
-    // Read the blacklist mode
-    let blacklist_mode = hashmap.get_optional("blacklist.mode", "block".into());
-
-    // Parse the blacklist mode
-    let blacklist_mode = match blacklist_mode.as_str() {
-        "block" => BlacklistMode::Block,
-        "forbidden" => BlacklistMode::Forbidden,
-        _ => return Err("The blacklist mode was invalid"),
-    };
-
-    if mode != "static" && blacklist_mode == BlacklistMode::Forbidden {
-        return Err("Blacklist mode 'forbidden' is only supported when serving static content");
+        Ok(config)
     }
 
-    // Get logging configuration
-    let log_level =
-        hashmap.get_optional_parsed("log.level", LogLevel::Warn, "Invalid log level")?;
-    let log_file = hashmap.get_owned("log.file");
-    let log_console = hashmap.get("log.console".into()) != Some(&String::from("false"));
+    /// Parses the config from the config tree.
+    pub fn from_tree(tree: ConfigNode) -> Result<Self, &'static str> {
+        let mut hashmap: HashMap<String, ConfigNode> = HashMap::new();
+        tree.flatten(&mut hashmap, &Vec::new());
 
-    match mode.as_str() {
-        "static" => {
-            // Get and parse the cache size limit
-            let cache_size_limit = hashmap.get_optional("static.cache", "0".into());
-            let cache_size_limit = parse_size(cache_size_limit)?;
+        // Get and validate the specified address, port and threads
+        let address = hashmap.get_optional("server.address", "0.0.0.0".into());
+        let port: u16 = hashmap.get_optional_parsed("server.port", 80, "Invalid port")?;
+        let threads: usize =
+            hashmap.get_optional_parsed("server.threads", 32, "Invalid number of threads")?;
+        let websocket_proxy = hashmap.get_owned("server.websocket");
 
-            // Get and parse the cache time limit
-            let cache_time_limit: u64 =
-                hashmap.get_optional_parsed("static.cache_time", 60, "Invalid cache time limit")?;
-
-            // Get the root directory
-            let directory = hashmap.get_optional("static.directory", ".".into());
-
-            // Get the WebSocket proxy address
-            let websocket_proxy = hashmap.get("static.websocket").map(|s| s.to_string());
-
-            // Get and validate the plugins file
-            #[cfg(feature = "plugins")]
-            let plugin_libraries = load_list_file(hashmap.get("static.plugins".into()).clone())?;
-
-            Ok(Config {
-                address,
-                port,
-                threads,
-                mode: ServerMode::Static,
-                blacklist,
-                blacklist_mode,
-                log_level,
-                log_console,
-                log_file,
-                cache_limit: cache_size_limit,
-                cache_time_limit,
-                directory: Some(directory),
-                websocket_proxy,
-                #[cfg(feature = "plugins")]
-                plugin_libraries,
-                proxy_target: None,
-                load_balancer_targets: None,
-                load_balancer_mode: None,
-                raw: hashmap,
-            })
-        }
-        "proxy" => {
-            let proxy_target =
-                hashmap.get_compulsory("proxy.target", "The proxy target was not specified")?;
-
-            Ok(Config {
-                address,
-                port,
-                threads,
-                mode: ServerMode::Proxy,
-                blacklist,
-                blacklist_mode,
-                log_level,
-                log_console,
-                log_file,
-                cache_limit: 0,
-                cache_time_limit: 0,
-                directory: None,
-                websocket_proxy: None,
-                #[cfg(feature = "plugins")]
-                plugin_libraries: Vec::new(),
-                proxy_target: Some(proxy_target.clone()),
-                load_balancer_targets: None,
-                load_balancer_mode: None,
-                raw: hashmap,
-            })
-        }
-        "load_balancer" => {
-            // Try to get the path to the targets file
-            let targets_file = hashmap.get_compulsory(
-                "load_balancer.targets",
-                "The load balancer targets file was not specified",
-            )?;
-
-            // Try to open the targets file
-            let mut targets_file = File::open(targets_file)
-                .map_err(|_| "The load balancer targets file could not be opened")?;
-
-            // Try to read the targets file
-            let mut buf = String::new();
-            targets_file
-                .read_to_string(&mut buf)
-                .map_err(|_| "The load balancer targets file could not be read")?;
-
-            // Read the load balancer mode
-            let load_balancer_mode =
-                hashmap.get_optional("load_balancer.mode", "round-robin".into());
-
-            // Parse the load balancer mode
-            let load_balancer_mode = match load_balancer_mode.as_str() {
-                "round-robin" => LoadBalancerMode::RoundRobin,
-                "random" => LoadBalancerMode::Random,
-                _ => return Err("The load balancer mode was invalid"),
+        // Get and validate the blacklist file and mode
+        let blacklist = {
+            let blacklist = load_list_file(hashmap.get_owned("server.blacklist.file"))?;
+            let blacklist_mode = hashmap.get_optional("server.blacklist.mode", "block".into());
+            let blacklist_mode = match blacklist_mode.as_ref() {
+                "block" => BlacklistMode::Block,
+                "forbidden" => BlacklistMode::Forbidden,
+                _ => return Err("Invalid blacklist mode"),
             };
 
-            let targets: Vec<String> = buf.lines().map(|s| s.to_string()).collect();
+            BlacklistConfig {
+                list: blacklist,
+                mode: blacklist_mode,
+            }
+        };
 
-            Ok(Config {
-                address,
-                port,
-                threads,
-                mode: ServerMode::LoadBalancer,
-                blacklist,
-                blacklist_mode,
-                log_level,
-                log_console,
-                log_file,
-                cache_limit: 0,
-                cache_time_limit: 0,
-                directory: None,
-                websocket_proxy: None,
-                #[cfg(feature = "plugins")]
-                plugin_libraries: Vec::new(),
-                proxy_target: None,
-                load_balancer_targets: Some(targets),
-                load_balancer_mode: Some(load_balancer_mode),
-                raw: hashmap,
-            })
-        }
-        _ => Err("The server mode was invalid"),
+        // Get and validate the logging configuration
+        let logging = {
+            let log_level = hashmap.get_optional_parsed(
+                "server.log.level",
+                LogLevel::Warn,
+                "Invalid log level",
+            )?;
+            let log_file = hashmap.get_owned("server.log.file");
+            let log_console = hashmap.get_optional_parsed(
+                "server.log.console",
+                true,
+                "server.log.console must be a boolean",
+            )?;
+
+            LoggingConfig {
+                level: log_level,
+                console: log_console,
+                file: log_file,
+            }
+        };
+
+        // Get and validate the cache configuration
+        let cache = {
+            let cache_size =
+                hashmap.get_optional_parsed("server.cache.size", 0_usize, "Invalid cache size")?;
+            let cache_time =
+                hashmap.get_optional_parsed("server.cache.time", 0_usize, "Invalid cache time")?;
+
+            CacheConfig {
+                size_limit: cache_size,
+                time_limit: cache_time,
+            }
+        };
+
+        // Get and validate the configuration for the different routes
+        let routes = {
+            let routes_map = tree.get_routes();
+            let mut routes: Vec<RouteConfig> = Vec::with_capacity(routes_map.len());
+
+            for (wild, conf) in routes_map {
+                if conf.contains_key("directory") {
+                    // This is a regular file-serving route
+
+                    let directory = conf.get_compulsory("directory", "").unwrap();
+
+                    routes.push(RouteConfig::Serve {
+                        matches: wild,
+                        directory,
+                    });
+                } else if conf.contains_key("proxy") {
+                    // This is a proxy route
+
+                    let targets: Vec<String> = conf
+                        .get_compulsory("proxy", "")
+                        .unwrap()
+                        .split(',')
+                        .map(|s| s.to_owned())
+                        .collect();
+
+                    let load_balancer_mode =
+                        conf.get_optional("load_balancer_mode", "round-robin".into());
+                    let load_balancer_mode = match load_balancer_mode.as_str() {
+                        "round-robin" => LoadBalancerMode::RoundRobin,
+                        "random" => LoadBalancerMode::Random,
+                        _ => return Err("Invalid load balancer mode, valid options are `round-robin` or `random`"),
+                    };
+
+                    routes.push(RouteConfig::Proxy {
+                        matches: wild,
+                        load_balancer: EqMutex::new(LoadBalancer {
+                            targets,
+                            mode: load_balancer_mode,
+                            lcg: Lcg::new(),
+                            index: 0,
+                        }),
+                    })
+                } else {
+                    return Err("Invalid route configuration, every route must contain either the `directory` or `proxy` field");
+                }
+            }
+
+            routes
+        };
+
+        // Get and validate plugin configuration
+        #[cfg(feature = "plugins")]
+        let plugins = {
+            let plugins_map = tree.get_plugins();
+            let mut plugins: Vec<PluginConfig> = Vec::new();
+
+            for (name, conf) in plugins_map {
+                let library = conf.get_compulsory("library", "Plugin library not specified")?;
+                let mut additional_config: HashMap<String, String> = conf
+                    .clone()
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.get_string().unwrap()))
+                    .collect();
+                additional_config.remove("library").unwrap();
+
+                plugins.push(PluginConfig {
+                    name,
+                    library,
+                    config: additional_config,
+                })
+            }
+
+            plugins
+        };
+
+        Ok(Config {
+            address,
+            port,
+            threads,
+            websocket_proxy,
+            routes,
+            #[cfg(feature = "plugins")]
+            plugins,
+            logging,
+            cache,
+            blacklist,
+        })
     }
 }
 
-/// Locates and reads the configuration file.
-/// Uses the first command line argument as a path, defaults to "humphrey.ini" in the current directory if not specified.
-/// If the file cannot be found and/or read, returns `Err`.
-fn read_config() -> Result<String, ()> {
-    let path = args().nth(1).unwrap_or("humphrey.ini".into());
+/// Loads the configuration file.
+fn load_config_file() -> Result<String, ()> {
+    let path = args().nth(1).unwrap_or_else(|| "humphrey.conf".into());
 
     if let Ok(mut file) = File::open(path) {
         // The file can be opened
 
         let mut string = String::new();
-        if let Ok(_) = file.read_to_string(&mut string) {
+        if file.read_to_string(&mut string).is_ok() {
             // The file can be read
 
             Ok(string)
@@ -306,91 +291,8 @@ fn read_config() -> Result<String, ()> {
     }
 }
 
-/// Attempts to parse the given string as the INI configuration format.
-/// If successful, returns a hashmap of keys and values.
-/// Otherwise, returns `Err`.
-pub fn parse_ini(ini: &str) -> Result<HashMap<String, String>, ()> {
-    let mut config: HashMap<String, String> = HashMap::new();
-    let mut section: Option<String> = None;
-
-    for line in ini.lines() {
-        if line.chars().nth(0) == Some(';') || line.len() == 0 {
-            // If the line is empty or a comment, ignore it
-            continue;
-        }
-
-        if wildcard_match("[*]", line) {
-            // If the line is a section header, set the section and continue
-            section = Some(line[1..line.len() - 1].to_string());
-            continue;
-        }
-
-        // Get the key and the value separated by the `:`
-        let line = line.splitn(2, ';').nth(0).unwrap();
-        let mut key_value = line.splitn(2, '=');
-        let key = key_value.next();
-        let value = key_value.next();
-
-        if key.is_some() && value.is_some() {
-            // Both the key and the value are valid
-
-            // If the value is in quotation marks, remove them
-            let value = value.unwrap().trim();
-            let value = if wildcard_match("\"*\"", value) {
-                &value[1..value.len() - 1]
-            } else {
-                value
-            };
-
-            // If currently in a section, prepend the section name and a dot to the key
-            let full_key = if let Some(s) = &section {
-                format!("{}.{}", s, key.unwrap().trim())
-            } else {
-                key.unwrap().trim().into()
-            };
-
-            config.insert(full_key, value.into());
-        } else {
-            return Err(());
-        }
-    }
-
-    Ok(config)
-}
-
-/// Parses a size string into its corresponding number of bytes.
-/// For example, 4K => 4096, 1M => 1048576.
-/// If no letter is provided at the end, assumes the number to be in bytes.
-fn parse_size(size: String) -> Result<usize, &'static str> {
-    if size.len() == 0 {
-        // Empty string
-
-        Err("The specified size was invalid")
-    } else if size.len() == 1 {
-        // One character so cannot possibly be valid
-
-        size.parse::<usize>()
-            .map_err(|_| "The specified size was invalid")
-    } else {
-        let last_char = size.chars().last().unwrap().to_ascii_uppercase();
-        let number: usize = size[0..size.len() - 1]
-            .parse()
-            .map_err(|_| "The specified size was invalid")?;
-
-        match last_char {
-            'K' => Ok(number * 1024),
-            'M' => Ok(number * 1024 * 1024),
-            'G' => Ok(number * 1024 * 1024 * 1024),
-            '0'..='9' => size
-                .parse::<usize>()
-                .map_err(|_| "The specified size was invalid"),
-            _ => Err("The specified size was invalid"),
-        }
-    }
-}
-
 /// Loads a file which is a list of values.
-fn load_list_file(path: Option<&String>) -> Result<Vec<String>, &'static str> {
+fn load_list_file(path: Option<String>) -> Result<Vec<String>, &'static str> {
     if let Some(path) = path {
         // Try to open and read the file
         let mut file = File::open(path).map_err(|_| "List file could not be opened")?;

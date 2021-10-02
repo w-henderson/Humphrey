@@ -5,11 +5,11 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-use crate::config::Config;
-use crate::static_server::AppState;
+use crate::server::server::AppState;
 use humphrey::http::{Request, Response};
 
 use std::any::Any;
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -27,7 +27,7 @@ pub trait Plugin: Any + Send + Sync + Debug {
     ///   working at all.
     fn on_load(
         &mut self,
-        config: &Config,
+        config: &HashMap<String, String>,
         state: Arc<AppState>,
     ) -> PluginLoadResult<(), &'static str> {
         PluginLoadResult::Ok(())
@@ -36,7 +36,12 @@ pub trait Plugin: Any + Send + Sync + Debug {
     /// Called when a request is received but before it is processed. May modify the request in-place.
     /// Should return `None` to indicate that Humphrey should process the request,
     ///   or the plugin should process the request itself and return `Some(response)`.
-    fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
+    fn on_request(
+        &self,
+        request: &mut Request,
+        state: Arc<AppState>,
+        directory: &str,
+    ) -> Option<Response> {
         None
     }
 
@@ -79,10 +84,7 @@ pub enum PluginLoadResult<T, E> {
 impl<T, E> PluginLoadResult<T, E> {
     /// Returns `true` if the result is ok, and `false` if not.
     pub const fn is_ok(&self) -> bool {
-        match self {
-            Self::Ok(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Ok(_))
     }
 
     /// Returns `true` if the result is either of the two errors, and `false` if it is ok.
@@ -92,10 +94,7 @@ impl<T, E> PluginLoadResult<T, E> {
 
     /// Returns `true` if the result is a fatal error, and `false` if it is non-fatal or ok.
     pub const fn is_fatal(&self) -> bool {
-        match self {
-            Self::Fatal(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Fatal(_))
     }
 
     /// Maps a `PluginLoadResult<T, E>` to `PluginLoadResult<U, E>` by applying a function to the contained `Ok` value.
