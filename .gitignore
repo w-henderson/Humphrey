@@ -1,4 +1,5 @@
 target/
+dist/
 humphrey.ini
 conf/
 humphrey.log
