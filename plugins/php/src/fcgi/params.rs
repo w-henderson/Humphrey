@@ -16,12 +16,16 @@ impl Params for HashMap<String, String> {
                 result.push(name.len() as u8);
             } else {
                 result.extend((name.len() as u32).to_be_bytes());
+                let len = result.len();
+                result[len - 4] |= 0x80;
             }
 
             if value.len() < 128 {
                 result.push(value.len() as u8);
             } else {
                 result.extend((value.len() as u32).to_be_bytes());
+                let len = result.len();
+                result[len - 4] |= 0x80;
             }
 
             result.extend(name.as_bytes());

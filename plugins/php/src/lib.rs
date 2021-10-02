@@ -1,14 +1,14 @@
-use humphrey::http::headers::ResponseHeaderMap;
+use humphrey::http::headers::{RequestHeader, ResponseHeaderMap};
 use humphrey::http::{Request, Response, StatusCode};
 
 use humphrey_server::config::extended_hashmap::ExtendedMap;
-use humphrey_server::config::Config;
 use humphrey_server::declare_plugin;
 use humphrey_server::plugins::plugin::{Plugin, PluginLoadResult};
 use humphrey_server::route::try_find_path;
 use humphrey_server::server::server::AppState;
 
 use std::collections::{BTreeMap, HashMap};
+use std::convert::TryFrom;
 use std::io::Write;
 use std::net::{Shutdown, TcpStream};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -91,14 +91,17 @@ impl Plugin for PhpPlugin {
                 let mut params: HashMap<String, String> = HashMap::new();
                 params.insert("GATEWAY_INTERFACE".into(), "FastCGI/1.0".into());
                 params.insert("REQUEST_METHOD".into(), request.method.to_string());
-                params.insert("SCRIPT_NAME".into(), request.uri.clone());
+                params.insert("REQUEST_URI".into(), format!("/{}", request.uri));
+                params.insert("SCRIPT_NAME".into(), format!("/{}", request.uri));
                 params.insert("SCRIPT_FILENAME".into(), file_name);
                 params.insert("QUERY_STRING".into(), request.query.clone());
                 params.insert("SERVER_SOFTWARE".into(), "Humphrey".into());
                 params.insert("REMOTE_ADDR".into(), "127.0.0.1".into());
-                params.insert("SERVER_NAME".into(), "127.0.0.1".into());
+                params.insert("SERVER_NAME".into(), "localhost".into());
                 params.insert("SERVER_PORT".into(), "80".into());
                 params.insert("SERVER_PROTOCOL".into(), "HTTP/1.1".into());
+                params.insert("PHP_SELF".into(), format!("/{}", request.uri));
+                params.insert("DOCUMENT_ROOT".into(), directory.into());
                 params.insert(
                     "CONTENT_LENGTH".into(),
                     request
@@ -108,6 +111,19 @@ impl Plugin for PhpPlugin {
                         .unwrap_or(0)
                         .to_string(),
                 );
+
+                // Forward supported headers
+                for (forwarded_header, param_name) in [
+                    (RequestHeader::Host, "HTTP_HOST"),
+                    (RequestHeader::ContentType, "CONTENT_TYPE"),
+                    (RequestHeader::Cookie, "HTTP_COOKIE"),
+                    (RequestHeader::UserAgent, "HTTP_USER_AGENT"),
+                    (RequestHeader::Authorization, "HTTP_AUTHORIZATION"),
+                ] {
+                    if let Some(value) = request.headers.get(&forwarded_header) {
+                        params.insert(param_name.into(), value.clone());
+                    }
+                }
 
                 // Generate the FCGI request
                 let empty_vec = Vec::new();
@@ -133,7 +149,9 @@ impl Plugin for PhpPlugin {
                 loop {
                     match FcgiRecord::read_from(&*stream) {
                         Ok(record) => {
-                            if record.fcgi_type != FcgiType::Stdout {
+                            if record.fcgi_type != FcgiType::Stdout
+                                && record.fcgi_type != FcgiType::Stderr
+                            {
                                 break;
                             }
                             records.push(record);
@@ -148,37 +166,56 @@ impl Plugin for PhpPlugin {
                     }
                 }
 
-                // Assume the content to be UTF-8 and parse the headers
-                let content = std::str::from_utf8(&records[0].content_data).unwrap();
+                // Assume the content to be UTF-8 and load it all
+                let mut content_bytes: Vec<u8> = Vec::new();
+                records.iter().fold(&mut content_bytes, |acc, val| {
+                    acc.extend(&val.content_data);
+                    acc
+                });
+
+                // Parse the headers
+                let content = std::str::from_utf8(&content_bytes).unwrap();
                 let mut headers: ResponseHeaderMap = BTreeMap::new();
                 let mut content_split = content.splitn(2, "\r\n\r\n");
+                let mut status = StatusCode::OK;
 
                 for line in content_split.next().unwrap().lines() {
-                    let mut line_split = line.splitn(2, ":");
+                    let mut line_split = line.splitn(2, ':');
                     let name = line_split.next().unwrap().trim();
                     let value = line_split.next().map(|s| s.trim());
 
                     if let Some(value) = value {
-                        headers.insert(name.into(), value.into());
+                        if name == "Status" {
+                            if let Ok(new_status) = StatusCode::try_from(
+                                value.split(' ').next().unwrap().parse::<u16>().unwrap(),
+                            ) {
+                                status = new_status;
+                            }
+                        } else {
+                            headers.insert(name.into(), value.into());
+                        }
                     }
                 }
 
                 // Create a response
-                let mut response = Response::new(StatusCode::OK)
+                let mut response = Response::new(status.clone())
                     .with_bytes(content_split.next().unwrap_or("").as_bytes().to_vec());
 
                 // Add the headers
                 response.headers = headers;
 
+                let status_code_number: u16 = status.clone().into();
+                let status_code_string: &str = status.into();
+
                 state.logger.info(&format!(
-                    "{}: 200 OK (PHP Plugin) {}",
-                    request.address, request.uri
+                    "{}: {} {} (PHP Plugin) {}",
+                    request.address, status_code_number, status_code_string, request.uri
                 ));
 
                 // Add final headers and return the response
                 Some(
                     response
-                        .with_request_compatibility(&request)
+                        .with_request_compatibility(request)
                         .with_generated_headers(),
                 )
             } else {

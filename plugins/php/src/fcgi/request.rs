@@ -32,7 +32,7 @@ impl<'a> FcgiRequest<'a> {
 
         // Add the params record if it exists, then add an empty one
         let params: Vec<u8> = self.params.encode();
-        if params.len() > 0 {
+        if !params.is_empty() {
             let params_record: Vec<u8> =
                 FcgiRecord::new(FcgiType::Params, &params, request_id).into();
             request.extend(params_record);
@@ -42,7 +42,7 @@ impl<'a> FcgiRequest<'a> {
         request.extend(blank_params_record);
 
         // Add the content record if it exists, then add an empty one
-        if self.content.len() > 0 {
+        if !self.content.is_empty() {
             let content_record: Vec<u8> =
                 FcgiRecord::new(FcgiType::Stdin, self.content, request_id).into();
             request.extend(content_record);

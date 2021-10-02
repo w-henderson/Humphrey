@@ -85,19 +85,19 @@ impl FcgiRecord {
     }
 }
 
-impl Into<Vec<u8>> for FcgiRecord {
-    fn into(self) -> Vec<u8> {
-        let length = FCGI_HEADER_SIZE as u16 + self.content_length + self.padding_length as u16;
+impl From<FcgiRecord> for Vec<u8> {
+    fn from(val: FcgiRecord) -> Self {
+        let length = FCGI_HEADER_SIZE as u16 + val.content_length + val.padding_length as u16;
         let mut result: Vec<u8> = Vec::with_capacity(length as usize);
 
-        result.push(self.version);
-        result.push(self.fcgi_type as u8);
-        result.extend(self.request_id.to_be_bytes());
-        result.extend(self.content_length.to_be_bytes());
-        result.push(self.padding_length);
-        result.push(self.reserved);
-        result.extend(self.content_data);
-        result.extend(self.padding_data);
+        result.push(val.version);
+        result.push(val.fcgi_type as u8);
+        result.extend(val.request_id.to_be_bytes());
+        result.extend(val.content_length.to_be_bytes());
+        result.push(val.padding_length);
+        result.push(val.reserved);
+        result.extend(val.content_data);
+        result.extend(val.padding_data);
 
         result
     }
