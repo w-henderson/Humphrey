@@ -3,6 +3,7 @@ use crate::config::tree::{parse_conf, ConfigNode};
 use crate::logger::LogLevel;
 use crate::proxy::{EqMutex, LoadBalancer};
 use crate::rand::Lcg;
+use crate::server::logger::Logger;
 
 use std::collections::HashMap;
 use std::env::args;
@@ -111,12 +112,19 @@ pub enum BlacklistMode {
 impl Config {
     /// Attempts to load the configuration.
     pub fn load() -> Result<Self, String> {
-        let config_string = load_config_file()
-            .map_err(|_| "Could not open the specified config file or default `humphrey.conf`")?;
-        let tree = parse_conf(&config_string).map_err(|e| e.to_string())?;
-        let config = Self::from_tree(tree)?;
+        if let Ok(config_string) = load_config_file() {
+            let tree = parse_conf(&config_string).map_err(|e| e.to_string())?;
+            let config = Self::from_tree(tree)?;
 
-        Ok(config)
+            Ok(config)
+        } else {
+            let logger = Logger::default();
+            logger.warn(
+                "Configuration file not specified or inaccessible, falling back to default configuration",
+            );
+
+            Ok(Config::default())
+        }
     }
 
     /// Parses the config from the config tree.
