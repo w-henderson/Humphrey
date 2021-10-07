@@ -1,4 +1,3 @@
-#[allow(unused_imports)]
 use crate::krauss::wildcard_match;
 
 #[test]
@@ -24,6 +23,9 @@ fn test_match() {
     assert!(wildcard_match("*cd*", "abcd"));
     assert!(wildcard_match("*cd*", "cdef"));
     assert!(wildcard_match("*cd*", "abcdef"));
+    assert!(!wildcard_match("*ab", "abc"));
+    assert!(!wildcard_match("a*f", "abcd"));
+    assert!(!wildcard_match("a*f", "cdef"));
 
     // Just matches
     assert!(wildcard_match("*", "ab"));
