@@ -43,7 +43,7 @@ fn test_build_tree() {
         ])
     ]);
 
-    let parsed_conf = parse_conf(CONF).unwrap();
+    let parsed_conf = parse_conf(CONF, "valid.conf").unwrap();
 
     assert_eq!(parsed_conf, expected_parsed_conf);
 }
@@ -51,7 +51,7 @@ fn test_build_tree() {
 #[test]
 #[rustfmt::skip]
 fn test_flatten_config() {
-    let parsed_conf = parse_conf(CONF).unwrap();
+    let parsed_conf = parse_conf(CONF, "valid.conf").unwrap();
 
     let mut expected_hashmap: HashMap<String, ConfigNode> = HashMap::new();
     expected_hashmap.insert("server.address".into(), ConfigNode::String("address".into(), "0.0.0.0".into()));
@@ -74,7 +74,7 @@ fn test_flatten_config() {
 #[test]
 #[rustfmt::skip]
 fn test_get_routes() {
-    let parsed_conf = parse_conf(CONF).unwrap();
+    let parsed_conf = parse_conf(CONF, "valid.conf").unwrap();
 
     let mut expected_map: Vec<(String, HashMap<String, ConfigNode>)> = Vec::new();
 
@@ -95,7 +95,7 @@ fn test_get_routes() {
 #[test]
 #[rustfmt::skip]
 fn test_get_plugins() {
-    let parsed_conf = parse_conf(CONF).unwrap();
+    let parsed_conf = parse_conf(CONF, "valid.conf").unwrap();
 
     let mut expected_map: Vec<(String, HashMap<String, ConfigNode>)> = Vec::new();
 
