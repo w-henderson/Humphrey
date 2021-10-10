@@ -3,6 +3,8 @@ use crate::config::traceback::TracebackIterator;
 use humphrey::krauss::wildcard_match;
 
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
 use std::str::Lines;
 
 /// Represents a node in the configuration syntax tree.
@@ -91,7 +93,7 @@ impl ConfigNode {
 }
 
 /// Parses an entire configuration string.
-pub fn parse_conf(conf: &str) -> Result<ConfigNode, ConfigError> {
+pub fn parse_conf(conf: &str, filename: &str) -> Result<ConfigNode, ConfigError> {
     let mut lines = TracebackIterator::from(conf.lines());
 
     // Attemps to find the start of the configuration
@@ -100,24 +102,28 @@ pub fn parse_conf(conf: &str) -> Result<ConfigNode, ConfigError> {
         if let Some(line) = lines.next() {
             line_content = clean_up(line);
         } else {
-            return Err(ConfigError::new("Could not find `server` section", 0));
+            return Err(ConfigError::new(
+                "Could not find `server` section",
+                filename,
+                0,
+            ));
         }
     }
 
     // Parses the main section
-    parse_section("server", &mut lines)
+    parse_section("server", &mut lines, filename)
 }
 
 /// Recursively parses a section of the configuration.
 fn parse_section(
     name: &str,
     lines: &mut TracebackIterator<Lines>,
+    filename: &str,
 ) -> Result<ConfigNode, ConfigError> {
-    let mut section_open: bool = true;
     let mut values: Vec<ConfigNode> = Vec::new();
 
-    // While this section has not been closed
-    while section_open {
+    // While this section has not ended
+    loop {
         // Attempt to read a line
 
         if let Some(line) = lines.next() {
@@ -130,41 +136,59 @@ fn parse_section(
                 if section_name.starts_with("route ") && section_name != "route {" {
                     // If the section is a route section, parse it as such
                     let route_name = section_name.splitn(2, ' ').last().unwrap().trim();
-                    let section = parse_section(route_name, lines)?;
+                    let section = parse_section(route_name, lines, filename)?;
                     if let ConfigNode::Section(route_name, inner_values) = section {
                         values.push(ConfigNode::Route(route_name, inner_values));
                     }
                 } else {
                     // If the section is just a regular section, parse it in the normal way
-                    values.push(parse_section(section_name, lines)?);
+                    values.push(parse_section(section_name, lines, filename)?);
                 }
             } else if line == "}" {
                 // If the line indicates the end of this section, return the parsed section
 
-                section_open = false;
+                break;
             } else if !line.is_empty() {
                 // If the line is not empty, attempt to parse the value
 
                 let parts: Vec<&str> = line.splitn(2, ' ').collect();
-                quiet_assert(parts.len() == 2, "Syntax error", lines)?;
+                quiet_assert(parts.len() == 2, "Syntax error", filename, lines)?;
 
                 let key = parts[0].trim();
                 let value = parts[1].trim();
 
-                if wildcard_match("\"*\"", value) {
-                    values.push(ConfigNode::String(
-                        key.into(),
-                        value[1..value.len() - 1].into(),
-                    ))
-                } else if value.parse::<i64>().is_ok() {
-                    values.push(ConfigNode::Number(key.into(), value.into()))
-                } else if value.parse::<bool>().is_ok() {
-                    values.push(ConfigNode::Boolean(key.into(), value.into()))
-                } else if let Ok(size) = parse_size(value) {
-                    values.push(ConfigNode::Number(key.into(), size.to_string()))
+                // If this is just a regular value
+                if key != "include" {
+                    if wildcard_match("\"*\"", value) {
+                        values.push(ConfigNode::String(
+                            key.into(),
+                            value[1..value.len() - 1].into(),
+                        ))
+                    } else if value.parse::<i64>().is_ok() {
+                        values.push(ConfigNode::Number(key.into(), value.into()))
+                    } else if value.parse::<bool>().is_ok() {
+                        values.push(ConfigNode::Boolean(key.into(), value.into()))
+                    } else if let Ok(size) = parse_size(value) {
+                        values.push(ConfigNode::Number(key.into(), size.to_string()))
+                    } else {
+                        return Err(ConfigError::new(
+                            "Could not parse value",
+                            filename,
+                            lines.current_line(),
+                        ));
+                    }
+                } else if wildcard_match("\"*\"", value) {
+                    let include_result =
+                        include(&value[1..value.len() - 1], filename, lines.current_line());
+                    if let Ok(included_nodes) = include_result {
+                        values.extend(included_nodes);
+                    } else {
+                        return Err(include_result.unwrap_err());
+                    }
                 } else {
                     return Err(ConfigError::new(
-                        "Could not parse value",
+                        "Invalid include value, it takes a file path in quotation marks as its value",
+                        filename,
                         lines.current_line(),
                     ));
                 }
@@ -174,12 +198,48 @@ fn parse_section(
 
             return Err(ConfigError::new(
                 "Unexpected end of file, expected `}`",
+                filename,
                 lines.current_line(),
             ));
         }
     }
 
     Ok(ConfigNode::Section(name.into(), values))
+}
+
+/// Attempts to include the configuration file at the specified path into the tree,
+///   returning a `Vec` of `ConfigNode`s. If unsuccessful, returns a descriptive error.
+fn include(path: &str, containing_file: &str, line: u64) -> Result<Vec<ConfigNode>, ConfigError> {
+    if let Ok(mut file) = File::open(path) {
+        let mut buf = String::new();
+        if file.read_to_string(&mut buf).is_ok() {
+            buf.push_str("\n}");
+
+            let mut iter = TracebackIterator::from(buf.lines());
+            let parsed_node = parse_section("temp_included_section", &mut iter, path)?;
+
+            match parsed_node {
+                ConfigNode::Section(_, children) => Ok(children),
+                _ => Err(ConfigError::new(
+                    "Internal parser error",
+                    containing_file,
+                    line,
+                )),
+            }
+        } else {
+            Err(ConfigError::new(
+                "Could not read included file",
+                containing_file,
+                line,
+            ))
+        }
+    } else {
+        Err(ConfigError::new(
+            "Could not open included file",
+            containing_file,
+            line,
+        ))
+    }
 }
 
 /// Cleans up a line by removing comments and trailing whitespace.
@@ -217,6 +277,7 @@ fn parse_size(size: &str) -> Result<i64, ()> {
 fn quiet_assert<T>(
     condition: bool,
     message: &'static str,
+    filename: &str,
     iter: &mut TracebackIterator<T>,
 ) -> Result<(), ConfigError>
 where
@@ -224,6 +285,6 @@ where
 {
     match condition {
         true => Ok(()),
-        false => Err(ConfigError::new(message, iter.current_line())),
+        false => Err(ConfigError::new(message, filename, iter.current_line())),
     }
 }

@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 #[test]
 fn test_parse_config() {
-    let tree = parse_conf(CONF).unwrap();
+    let tree = parse_conf(CONF, "valid.conf").unwrap();
     let conf = Config::from_tree(tree).unwrap();
 
     #[cfg(feature = "plugins")]
