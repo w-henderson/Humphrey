@@ -5,7 +5,7 @@ where
     T: Iterator,
 {
     inner_iterator: T,
-    current_line: i64,
+    current_line: u64,
 }
 
 impl<T> TracebackIterator<T>
@@ -13,7 +13,7 @@ where
     T: Iterator,
 {
     /// Gets the current index of the iterator.
-    pub fn current_line(&self) -> i64 {
+    pub fn current_line(&self) -> u64 {
         self.current_line
     }
 }

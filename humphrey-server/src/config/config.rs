@@ -112,8 +112,8 @@ pub enum BlacklistMode {
 impl Config {
     /// Attempts to load the configuration.
     pub fn load() -> Result<Self, String> {
-        if let Ok(config_string) = load_config_file() {
-            let tree = parse_conf(&config_string).map_err(|e| e.to_string())?;
+        if let Ok((filename, config_string)) = load_config_file() {
+            let tree = parse_conf(&config_string, &filename).map_err(|e| e.to_string())?;
             let config = Self::from_tree(tree)?;
 
             Ok(config)
@@ -280,17 +280,17 @@ impl Config {
 }
 
 /// Loads the configuration file.
-fn load_config_file() -> Result<String, ()> {
+fn load_config_file() -> Result<(String, String), ()> {
     let path = args().nth(1).unwrap_or_else(|| "humphrey.conf".into());
 
-    if let Ok(mut file) = File::open(path) {
+    if let Ok(mut file) = File::open(&path) {
         // The file can be opened
 
         let mut string = String::new();
         if file.read_to_string(&mut string).is_ok() {
             // The file can be read
 
-            Ok(string)
+            Ok((path, string))
         } else {
             Err(())
         }

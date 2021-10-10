@@ -5,13 +5,18 @@ use std::fmt::Display;
 #[derive(Debug, PartialEq, Eq)]
 pub struct ConfigError {
     message: &'static str,
-    line: i64,
+    file: String,
+    line: u64,
 }
 
 impl ConfigError {
     /// Creates a new configuration error object.
-    pub fn new(message: &'static str, line: i64) -> Self {
-        Self { message, line }
+    pub fn new(message: &'static str, file: &str, line: u64) -> Self {
+        Self {
+            message,
+            file: file.to_string(),
+            line,
+        }
     }
 }
 
@@ -19,8 +24,8 @@ impl Display for ConfigError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Configuration error on line {}: {}",
-            self.line, self.message
+            "Configuration error at {} line {}: {}",
+            self.file, self.line, self.message
         )
     }
 }
