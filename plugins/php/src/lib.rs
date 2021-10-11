@@ -78,6 +78,10 @@ impl Plugin for PhpPlugin {
         state: Arc<AppState>,
         directory: &str,
     ) -> Option<Response> {
+        if !request.uri.ends_with(".php") {
+            return None;
+        }
+
         if let Some(located) = try_find_path(directory, &request.uri) {
             // If the requested file is a PHP file, check that the file exists then process it
             let file_name = located.path.to_str().unwrap().to_string();
