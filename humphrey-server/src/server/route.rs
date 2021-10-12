@@ -1,8 +1,6 @@
 use std::fs::metadata;
 use std::path::PathBuf;
 
-const INDEX_FILES: [&str; 3] = ["index.html", "index.htm", "index.php"];
-
 pub struct LocatedPath {
     pub path: PathBuf,
     pub was_redirected: bool,
@@ -11,7 +9,7 @@ pub struct LocatedPath {
 /// Attemps to find a given path.
 /// If the path itself is not found, attemps to find index files within it.
 /// If these are not found, returns `None`.
-pub fn try_find_path(directory: &str, request_path: &str) -> Option<LocatedPath> {
+pub fn try_find_path(directory: &str, request_path: &str, php: bool) -> Option<LocatedPath> {
     if request_path.contains("..") || request_path.contains(':') {
         return None;
     }
@@ -19,11 +17,19 @@ pub fn try_find_path(directory: &str, request_path: &str) -> Option<LocatedPath>
     let request_path = request_path.trim_start_matches('/');
     let directory = directory.trim_end_matches('/');
 
-    let mut paths: Vec<String> = INDEX_FILES
-        .iter()
-        .map(|s| format!("{}/{}/{}", directory, request_path, s))
-        .collect();
-    paths.insert(0, format!("{}/{}", directory, request_path));
+    let paths: Vec<String> = if php {
+        if request_path.ends_with(".php") {
+            vec![format!("{}/{}", directory, request_path)]
+        } else {
+            vec![format!("{}/{}/index.php", directory, request_path)]
+        }
+    } else {
+        vec![
+            format!("{}/{}", directory, request_path),
+            format!("{}/{}/index.html", directory, request_path),
+            format!("{}/{}/index.htm", directory, request_path),
+        ]
+    };
 
     for (index, path) in paths.iter().enumerate() {
         if let Ok(meta) = metadata(path) {

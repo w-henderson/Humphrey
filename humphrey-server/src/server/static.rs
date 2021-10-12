@@ -65,7 +65,7 @@ fn inner_file_handler(request: Request, state: Arc<AppState>, directory: &str) -
         drop(cache);
     }
 
-    if let Some(located) = try_find_path(directory, &request.uri) {
+    if let Some(located) = try_find_path(directory, &request.uri, false) {
         if located.was_redirected && !request.uri.ends_with('/') && !request.uri.is_empty() {
             state.logger.info(&format!(
                 "{}: 301 Moved Permanently {}",
