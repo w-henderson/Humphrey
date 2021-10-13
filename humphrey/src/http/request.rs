@@ -77,8 +77,11 @@ impl Request {
         let version = start_line
             .next()
             .to_error(RequestError::Request)?
-            .to_string()
-            .replace("\r\n", "");
+            .strip_suffix("\r\n")
+            .unwrap_or("")
+            .to_string();
+
+        safe_assert(!version.is_empty())?;
 
         let uri = uri_iter.next().unwrap().to_string();
         let query = uri_iter.next().unwrap_or("").to_string();
