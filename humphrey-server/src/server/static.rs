@@ -38,7 +38,7 @@ fn inner_file_handler(request: Request, state: Arc<AppState>, directory: &str) -
         .config
         .blacklist
         .list
-        .contains(&request.address.origin_addr.to_string())
+        .contains(&request.address.origin_addr)
     {
         state.logger.warn(&format!(
             "{}: Blacklisted IP attempted to request {}",

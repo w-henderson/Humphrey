@@ -47,7 +47,7 @@ pub fn proxy_handler(
         .config
         .blacklist
         .list
-        .contains(&request.address.origin_addr.to_string())
+        .contains(&request.address.origin_addr)
     {
         state.logger.warn(&format!(
             "{}: Blacklisted IP attempted to request {}",

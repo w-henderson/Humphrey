@@ -41,7 +41,7 @@ trait OptionToRequestResult<T> {
 
 impl<T> OptionToRequestResult<T> for Option<T> {
     fn to_error(self, e: RequestError) -> Result<T, RequestError> {
-        self.map_or(Err(e), |s| Ok(s))
+        self.map_or(Err(e), Ok)
     }
 }
 
