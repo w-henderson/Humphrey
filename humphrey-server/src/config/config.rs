@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::env::args;
 use std::fs::File;
 use std::io::Read;
+use std::net::IpAddr;
 
 /// Represents the parsed and validated configuration.
 #[derive(Debug, PartialEq)]
@@ -77,7 +78,7 @@ pub struct CacheConfig {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlacklistConfig {
     /// The list of addresses to block
-    pub list: Vec<String>,
+    pub list: Vec<IpAddr>,
     /// The way in which the blacklist is enforced
     pub mode: BlacklistMode,
 }
@@ -141,7 +142,17 @@ impl Config {
 
         // Get and validate the blacklist file and mode
         let blacklist = {
-            let blacklist = load_list_file(hashmap.get_owned("server.blacklist.file"))?;
+            let blacklist_strings: Vec<String> =
+                load_list_file(hashmap.get_owned("server.blacklist.file"))?;
+            let mut blacklist: Vec<IpAddr> = Vec::with_capacity(blacklist_strings.len());
+
+            for ip in blacklist_strings {
+                blacklist.push(
+                    ip.parse::<IpAddr>()
+                        .map_err(|_| "Could not parse IP address in blacklist file")?,
+                );
+            }
+
             let blacklist_mode = hashmap.get_optional("server.blacklist.mode", "block".into());
             let blacklist_mode = match blacklist_mode.as_ref() {
                 "block" => BlacklistMode::Block,

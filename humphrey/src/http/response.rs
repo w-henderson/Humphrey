@@ -221,7 +221,8 @@ impl From<Response> for Vec<u8> {
             Into::<&str>::into(val.status_code.clone())
         );
 
-        let mut bytes: Vec<u8> = Vec::with_capacity(status_line.len());
+        let mut bytes: Vec<u8> =
+            Vec::with_capacity(status_line.len() + val.body.len() + val.headers.len() * 32);
         bytes.extend(status_line.as_bytes());
 
         for (header, value) in val.headers {

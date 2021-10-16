@@ -35,6 +35,16 @@ pub enum RequestError {
     Stream,
 }
 
+trait OptionToRequestResult<T> {
+    fn to_error(self, e: RequestError) -> Result<T, RequestError>;
+}
+
+impl<T> OptionToRequestResult<T> for Option<T> {
+    fn to_error(self, e: RequestError) -> Result<T, RequestError> {
+        self.map_or(Err(e), Ok)
+    }
+}
+
 impl std::fmt::Display for RequestError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "RequestError")
@@ -50,42 +60,54 @@ impl Request {
         T: Read,
     {
         let mut reader = BufReader::new(stream);
-        let mut start_line_buf: Vec<u8> = Vec::new();
+        let mut start_line_buf: Vec<u8> = Vec::with_capacity(256);
         reader
             .read_until(0xA, &mut start_line_buf)
             .map_err(|_| RequestError::Stream)?;
 
         let start_line_string =
-            String::from_utf8(start_line_buf).map_err(|_| RequestError::Request)?;
-        let start_line: Vec<&str> = start_line_string.split(' ').collect();
+            std::str::from_utf8(&start_line_buf).map_err(|_| RequestError::Request)?;
+        let mut start_line = start_line_string.split(' ');
 
-        safe_assert(start_line.len() == 3)?;
+        let method = Method::from_name(start_line.next().to_error(RequestError::Request)?)?;
+        let mut uri_iter = start_line
+            .next()
+            .to_error(RequestError::Request)?
+            .splitn(2, '?');
+        let version = start_line
+            .next()
+            .to_error(RequestError::Request)?
+            .strip_suffix("\r\n")
+            .unwrap_or("")
+            .to_string();
 
-        let method = Method::from_name(start_line[0])?;
-        let version = start_line[2].to_string().replace("\r\n", "");
+        safe_assert(!version.is_empty())?;
 
-        let mut uri_iter = start_line[1].splitn(2, '?');
         let uri = uri_iter.next().unwrap().to_string();
         let query = uri_iter.next().unwrap_or("").to_string();
 
         let mut headers = RequestHeaderMap::new();
 
         loop {
-            let mut line_buf: Vec<u8> = Vec::new();
+            let mut line_buf: Vec<u8> = Vec::with_capacity(256);
             reader
                 .read_until(0xA, &mut line_buf)
                 .map_err(|_| RequestError::Stream)?;
-            let line = String::from_utf8(line_buf).map_err(|_| RequestError::Request)?;
+            let line = std::str::from_utf8(&line_buf).map_err(|_| RequestError::Request)?;
 
             if line == "\r\n" {
                 break;
             } else {
                 safe_assert(line.len() >= 2)?;
                 let line_without_crlf = &line[0..line.len() - 2];
-                let line_parts: Vec<&str> = line_without_crlf.splitn(2, ':').collect();
+                let mut line_parts = line_without_crlf.splitn(2, ':');
                 headers.insert(
-                    RequestHeader::from(line_parts[0]),
-                    line_parts[1].trim_start().to_string(),
+                    RequestHeader::from(line_parts.next().to_error(RequestError::Request)?),
+                    line_parts
+                        .next()
+                        .to_error(RequestError::Request)?
+                        .trim_start()
+                        .to_string(),
                 );
             }
         }
