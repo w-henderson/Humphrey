@@ -7,7 +7,7 @@ use std::path::PathBuf;
 /// Encapsulates a route and its handler.
 pub struct RouteHandler<State> {
     pub route: String,
-    pub handler: RequestHandler<State>,
+    pub handler: Box<dyn RequestHandler<State>>,
 }
 
 /// An object that can represent a route, currently only `String`.
