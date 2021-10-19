@@ -16,7 +16,7 @@ use std::sync::Arc;
 /// The type parameter represents the app state, which is shared between threads.
 /// It must implement the `Send` and `Sync` traits to be sent between threads.
 /// The state is given to every request as an `Arc<State>`.
-pub struct App<State>
+pub struct App<State = ()>
 where
     State: Send + Sync + 'static,
 {
