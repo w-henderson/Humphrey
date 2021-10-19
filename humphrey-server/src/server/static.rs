@@ -1,9 +1,9 @@
-use crate::route::{try_find_path, LocatedPath};
 use crate::server::server::AppState;
 
 use humphrey::http::headers::ResponseHeader;
 use humphrey::http::mime::MimeType;
 use humphrey::http::{Request, Response, StatusCode};
+use humphrey::route::{try_find_path, LocatedPath};
 
 use std::fs::File;
 use std::io::Read;
