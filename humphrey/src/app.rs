@@ -98,6 +98,11 @@ where
     State: Send + Sync + 'static,
 {
     /// Initialises a new Humphrey app.
+    ///
+    /// Initialising an app like this requires the app state type to implement `Default` in order to
+    ///   automatically generate an initial value for the state. If this requirement is not, or cannnot
+    ///   be met, please use `App::new_with_config` and specify a number of threads and the default
+    ///   state value.
     pub fn new() -> Self
     where
         State: Default,
