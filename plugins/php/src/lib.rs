@@ -1,10 +1,10 @@
 use humphrey::http::headers::{RequestHeader, ResponseHeaderMap};
 use humphrey::http::{Request, Response, StatusCode};
+use humphrey::route::{try_find_path, LocatedPath};
 
 use humphrey_server::config::extended_hashmap::ExtendedMap;
 use humphrey_server::declare_plugin;
 use humphrey_server::plugins::plugin::{Plugin, PluginLoadResult};
-use humphrey_server::route::{try_find_path, LocatedPath};
 use humphrey_server::server::server::AppState;
 
 use std::collections::{BTreeMap, HashMap};
