@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 
 #[test]
 fn test_response() {
-    let response = Response::new(StatusCode::OK)
-        .with_bytes(b"<body>test</body>".to_vec())
+    let response = Response::empty(StatusCode::OK)
+        .with_bytes(b"<body>test</body>")
         .with_header(ResponseHeader::ContentType, "text/html".to_string())
         .with_header(ResponseHeader::ContentLanguage, "en-GB".to_string())
         .with_header(

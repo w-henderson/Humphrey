@@ -52,7 +52,7 @@ pub type WebsocketHandler<State> = fn(Request, TcpStream, Arc<State>);
 /// The most basic request handler would be as follows:
 /// ```
 /// fn handler(request: Request, _: Arc<()>) -> Response {
-///     Response::new(StatusCode::OK) // create the response
+///     Response::empty(StatusCode::OK) // create the response
 ///         .with_bytes(b"<html><body><h1>Success</h1></body></html>".to_vec()) // add the body
 ///         .with_request_compatibility(&request) // ensure compatibility with the request
 ///         .with_generated_headers() // generate required headers
@@ -78,12 +78,12 @@ impl<T, S> RequestHandler<S> for T where T: Fn(Request, Arc<S>) -> Response + Se
 ///     );
 ///
 ///     if let Some(request) = request {
-///         Response::new(status_code)
+///         Response::empty(status_code)
 ///             .with_bytes(body.as_bytes().to_vec())
 ///             .with_request_compatibility(&request)
 ///             .with_generated_headers()
 ///     } else {
-///         Response::new(status_code)
+///         Response::empty(status_code)
 ///             .with_bytes(body.as_bytes().to_vec())
 ///             .with_generated_headers()
 ///     }
@@ -304,12 +304,9 @@ pub(crate) fn error_handler(request: Option<Request>, status_code: StatusCode) -
     );
 
     if let Some(request) = request {
-        Response::new(status_code)
-            .with_bytes(body.as_bytes().to_vec())
-            .with_request_compatibility(&request)
-            .with_generated_headers()
+        Response::new(status_code, body.as_bytes(), &request)
     } else {
-        Response::new(status_code)
+        Response::empty(status_code)
             .with_bytes(body.as_bytes().to_vec())
             .with_generated_headers()
     }

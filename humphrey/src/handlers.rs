@@ -15,10 +15,7 @@ pub fn serve_file<T>(file_path: &'static str) -> impl Fn(Request, Arc<T>) -> Res
         if let Ok(mut file) = File::open(file_path) {
             let mut buf = Vec::new();
             if file.read_to_end(&mut buf).is_ok() {
-                return Response::new(StatusCode::OK)
-                    .with_bytes(buf)
-                    .with_request_compatibility(&request)
-                    .with_generated_headers();
+                return Response::new(StatusCode::OK, buf, &request);
             }
         }
 
@@ -44,10 +41,7 @@ pub fn serve_as_file_path<T>(directory_path: &'static str) -> impl Fn(Request, A
         if let Ok(mut file) = File::open(path) {
             let mut buf = Vec::new();
             if file.read_to_end(&mut buf).is_ok() {
-                return Response::new(StatusCode::OK)
-                    .with_bytes(buf)
-                    .with_request_compatibility(&request)
-                    .with_generated_headers();
+                return Response::new(StatusCode::OK, buf, &request);
             }
         }
 
@@ -82,7 +76,7 @@ pub fn serve_dir<T>(
 
         if let Some(located) = located {
             match located {
-                LocatedPath::Directory => Response::new(StatusCode::MovedPermanently)
+                LocatedPath::Directory => Response::empty(StatusCode::MovedPermanently)
                     .with_header(ResponseHeader::Location, format!("{}/", &request.uri))
                     .with_request_compatibility(&request)
                     .with_generated_headers(),
@@ -90,10 +84,7 @@ pub fn serve_dir<T>(
                     if let Ok(mut file) = File::open(path) {
                         let mut buf = Vec::new();
                         if file.read_to_end(&mut buf).is_ok() {
-                            return Response::new(StatusCode::OK)
-                                .with_bytes(buf)
-                                .with_request_compatibility(&request)
-                                .with_generated_headers();
+                            return Response::new(StatusCode::OK, buf, &request);
                         }
                     }
 
