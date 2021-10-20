@@ -26,7 +26,7 @@ impl Plugin for ExamplePlugin {
             state.logger.info("Example plugin overrode a response");
 
             return Some(
-                Response::new(StatusCode::OK)
+                Response::empty(StatusCode::OK)
                     .with_bytes(b"Response overridden by example plugin :)".to_vec())
                     .with_header(ResponseHeader::ContentType, "text/plain".into())
                     .with_request_compatibility(request)
