@@ -37,3 +37,8 @@ fn contact(request: Request, _: Arc<()>) -> Response {
     Response::new(StatusCode::OK, b"<html><body><h1>Contact</h1></body></html>", &request)
 }
 ```
+
+## Further Examples
+- [Stateful Example](https://github.com/w-henderson/Humphrey/tree/master/examples/stateful): keeps track of button presses across sessions and devices
+- [Wildcard Example](https://github.com/w-henderson/Humphrey/tree/master/examples/wildcard): demonstrates a wildcard route
+- [Static Content Example](https://github.com/w-henderson/Humphrey/tree/master/examples/static-content): demonstrates the built-in static content handlers
