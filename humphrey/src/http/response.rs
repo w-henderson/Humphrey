@@ -10,14 +10,18 @@ use std::io::{BufRead, BufReader, Read};
 /// Represents a response from the server.
 /// Implements `Into<Vec<u8>>` so can be serialised into bytes to transmit.
 ///
-/// ## Example
+/// ## Simple Creation
 /// ```
-/// fn handler(request: &Request, _: Arc<Mutex<()>>) -> Response {
-///     Response::empty(StatusCode::OK) // create the response
-///         .with_bytes(b"<html><body><h1>Success</h1></body></html>".to_vec()) // add the body
-///         .with_request_compatibility(request) // ensure compatibility with the request
-///         .with_generated_headers() // generate required headers
-/// }
+/// Response::new(StatusCode::OK, b"Success", &request)
+/// ```
+///
+/// ## Advanced Creation
+/// ```
+/// Response::empty(StatusCode::OK)
+///     .with_bytes(b"Success")
+///     .with_header(ResponseHeader::ContentType, "text/plain".into())
+///     .with_request_compatibility(&request)
+///     .with_generated_headers()
 /// ```
 #[derive(Debug)]
 pub struct Response {
