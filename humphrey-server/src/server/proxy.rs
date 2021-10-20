@@ -53,9 +53,9 @@ pub fn proxy_handler(
             "{}: Blacklisted IP attempted to request {}",
             request.address, request.uri
         ));
-        Response::new(StatusCode::Forbidden)
+        Response::empty(StatusCode::Forbidden)
             .with_header(ResponseHeader::ContentType, "text/html".into())
-            .with_bytes(b"<h1>403 Forbidden</h1>".to_vec())
+            .with_bytes(b"<h1>403 Forbidden</h1>")
             .with_request_compatibility(&request)
             .with_generated_headers()
     } else {
