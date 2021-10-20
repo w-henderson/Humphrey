@@ -208,8 +208,8 @@ impl Plugin for PhpPlugin {
                         }
 
                         // Create a response
-                        let mut response = Response::new(status.clone())
-                            .with_bytes(content_split.next().unwrap_or("").as_bytes().to_vec());
+                        let mut response = Response::empty(status.clone())
+                            .with_bytes(content_split.next().unwrap_or("").as_bytes());
 
                         // Add the headers
                         response.headers = headers;
