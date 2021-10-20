@@ -1,9 +1,9 @@
-use crate::route::{try_find_path, LocatedPath};
 use crate::server::server::AppState;
 
 use humphrey::http::headers::ResponseHeader;
 use humphrey::http::mime::MimeType;
 use humphrey::http::{Request, Response, StatusCode};
+use humphrey::route::{try_find_path, LocatedPath};
 
 use std::fs::File;
 use std::io::Read;
@@ -44,9 +44,9 @@ fn inner_file_handler(request: Request, state: Arc<AppState>, directory: &str) -
             "{}: Blacklisted IP attempted to request {}",
             request.address, request.uri
         ));
-        return Response::new(StatusCode::Forbidden)
+        return Response::empty(StatusCode::Forbidden)
             .with_header(ResponseHeader::ContentType, "text/html".into())
-            .with_bytes(b"<h1>403 Forbidden</h1>".to_vec())
+            .with_bytes(b"<h1>403 Forbidden</h1>")
             .with_request_compatibility(&request)
             .with_generated_headers();
     }
@@ -58,7 +58,7 @@ fn inner_file_handler(request: Request, state: Arc<AppState>, directory: &str) -
                 "{}: 200 OK (cached) {}",
                 request.address, request.uri
             ));
-            return Response::new(StatusCode::OK)
+            return Response::empty(StatusCode::OK)
                 .with_header(ResponseHeader::ContentType, cached.mime_type.into())
                 .with_bytes(cached.data.clone())
                 .with_request_compatibility(&request)
@@ -74,7 +74,7 @@ fn inner_file_handler(request: Request, state: Arc<AppState>, directory: &str) -
                     "{}: 301 Moved Permanently {}",
                     request.address, request.uri
                 ));
-                Response::new(StatusCode::MovedPermanently)
+                Response::empty(StatusCode::MovedPermanently)
                     .with_header(ResponseHeader::Location, format!("{}/", &request.uri))
                     .with_request_compatibility(&request)
                     .with_generated_headers()
@@ -101,7 +101,7 @@ fn inner_file_handler(request: Request, state: Arc<AppState>, directory: &str) -
                 state
                     .logger
                     .info(&format!("{}: 200 OK {}", request.address, request.uri));
-                Response::new(StatusCode::OK)
+                Response::empty(StatusCode::OK)
                     .with_header(ResponseHeader::ContentType, mime_type.into())
                     .with_bytes(contents)
                     .with_request_compatibility(&request)
@@ -118,9 +118,9 @@ fn inner_file_handler(request: Request, state: Arc<AppState>, directory: &str) -
 }
 
 pub fn not_found(request: &Request) -> Response {
-    Response::new(StatusCode::NotFound)
+    Response::empty(StatusCode::NotFound)
         .with_header(ResponseHeader::ContentType, "text/html".into())
-        .with_bytes(b"<h1>404 Not Found</h1>".to_vec())
+        .with_bytes(b"<h1>404 Not Found</h1>")
         .with_request_compatibility(request)
         .with_generated_headers()
 }

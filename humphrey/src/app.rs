@@ -16,7 +16,7 @@ use std::sync::Arc;
 /// The type parameter represents the app state, which is shared between threads.
 /// It must implement the `Send` and `Sync` traits to be sent between threads.
 /// The state is given to every request as an `Arc<State>`.
-pub struct App<State>
+pub struct App<State = ()>
 where
     State: Send + Sync + 'static,
 {
@@ -52,13 +52,11 @@ pub type WebsocketHandler<State> = fn(Request, TcpStream, Arc<State>);
 /// The most basic request handler would be as follows:
 /// ```
 /// fn handler(request: Request, _: Arc<()>) -> Response {
-///     Response::new(StatusCode::OK) // create the response
-///         .with_bytes(b"<html><body><h1>Success</h1></body></html>".to_vec()) // add the body
-///         .with_request_compatibility(&request) // ensure compatibility with the request
-///         .with_generated_headers() // generate required headers
+///     Response::new(StatusCode::OK, b"Success", &request)
 /// }
 /// ```
-pub type RequestHandler<State> = fn(Request, Arc<State>) -> Response;
+pub trait RequestHandler<State>: Fn(Request, Arc<State>) -> Response + Send + Sync {}
+impl<T, S> RequestHandler<S> for T where T: Fn(Request, Arc<S>) -> Response + Send + Sync {}
 
 /// Represents a function able to handle an error.
 /// The first parameter of type `Option<Request>` will be `Some` if the request could be parsed.
@@ -75,15 +73,12 @@ pub type RequestHandler<State> = fn(Request, Arc<State>) -> Response;
 ///         Into::<u16>::into(status_code.clone()),
 ///         Into::<&str>::into(status_code.clone())
 ///     );
-///
+///     
 ///     if let Some(request) = request {
-///         Response::new(status_code)
-///             .with_bytes(body.as_bytes().to_vec())
-///             .with_request_compatibility(&request)
-///             .with_generated_headers()
+///         Response::new(status_code, body.as_bytes(), &request)
 ///     } else {
-///         Response::new(status_code)
-///             .with_bytes(body.as_bytes().to_vec())
+///         Response::empty(status_code)
+///             .with_bytes(body.as_bytes())
 ///             .with_generated_headers()
 ///     }
 /// }
@@ -98,6 +93,11 @@ where
     State: Send + Sync + 'static,
 {
     /// Initialises a new Humphrey app.
+    ///
+    /// Initialising an app like this requires the app state type to implement `Default` in order to
+    ///   automatically generate an initial value for the state. If this requirement is not, or cannnot
+    ///   be met, please use `App::new_with_config` and specify a number of threads and the default
+    ///   state value.
     pub fn new() -> Self
     where
         State: Default,
@@ -177,10 +177,13 @@ where
     ///
     /// ## Panics
     /// This function will panic if the route string cannot be converted to a `Uri` object.
-    pub fn with_route(mut self, route: &str, handler: RequestHandler<State>) -> Self {
+    pub fn with_route<T>(mut self, route: &str, handler: T) -> Self
+    where
+        T: RequestHandler<State> + 'static,
+    {
         self.routes.push(RouteHandler {
             route: route.parse().unwrap(),
-            handler,
+            handler: Box::new(handler),
         });
         self
     }
@@ -287,7 +290,7 @@ fn client_handler<State>(
 
 /// The default error handler for every Humphrey app.
 /// This can be overridden by using the `with_error_handler` method when building the app.
-fn error_handler(request: Option<Request>, status_code: StatusCode) -> Response {
+pub(crate) fn error_handler(request: Option<Request>, status_code: StatusCode) -> Response {
     let body = format!(
         "<html><body><h1>{} {}</h1></body></html>",
         Into::<u16>::into(status_code.clone()),
@@ -295,12 +298,9 @@ fn error_handler(request: Option<Request>, status_code: StatusCode) -> Response 
     );
 
     if let Some(request) = request {
-        Response::new(status_code)
-            .with_bytes(body.as_bytes().to_vec())
-            .with_request_compatibility(&request)
-            .with_generated_headers()
+        Response::new(status_code, body.as_bytes(), &request)
     } else {
-        Response::new(status_code)
+        Response::empty(status_code)
             .with_bytes(body.as_bytes().to_vec())
             .with_generated_headers()
     }

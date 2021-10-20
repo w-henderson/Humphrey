@@ -10,14 +10,18 @@ use std::io::{BufRead, BufReader, Read};
 /// Represents a response from the server.
 /// Implements `Into<Vec<u8>>` so can be serialised into bytes to transmit.
 ///
-/// ## Example
+/// ## Simple Creation
 /// ```
-/// fn handler(request: &Request, _: Arc<Mutex<()>>) -> Response {
-///     Response::new(StatusCode::OK) // create the response
-///         .with_bytes(b"<html><body><h1>Success</h1></body></html>".to_vec()) // add the body
-///         .with_request_compatibility(request) // ensure compatibility with the request
-///         .with_generated_headers() // generate required headers
-/// }
+/// Response::new(StatusCode::OK, b"Success", &request)
+/// ```
+///
+/// ## Advanced Creation
+/// ```
+/// Response::empty(StatusCode::OK)
+///     .with_bytes(b"Success")
+///     .with_header(ResponseHeader::ContentType, "text/plain".into())
+///     .with_request_compatibility(&request)
+///     .with_generated_headers()
 /// ```
 #[derive(Debug)]
 pub struct Response {
@@ -49,9 +53,36 @@ impl std::fmt::Display for ResponseError {
 impl Error for ResponseError {}
 
 impl Response {
+    /// Creates a new response object with the given status code, bytes and request.
+    /// Functionally equivalent to the following (but with some allocation optimisations not shown):
+    ///
+    /// ```
+    /// Response::empty(status_code)
+    ///     .with_bytes(bytes)
+    ///     .with_request_compatibility(request)
+    ///     .with_generated_headers()
+    /// ```
+    ///
+    /// ## Note about Headers
+    /// If you want to add headers to a response, ideally use `Response::empty` and the builder pattern
+    ///   so as to not accidentally override important generated headers such as content length and connection.
+    pub fn new<T>(status_code: StatusCode, bytes: T, request: &Request) -> Self
+    where
+        T: AsRef<[u8]>,
+    {
+        Self {
+            version: "HTTP/1.1".to_string(),
+            status_code,
+            headers: ResponseHeaderMap::new(),
+            body: bytes.as_ref().to_vec(),
+        }
+        .with_request_compatibility(request)
+        .with_generated_headers()
+    }
+
     /// Creates a new response object with the given status code.
     /// Automatically sets the HTTP version to "HTTP/1.1", sets no headers, and creates an empty body.
-    pub fn new(status_code: StatusCode) -> Self {
+    pub fn empty(status_code: StatusCode) -> Self {
         Self {
             version: "HTTP/1.1".to_string(),
             status_code,
@@ -68,8 +99,11 @@ impl Response {
     }
     /// Appends the given bytes to the body.
     /// Returns itself for use in a builder pattern.
-    pub fn with_bytes(mut self, bytes: Vec<u8>) -> Self {
-        self.body.extend(bytes);
+    pub fn with_bytes<T>(mut self, bytes: T) -> Self
+    where
+        T: AsRef<[u8]>,
+    {
+        self.body.extend(bytes.as_ref());
         self
     }
 

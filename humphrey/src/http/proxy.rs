@@ -11,8 +11,8 @@ use std::time::Duration;
 pub fn proxy_request(request: &Request, target: SocketAddr, timeout: Duration) -> Response {
     match proxy_request_internal(request, target, timeout) {
         Ok(response) => response,
-        Err(_) => Response::new(StatusCode::BadGateway)
-            .with_bytes(b"<html><body><h1>502 Bad Gateway</h1></body></html>".to_vec())
+        Err(_) => Response::empty(StatusCode::BadGateway)
+            .with_bytes(b"<html><body><h1>502 Bad Gateway</h1></body></html>")
             .with_request_compatibility(request)
             .with_generated_headers(),
     }
