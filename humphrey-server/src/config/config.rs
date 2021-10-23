@@ -206,44 +206,46 @@ impl Config {
             let mut routes: Vec<RouteConfig> = Vec::with_capacity(routes_map.len());
 
             for (wild, conf) in routes_map {
-                if conf.contains_key("directory") {
-                    // This is a regular file-serving route
+                for wild in wild.split(',').map(|s| s.trim()) {
+                    if conf.contains_key("directory") {
+                        // This is a regular file-serving route
 
-                    let directory = conf.get_compulsory("directory", "").unwrap();
+                        let directory = conf.get_compulsory("directory", "").unwrap();
 
-                    routes.push(RouteConfig::Serve {
-                        matches: wild,
-                        directory,
-                    });
-                } else if conf.contains_key("proxy") {
-                    // This is a proxy route
+                        routes.push(RouteConfig::Serve {
+                            matches: wild.to_string(),
+                            directory,
+                        });
+                    } else if conf.contains_key("proxy") {
+                        // This is a proxy route
 
-                    let targets: Vec<String> = conf
-                        .get_compulsory("proxy", "")
-                        .unwrap()
-                        .split(',')
-                        .map(|s| s.to_owned())
-                        .collect();
+                        let targets: Vec<String> = conf
+                            .get_compulsory("proxy", "")
+                            .unwrap()
+                            .split(',')
+                            .map(|s| s.to_owned())
+                            .collect();
 
-                    let load_balancer_mode =
-                        conf.get_optional("load_balancer_mode", "round-robin".into());
-                    let load_balancer_mode = match load_balancer_mode.as_str() {
+                        let load_balancer_mode =
+                            conf.get_optional("load_balancer_mode", "round-robin".into());
+                        let load_balancer_mode = match load_balancer_mode.as_str() {
                         "round-robin" => LoadBalancerMode::RoundRobin,
                         "random" => LoadBalancerMode::Random,
                         _ => return Err("Invalid load balancer mode, valid options are `round-robin` or `random`"),
                     };
 
-                    routes.push(RouteConfig::Proxy {
-                        matches: wild,
-                        load_balancer: EqMutex::new(LoadBalancer {
-                            targets,
-                            mode: load_balancer_mode,
-                            lcg: Lcg::new(),
-                            index: 0,
-                        }),
-                    })
-                } else {
-                    return Err("Invalid route configuration, every route must contain either the `directory` or `proxy` field");
+                        routes.push(RouteConfig::Proxy {
+                            matches: wild.to_string(),
+                            load_balancer: EqMutex::new(LoadBalancer {
+                                targets,
+                                mode: load_balancer_mode,
+                                lcg: Lcg::new(),
+                                index: 0,
+                            }),
+                        })
+                    } else {
+                        return Err("Invalid route configuration, every route must contain either the `directory` or `proxy` field");
+                    }
                 }
             }
 
