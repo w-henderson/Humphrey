@@ -41,7 +41,22 @@ pub fn proxy_handler(
     request: Request,
     state: Arc<AppState>,
     load_balancer: &EqMutex<LoadBalancer>,
+    matches: &str,
 ) -> Response {
+    let mut simplified_uri = request.uri.clone();
+
+    for ch in matches.chars() {
+        if ch != '*' {
+            simplified_uri.remove(0);
+        } else {
+            break;
+        }
+    }
+
+    if !simplified_uri.starts_with('/') {
+        simplified_uri.insert(0, '/');
+    }
+
     // Return error 403 if the address was blacklisted
     if state
         .config
@@ -64,8 +79,11 @@ pub fn proxy_handler(
         let target = load_balancer_lock.select_target();
         drop(load_balancer_lock);
 
+        let mut proxied_request = request.clone();
+        proxied_request.uri = simplified_uri;
+
         let target_sock = target.to_socket_addrs().unwrap().next().unwrap();
-        let response = proxy_request(&request, target_sock, Duration::from_secs(5));
+        let response = proxy_request(&proxied_request, target_sock, Duration::from_secs(5));
         let status: u16 = response.status_code.clone().into();
         let status_string: &str = response.status_code.clone().into();
 

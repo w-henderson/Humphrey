@@ -91,7 +91,7 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
     true
 }
 
-fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
+fn request_handler(request: Request, state: Arc<AppState>) -> Response {
     for route in &state.config.routes {
         match route {
             RouteConfig::File { matches, file } => {
@@ -102,15 +102,7 @@ fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
 
             RouteConfig::Directory { matches, directory } => {
                 if wildcard_match(matches, &request.uri) {
-                    for ch in matches.chars() {
-                        if ch != '*' {
-                            request.uri.remove(0);
-                        } else {
-                            break;
-                        }
-                    }
-
-                    return directory_handler(request, state.clone(), directory);
+                    return directory_handler(request, state.clone(), directory, matches);
                 }
             }
 
@@ -119,19 +111,7 @@ fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
                 load_balancer,
             } => {
                 if wildcard_match(matches, &request.uri) {
-                    for ch in matches.chars() {
-                        if ch != '*' {
-                            request.uri.remove(0);
-                        } else {
-                            break;
-                        }
-                    }
-
-                    if !request.uri.starts_with('/') {
-                        request.uri.insert(0, '/');
-                    }
-
-                    return proxy_handler(request, state.clone(), load_balancer);
+                    return proxy_handler(request, state.clone(), load_balancer, matches);
                 }
             }
 

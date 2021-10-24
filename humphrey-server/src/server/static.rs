@@ -13,7 +13,12 @@ use std::sync::Arc;
 const INDEX_FILES: [&str; 2] = ["index.html", "index.htm"];
 
 #[cfg(feature = "plugins")]
-pub fn directory_handler(mut request: Request, state: Arc<AppState>, directory: &str) -> Response {
+pub fn directory_handler(
+    mut request: Request,
+    state: Arc<AppState>,
+    directory: &str,
+    matches: &str,
+) -> Response {
     let plugins = state.plugin_manager.read().unwrap();
 
     let mut response = plugins
@@ -27,8 +32,13 @@ pub fn directory_handler(mut request: Request, state: Arc<AppState>, directory: 
 }
 
 #[cfg(not(feature = "plugins"))]
-pub fn directory_handler(request: Request, state: Arc<AppState>, directory: &str) -> Response {
-    inner_directory_handler(request, state, directory)
+pub fn directory_handler(
+    request: Request,
+    state: Arc<AppState>,
+    directory: &str,
+    matches: &str,
+) -> Response {
+    inner_directory_handler(request, state, directory, matches)
 }
 
 /// Request handler for files.
@@ -91,7 +101,12 @@ fn inner_file_handler(request: Request, state: Arc<AppState>, path: PathBuf) -> 
 
 /// Request handler for directories.
 /// Attempts to open a given file relative to the binary and returns error 404 if not found.
-fn inner_directory_handler(request: Request, state: Arc<AppState>, directory: &str) -> Response {
+fn inner_directory_handler(
+    request: Request,
+    state: Arc<AppState>,
+    directory: &str,
+    matches: &str,
+) -> Response {
     if let Some(response) = blacklist_check(&request, state.clone()) {
         return response;
     }
@@ -100,7 +115,17 @@ fn inner_directory_handler(request: Request, state: Arc<AppState>, directory: &s
         return response;
     }
 
-    if let Some(located) = try_find_path(directory, &request.uri, &INDEX_FILES) {
+    let mut simplified_uri = request.uri.clone();
+
+    for ch in matches.chars() {
+        if ch != '*' {
+            simplified_uri.remove(0);
+        } else {
+            break;
+        }
+    }
+
+    if let Some(located) = try_find_path(directory, &simplified_uri, &INDEX_FILES) {
         match located {
             LocatedPath::Directory => {
                 state.logger.info(&format!(
