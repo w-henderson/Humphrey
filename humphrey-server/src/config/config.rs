@@ -38,8 +38,15 @@ pub struct Config {
 /// Represents configuration for a specific route.
 #[derive(Debug, PartialEq)]
 pub enum RouteConfig {
+    /// Serve a single file
+    File {
+        /// Wildcard string specifying what URIs to match
+        matches: String,
+        /// File to serve
+        file: String,
+    },
     /// Serve files from a directory
-    Serve {
+    Directory {
         /// Wildcard string specifying what URIs to match
         matches: String,
         /// Directory to serve files from
@@ -51,6 +58,13 @@ pub enum RouteConfig {
         matches: String,
         /// Load balancer instance
         load_balancer: EqMutex<LoadBalancer>,
+    },
+    /// Redirects requests to the target
+    Redirect {
+        /// Wildcard string specifying what URIs to match
+        matches: String,
+        /// Target URI to redirect to
+        target: String,
     },
 }
 
@@ -207,12 +221,21 @@ impl Config {
 
             for (wild, conf) in routes_map {
                 for wild in wild.split(',').map(|s| s.trim()) {
-                    if conf.contains_key("directory") {
+                    if conf.contains_key("file") {
                         // This is a regular file-serving route
+
+                        let file = conf.get_compulsory("file", "").unwrap();
+
+                        routes.push(RouteConfig::File {
+                            matches: wild.to_string(),
+                            file,
+                        });
+                    } else if conf.contains_key("directory") {
+                        // This is a regular directory-serving route
 
                         let directory = conf.get_compulsory("directory", "").unwrap();
 
-                        routes.push(RouteConfig::Serve {
+                        routes.push(RouteConfig::Directory {
                             matches: wild.to_string(),
                             directory,
                         });
@@ -229,10 +252,10 @@ impl Config {
                         let load_balancer_mode =
                             conf.get_optional("load_balancer_mode", "round-robin".into());
                         let load_balancer_mode = match load_balancer_mode.as_str() {
-                        "round-robin" => LoadBalancerMode::RoundRobin,
-                        "random" => LoadBalancerMode::Random,
-                        _ => return Err("Invalid load balancer mode, valid options are `round-robin` or `random`"),
-                    };
+                            "round-robin" => LoadBalancerMode::RoundRobin,
+                            "random" => LoadBalancerMode::Random,
+                            _ => return Err("Invalid load balancer mode, valid options are `round-robin` or `random`"),
+                        };
 
                         routes.push(RouteConfig::Proxy {
                             matches: wild.to_string(),
@@ -243,8 +266,17 @@ impl Config {
                                 index: 0,
                             }),
                         })
+                    } else if conf.contains_key("redirect") {
+                        // This is a redirect route
+
+                        let target = conf.get_compulsory("redirect", "").unwrap();
+
+                        routes.push(RouteConfig::Redirect {
+                            matches: wild.to_string(),
+                            target,
+                        });
                     } else {
-                        return Err("Invalid route configuration, every route must contain either the `directory` or `proxy` field");
+                        return Err("Invalid route configuration, every route must contain either the `file`, `directory`, `proxy` or `redirect` field");
                     }
                 }
             }

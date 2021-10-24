@@ -13,7 +13,7 @@ use crate::cache::Cache;
 use crate::config::{BlacklistMode, Config, RouteConfig};
 use crate::logger::Logger;
 use crate::proxy::proxy_handler;
-use crate::r#static::{file_handler, not_found};
+use crate::r#static::{directory_handler, file_handler, not_found, redirect_handler};
 use crate::server::pipe::pipe;
 
 use std::io::Write;
@@ -94,7 +94,13 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
 fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
     for route in &state.config.routes {
         match route {
-            RouteConfig::Serve { matches, directory } => {
+            RouteConfig::File { matches, file } => {
+                if wildcard_match(matches, &request.uri) {
+                    return file_handler(request, state.clone(), file);
+                }
+            }
+
+            RouteConfig::Directory { matches, directory } => {
                 if wildcard_match(matches, &request.uri) {
                     for ch in matches.chars() {
                         if ch != '*' {
@@ -104,7 +110,7 @@ fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
                         }
                     }
 
-                    return file_handler(request, state.clone(), directory);
+                    return directory_handler(request, state.clone(), directory);
                 }
             }
 
@@ -126,6 +132,12 @@ fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
                     }
 
                     return proxy_handler(request, state.clone(), load_balancer);
+                }
+            }
+
+            RouteConfig::Redirect { matches, target } => {
+                if wildcard_match(matches, &request.uri) {
+                    return redirect_handler(request, state.clone(), target);
                 }
             }
         }

@@ -34,7 +34,7 @@ fn test_parse_config() {
         threads: 32,
         websocket_proxy: Some("localhost:1234".into()),
         routes: vec![
-            RouteConfig::Serve {
+            RouteConfig::Directory {
                 matches: "/static/*".into(),
                 directory: "/var/www".into(),
             },
@@ -83,11 +83,11 @@ fn comma_separated_routes() {
         threads: 32,
         websocket_proxy: None,
         routes: vec![
-            RouteConfig::Serve {
+            RouteConfig::Directory {
                 matches: "/example/*".into(),
                 directory: "/var/www".into(),
             },
-            RouteConfig::Serve {
+            RouteConfig::Directory {
                 matches: "/test/*".into(),
                 directory: "/var/www".into(),
             },

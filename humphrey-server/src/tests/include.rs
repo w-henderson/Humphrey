@@ -24,7 +24,7 @@ fn include_route() {
         port: 80,
         threads: 32,
         websocket_proxy: None,
-        routes: vec![RouteConfig::Serve {
+        routes: vec![RouteConfig::Directory {
             matches: "/*".into(),
             directory: "/var/www".into(),
         }],
