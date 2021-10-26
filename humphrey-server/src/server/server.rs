@@ -13,7 +13,7 @@ use crate::cache::Cache;
 use crate::config::{BlacklistMode, Config, RouteConfig};
 use crate::logger::Logger;
 use crate::proxy::proxy_handler;
-use crate::r#static::{file_handler, not_found};
+use crate::r#static::{directory_handler, file_handler, not_found, redirect_handler};
 use crate::server::pipe::pipe;
 
 use std::io::Write;
@@ -91,20 +91,37 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
     true
 }
 
+#[cfg(feature = "plugins")]
 fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
+    let plugins = state.plugin_manager.read().unwrap();
+
+    let mut response = plugins
+        .on_request(&mut request, state.clone()) // If the plugin overrides the response, return it
+        .unwrap_or_else(|| inner_request_handler(request, state.clone())); // If no plugin overrides the response, generate it in the normal way
+
+    // Pass the response to plugins before it is sent to the client
+    plugins.on_response(&mut response, state.clone());
+
+    response
+}
+
+#[cfg(not(feature = "plugins"))]
+fn request_handler(request: Request, state: Arc<AppState>) -> Response {
+    inner_request_handler(request, state)
+}
+
+fn inner_request_handler(request: Request, state: Arc<AppState>) -> Response {
     for route in &state.config.routes {
         match route {
-            RouteConfig::Serve { matches, directory } => {
+            RouteConfig::File { matches, file } => {
                 if wildcard_match(matches, &request.uri) {
-                    for ch in matches.chars() {
-                        if ch != '*' {
-                            request.uri.remove(0);
-                        } else {
-                            break;
-                        }
-                    }
+                    return file_handler(request, state.clone(), file);
+                }
+            }
 
-                    return file_handler(request, state.clone(), directory);
+            RouteConfig::Directory { matches, directory } => {
+                if wildcard_match(matches, &request.uri) {
+                    return directory_handler(request, state.clone(), directory, matches);
                 }
             }
 
@@ -113,19 +130,13 @@ fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
                 load_balancer,
             } => {
                 if wildcard_match(matches, &request.uri) {
-                    for ch in matches.chars() {
-                        if ch != '*' {
-                            request.uri.remove(0);
-                        } else {
-                            break;
-                        }
-                    }
+                    return proxy_handler(request, state.clone(), load_balancer, matches);
+                }
+            }
 
-                    if !request.uri.starts_with('/') {
-                        request.uri.insert(0, '/');
-                    }
-
-                    return proxy_handler(request, state.clone(), load_balancer);
+            RouteConfig::Redirect { matches, target } => {
+                if wildcard_match(matches, &request.uri) {
+                    return redirect_handler(request, state.clone(), target);
                 }
             }
         }

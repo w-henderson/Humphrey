@@ -15,7 +15,7 @@ impl Plugin for ExamplePlugin {
         "Example Plugin"
     }
 
-    fn on_request(&self, request: &mut Request, state: Arc<AppState>, _: &str) -> Option<Response> {
+    fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
         state.logger.info(&format!(
             "Example plugin read a request from {}",
             request.address

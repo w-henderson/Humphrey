@@ -22,7 +22,7 @@ impl Default for Config {
 
 impl Default for RouteConfig {
     fn default() -> Self {
-        Self::Serve {
+        Self::Directory {
             matches: "/*".into(),
             directory: '.'.into(),
         }

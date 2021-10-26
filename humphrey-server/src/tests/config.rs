@@ -34,7 +34,7 @@ fn test_parse_config() {
         threads: 32,
         websocket_proxy: Some("localhost:1234".into()),
         routes: vec![
-            RouteConfig::Serve {
+            RouteConfig::Directory {
                 matches: "/static/*".into(),
                 directory: "/var/www".into(),
             },
@@ -64,7 +64,47 @@ fn test_parse_config() {
             time_limit: 60,
         },
         blacklist: BlacklistConfig {
-            list: vec![],
+            list: Vec::new(),
+            mode: BlacklistMode::Block,
+        },
+    };
+
+    assert_eq!(conf, expected_conf);
+}
+
+#[test]
+fn comma_separated_routes() {
+    let tree = parse_conf(include_str!("testcases/commas.conf"), "commas.conf").unwrap();
+    let conf = Config::from_tree(tree).unwrap();
+
+    let expected_conf = Config {
+        address: "0.0.0.0".into(),
+        port: 80,
+        threads: 32,
+        websocket_proxy: None,
+        routes: vec![
+            RouteConfig::Directory {
+                matches: "/example/*".into(),
+                directory: "/var/www".into(),
+            },
+            RouteConfig::Directory {
+                matches: "/test/*".into(),
+                directory: "/var/www".into(),
+            },
+        ],
+        #[cfg(feature = "plugins")]
+        plugins: Vec::new(),
+        logging: LoggingConfig {
+            level: LogLevel::Warn,
+            console: true,
+            file: None,
+        },
+        cache: CacheConfig {
+            size_limit: 0,
+            time_limit: 0,
+        },
+        blacklist: BlacklistConfig {
+            list: Vec::new(),
             mode: BlacklistMode::Block,
         },
     };

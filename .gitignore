@@ -6,4 +6,4 @@ humphrey.log
 Cargo.lock
 
 *.conf
-!/humphrey-server/src/tests/testcases
+!/humphrey-server/src/tests/testcases/*.conf
