@@ -46,8 +46,20 @@ server {
     load_balancer_mode "round-robin"                   # Load balancing mode, either "round-robin" or "random"
   }
 
+  route /static/*, /images/* {
+    directory "/var/static" # Serve content from this directory to both paths
+  }
+
+  route /logo.png {
+    file "/var/static/logo_256x256.png" # Serve this file to this route
+  }
+
+  route /home {
+    redirect "/" # Redirect this route with 302 Moved Permanently
+  }
+
   route /* {
-    directory "/var/www" # Serve static content from this directory
+    directory "/var/www" # Serve content from this directory
   }
 }
 ```
