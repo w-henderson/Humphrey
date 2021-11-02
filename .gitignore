@@ -4,6 +4,7 @@ humphrey.ini
 conf/
 humphrey.log
 Cargo.lock
+docs/book/
 
 *.conf
 !/humphrey-server/src/tests/testcases/*.conf
