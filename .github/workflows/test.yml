@@ -1,4 +1,9 @@
-on: [push, pull_request]
+on:
+  push:
+    paths:
+    - "humphrey/**"
+    - "humphrey-server/**"
+  pull_request:
 
 name: CI
 
