@@ -1,3 +1,16 @@
 # Summary
 
-- [Chapter 1](./chapter_1.md)
+- [Introduction](introduction.md)
+- [Humphrey Core](core/index.md)
+  - [Getting Started](core/getting-started.md)
+  - [Basic Syntax](core/basic-syntax.md)
+  - [Using State](core/state.md)
+  - [Static Content](core/static-content.md)
+  - [WebSockets](core/websockets.md)
+- [Humphrey Server](server/index.md)
+  - [Configuration](server/configuration.md)
+  - [Using PHP](server/using-php.md)
+  - [Creating a Plugin](server/creating-a-plugin.md)
+    - [Getting Started](server/plugin/getting-started.md)
+    - [Handling Requests](server/plugin/handling-requests.md)
+    - [Modifying Responses](server/plugin/modifying-responses.md)
