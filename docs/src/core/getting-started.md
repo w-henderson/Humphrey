@@ -7,12 +7,6 @@
 # Getting Started
 This chapter will walk you through the steps to get started with Humphrey Core. It assumes that you already have Rust and Cargo installed, but installation steps for these can be found in the [Rust book](https://doc.rust-lang.org/book/ch01-01-installation.html).
 
-## Contents
-1. [Creating a New Project](#creating-a-new-project)
-2. [Creating a Humphrey App](#creating-a-humphrey-app)
-3. [Adding Multiple Routes](#adding-multiple-routes)
-4. [Wildcard Routes](#wildcard-routes)
-
 ## Creating a New Project
 A Humphrey Core web application is a Rust binary crate, so to begin we'll need to create a new project using Cargo.
 
