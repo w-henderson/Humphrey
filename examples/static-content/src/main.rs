@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Serve the "/img/*" route with files stored in the "./static/images" directory.
         // Strip the "/img/" prefix from the request URI before it is concatenated with the directory path.
         // For example, "/img/ferris.png" would go to "ferris.png" and then to "./static/images/ferris.png".
-        .with_route("/img/*", handlers::serve_dir("./static/images", "/img/"))
+        .with_path_aware_route("/img/*", handlers::serve_dir("./static/images"))
         // Serve a regular file path in the current directory.
         // This means simply appending the request URI to the directory path and looking for a file there.
         // This is equivalent to `serve_dir` with a strip prefix value of `""`.
