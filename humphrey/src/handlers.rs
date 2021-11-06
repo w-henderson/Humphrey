@@ -85,3 +85,13 @@ pub fn serve_dir<T>(directory_path: &'static str) -> impl Fn(Request, Arc<T>, &s
         }
     }
 }
+
+/// Redirects requests to the given location with status code 301.
+pub fn redirect<T>(location: &'static str) -> impl Fn(Request, Arc<T>) -> Response {
+    move |request: Request, _| {
+        Response::empty(StatusCode::MovedPermanently)
+            .with_header(ResponseHeader::Location, location.to_string())
+            .with_request_compatibility(&request)
+            .with_generated_headers()
+    }
+}
