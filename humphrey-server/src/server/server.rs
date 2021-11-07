@@ -59,7 +59,7 @@ pub fn main(config: Config) {
     logger.info("Starting server");
 
     #[cfg(feature = "plugins")]
-    if let Ok(plugins_count) = load_plugins(&state.config, state) {
+    if let Ok(plugins_count) = load_plugins(&state.config, state.clone()) {
         logger.info(&format!("Loaded {} plugins", plugins_count))
     } else {
         exit(1);
@@ -199,7 +199,7 @@ fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppStat
 }
 
 #[cfg(feature = "plugins")]
-fn load_plugins(config: &Config, state: &Arc<AppState>) -> Result<usize, ()> {
+fn load_plugins(config: &Config, state: Arc<AppState>) -> Result<usize, ()> {
     let mut manager = state.plugin_manager.write().unwrap();
 
     for plugin in &config.plugins {
