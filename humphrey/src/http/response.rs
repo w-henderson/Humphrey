@@ -91,6 +91,17 @@ impl Response {
         }
     }
 
+    /// Creates a redirect response to the given location.
+    pub fn redirect<T>(location: T, request: &Request) -> Self
+    where
+        T: AsRef<str>,
+    {
+        Self::empty(StatusCode::MovedPermanently)
+            .with_header(ResponseHeader::Location, location.as_ref().to_string())
+            .with_request_compatibility(request)
+            .with_generated_headers()
+    }
+
     /// Adds the given header to the response.
     /// Returns itself for use in a builder pattern.
     pub fn with_header(mut self, header: ResponseHeader, value: String) -> Self {
