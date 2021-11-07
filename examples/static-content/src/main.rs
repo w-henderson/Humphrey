@@ -17,7 +17,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with_path_aware_route("/img/*", handlers::serve_dir("./static/images"))
         // Serve a regular file path in the current directory.
         // This means simply appending the request URI to the directory path and looking for a file there.
-        // This is equivalent to `serve_dir` with a strip prefix value of `""`.
         .with_route("/src/*", handlers::serve_as_file_path("."))
         // Redirect requests to "/ferris" to "/img/ferris.png"
         .with_route("/ferris", handlers::redirect("/img/ferris.png"));
