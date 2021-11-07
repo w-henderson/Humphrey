@@ -46,7 +46,7 @@ pub type ConnectionCondition<State> = fn(&mut TcpStream, Arc<State>) -> bool;
 pub type WebsocketHandler<State> = fn(Request, TcpStream, Arc<State>);
 
 /// Represents a function able to handle a request.
-/// It is passed a the request as well as the app's state, and must return a response.
+/// It is passed the request as well as the app's state, and must return a response.
 ///
 /// ## Example
 /// The most basic request handler would be as follows:
@@ -57,6 +57,37 @@ pub type WebsocketHandler<State> = fn(Request, TcpStream, Arc<State>);
 /// ```
 pub trait RequestHandler<State>: Fn(Request, Arc<State>) -> Response + Send + Sync {}
 impl<T, S> RequestHandler<S> for T where T: Fn(Request, Arc<S>) -> Response + Send + Sync {}
+
+/// Represents a function able to handle a request.
+/// It is passed only the request, and must return a response.
+/// If you want access to the app's state, consider using the `RequestHandler` trait instead.
+///
+/// ## Example
+/// The most basic stateless request handler would be as follows:
+/// ```
+/// fn handler(request: Request) -> Response {
+///     Response::new(StatusCode::OK, b"Success", &request)
+/// }
+/// ```
+pub trait StatelessRequestHandler<State>: Fn(Request) -> Response + Send + Sync {}
+impl<T, S> StatelessRequestHandler<S> for T where T: Fn(Request) -> Response + Send + Sync {}
+
+/// Represents a function able to handle a request with respect to the route it was called from.
+/// It is passed the request, the app's state, and the route it was called from, and must return a response.
+///
+/// ## Example
+/// The most basic path-aware request handler would be as follows:
+/// ```
+/// fn handler(request: Request, _: Arc<()>, route: &str) -> Response {
+///     Response::new(StatusCode::OK, format!("Success matching route {}", route), &request)
+/// }
+/// ```
+#[rustfmt::skip]
+pub trait PathAwareRequestHandler<State>:
+    Fn(Request, Arc<State>, &str) -> Response + Send + Sync {}
+#[rustfmt::skip]
+impl<T, S> PathAwareRequestHandler<S> for T where
+    T: Fn(Request, Arc<S>, &str) -> Response + Send + Sync {}
 
 /// Represents a function able to handle an error.
 /// The first parameter of type `Option<Request>` will be `Some` if the request could be parsed.
@@ -188,6 +219,42 @@ where
         self
     }
 
+    /// Adds a route and associated handler to the server.
+    /// Does not pass the state to the handler.
+    /// Routes can include wildcards, for example `/blog/*`.
+    ///
+    /// If you want to access the app's state in the handler, consider using `with_route`.
+    ///
+    /// ## Panics
+    /// This function will panic if the route string cannot be converted to a `Uri` object.
+    pub fn with_stateless_route<T>(mut self, route: &str, handler: T) -> Self
+    where
+        T: StatelessRequestHandler<State> + 'static,
+    {
+        self.routes.push(RouteHandler {
+            route: route.parse().unwrap(),
+            handler: Box::new(move |request, _| handler(request)),
+        });
+        self
+    }
+
+    /// Adds a path-aware route and associated handler to the server.
+    /// Routes can include wildcards, for example `/blog/*`.
+    /// Will also pass the route to the handler at runtime.
+    ///
+    /// ## Panics
+    /// This function will panic if the route string cannot be converted to a `Uri` object.
+    pub fn with_path_aware_route<T>(mut self, route: &'static str, handler: T) -> Self
+    where
+        T: PathAwareRequestHandler<State> + 'static,
+    {
+        self.routes.push(RouteHandler {
+            route: route.parse().unwrap(),
+            handler: Box::new(move |request, state| handler(request, state, route)),
+        });
+        self
+    }
+
     /// Sets the error handler for the server.
     pub fn with_error_handler(mut self, handler: ErrorHandler) -> Self {
         self.error_handler = handler;
@@ -217,8 +284,8 @@ where
 
     /// Gets a reference to the app's state.
     /// This should only be used in the main thread, as the state is passed to request handlers otherwise.
-    pub fn get_state(&self) -> &Arc<State> {
-        &self.state
+    pub fn get_state(&self) -> Arc<State> {
+        self.state.clone()
     }
 }
 
