@@ -59,12 +59,6 @@ where
             self.stream
                 .write_all(Frame::new(Opcode::Close, Vec::new()).as_ref())
                 .ok();
-
-            loop {
-                if matches!(self.recv(), Err(WebsocketError::ConnectionClosed)) {
-                    break;
-                }
-            }
         }
     }
 }
