@@ -1,18 +1,19 @@
+use crate::error::WebsocketError;
+
 use std::convert::TryFrom;
-use std::error::Error;
 use std::io::Read;
 
 /// Represents a frame of WebSocket data.
 /// Follows [Section 5.2 of RFC 6455](https://datatracker.ietf.org/doc/html/rfc6455#section-5.2)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Frame {
-    fin: bool,
-    rsv: [bool; 3],
-    opcode: Opcode,
-    mask: bool,
-    length: u64,
-    masking_key: [u8; 4],
-    payload: Vec<u8>,
+    pub(crate) fin: bool,
+    pub(crate) rsv: [bool; 3],
+    pub(crate) opcode: Opcode,
+    pub(crate) mask: bool,
+    pub(crate) length: u64,
+    pub(crate) masking_key: [u8; 4],
+    pub(crate) payload: Vec<u8>,
 }
 
 /// Represents the type of WebSocket frame.
@@ -28,7 +29,7 @@ pub enum Opcode {
 }
 
 impl TryFrom<u8> for Opcode {
-    type Error = Box<dyn Error>;
+    type Error = WebsocketError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -38,19 +39,35 @@ impl TryFrom<u8> for Opcode {
             0x8 => Ok(Self::Close),
             0x9 => Ok(Self::Ping),
             0xA => Ok(Self::Pong),
-            _ => Err("Invalid opcode".into()),
+            _ => Err(WebsocketError::InvalidOpcode),
         }
     }
 }
 
 impl Frame {
+    /// Creates a new frame with the given parameters.
+    /// Does not mask the payload.
+    pub fn new(opcode: Opcode, payload: Vec<u8>) -> Self {
+        Self {
+            fin: true,
+            rsv: [false; 3],
+            opcode,
+            mask: false,
+            length: payload.len() as u64,
+            masking_key: [0; 4],
+            payload,
+        }
+    }
+
     /// Attemps to read a frame from the given stream.
-    pub fn from_stream<T>(mut stream: T) -> Result<Self, Box<dyn Error>>
+    pub fn from_stream<T>(mut stream: T) -> Result<Self, WebsocketError>
     where
         T: Read,
     {
         let mut buf: [u8; 2] = [0; 2];
-        stream.read_exact(&mut buf)?;
+        stream
+            .read_exact(&mut buf)
+            .map_err(|_| WebsocketError::ReadError)?;
 
         // Parse header information
         let fin = buf[0] & 0x80 != 0;
@@ -60,7 +77,9 @@ impl Frame {
 
         let mut length: u64 = (buf[1] as u8 & 0x7F) as u64;
         if length == 126 {
-            stream.read_exact(&mut buf)?;
+            stream
+                .read_exact(&mut buf)
+                .map_err(|_| WebsocketError::ReadError)?;
             length = u16::from_be_bytes(buf) as u64;
         } else if length == 127 {
             let buf: [u8; 8] = [0; 8];
@@ -70,14 +89,18 @@ impl Frame {
         let masking_key = {
             let mut buf: [u8; 4] = [0; 4];
             if mask {
-                stream.read_exact(&mut buf)?;
+                stream
+                    .read_exact(&mut buf)
+                    .map_err(|_| WebsocketError::ReadError)?;
             }
             buf
         };
 
         // Read the payload
         let mut payload: Vec<u8> = vec![0; length as usize];
-        stream.read_exact(&mut payload)?;
+        stream
+            .read_exact(&mut payload)
+            .map_err(|_| WebsocketError::ReadError)?;
 
         // Unmask the payload
         payload
@@ -95,17 +118,38 @@ impl Frame {
             payload,
         })
     }
+}
 
-    /// Returns the payload as a string, if possible.
-    ///
-    /// If the payload opcode is `Opcode::Text` (`0x1`), but the payload is not valid UTF-8, the function will return `None`.
-    /// Otherwise, it will not attempt to convert the payload to a string and will immediately return `None`.
-    pub fn text(&self) -> Option<String> {
-        if self.opcode != Opcode::Text {
-            return None;
+impl From<Frame> for Vec<u8> {
+    fn from(frame: Frame) -> Self {
+        let mut buf: Vec<u8> = vec![0; 2];
+
+        // Set the header bits
+        buf[0] = (frame.fin as u8) << 7
+            | (frame.rsv[0] as u8) << 6
+            | (frame.rsv[1] as u8) << 5
+            | (frame.rsv[2] as u8) << 4
+            | frame.opcode as u8;
+
+        // Set the length information
+        if frame.length < 126 {
+            buf[1] = (frame.mask as u8) << 7 | frame.length as u8;
+        } else if frame.length < 65536 {
+            buf[1] = (frame.mask as u8) << 7 | 126;
+            buf.extend_from_slice(&(frame.length as u16).to_be_bytes());
+        } else {
+            buf[1] = (frame.mask as u8) << 7 | 127;
+            buf.extend_from_slice(&(frame.length as u64).to_be_bytes());
         }
 
-        String::from_utf8(self.payload.clone()).ok()
+        // Add the masking key (if required)
+        if frame.mask {
+            buf.extend_from_slice(&frame.masking_key);
+        }
+
+        // Add the payload and return
+        buf.extend_from_slice(&frame.payload);
+        buf
     }
 }
 
