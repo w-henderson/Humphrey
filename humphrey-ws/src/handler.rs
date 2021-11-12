@@ -14,6 +14,30 @@ use std::sync::Arc;
 pub trait WebsocketHandler<S>: Fn(WebsocketStream<TcpStream>, Arc<S>) + Send + Sync {}
 impl<T, S> WebsocketHandler<S> for T where T: Fn(WebsocketStream<TcpStream>, Arc<S>) + Send + Sync {}
 
+/// Provides WebSocket handshake functionality.
+/// Supply a `WebsocketHandler` to handle the subsequent messages.
+///
+/// ## Example
+/// ```
+/// use humphrey::App;
+/// use humphrey_ws::message::Message;
+/// use humphrey_ws::stream::WebsocketStream;
+/// use humphrey_ws::websocket_handler;
+///
+/// use std::net::TcpStream;
+/// use std::sync::Arc;
+///
+/// fn main() {
+///     let app: App<()> = App::new()
+///         .with_websocket_handler(websocket_handler(my_handler));
+///
+///     app.run("0.0.0.0:80").unwrap();
+/// }
+///
+/// fn my_handler(mut stream: WebsocketStream<TcpStream>, _: Arc<()>) {
+///     stream.send(Message::new("Hello, World!")).unwrap();
+/// }
+/// ```
 pub fn websocket_handler<T, S>(handler: T) -> impl Fn(Request, TcpStream, Arc<S>)
 where
     T: WebsocketHandler<S>,
@@ -25,6 +49,7 @@ where
     }
 }
 
+/// Performs the WebSocket handshake.
 fn handshake(request: Request, stream: &mut TcpStream) -> Result<(), WebsocketError> {
     // Get the handshake key header
     let handshake_key = request
