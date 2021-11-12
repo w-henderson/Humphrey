@@ -121,34 +121,34 @@ impl Frame {
 }
 
 impl From<Frame> for Vec<u8> {
-    fn from(frame: Frame) -> Self {
+    fn from(f: Frame) -> Self {
         let mut buf: Vec<u8> = vec![0; 2];
 
         // Set the header bits
-        buf[0] = (frame.fin as u8) << 7
-            | (frame.rsv[0] as u8) << 6
-            | (frame.rsv[1] as u8) << 5
-            | (frame.rsv[2] as u8) << 4
-            | frame.opcode as u8;
+        buf[0] = (f.fin as u8) << 7
+            | (f.rsv[0] as u8) << 6
+            | (f.rsv[1] as u8) << 5
+            | (f.rsv[2] as u8) << 4
+            | f.opcode as u8;
 
         // Set the length information
-        if frame.length < 126 {
-            buf[1] = (frame.mask as u8) << 7 | frame.length as u8;
-        } else if frame.length < 65536 {
-            buf[1] = (frame.mask as u8) << 7 | 126;
-            buf.extend_from_slice(&(frame.length as u16).to_be_bytes());
+        if f.length < 126 {
+            buf[1] = (f.mask as u8) << 7 | f.length as u8;
+        } else if f.length < 65536 {
+            buf[1] = (f.mask as u8) << 7 | 126;
+            buf.extend_from_slice(&(f.length as u16).to_be_bytes());
         } else {
-            buf[1] = (frame.mask as u8) << 7 | 127;
-            buf.extend_from_slice(&(frame.length as u64).to_be_bytes());
+            buf[1] = (f.mask as u8) << 7 | 127;
+            buf.extend_from_slice(&(f.length as u64).to_be_bytes());
         }
 
         // Add the masking key (if required)
-        if frame.mask {
-            buf.extend_from_slice(&frame.masking_key);
+        if f.mask {
+            buf.extend_from_slice(&f.masking_key);
         }
 
         // Add the payload and return
-        buf.extend_from_slice(&frame.payload);
+        buf.extend_from_slice(&f.payload);
         buf
     }
 }

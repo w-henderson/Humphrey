@@ -10,6 +10,31 @@ pub struct Message {
 }
 
 impl Message {
+    /// Creates a new message with the given payload.
+    ///
+    /// Marks the message as text if the payload is valid UTF-8.
+    /// To avoid this behaviour, use the `Message::new_binary` constructor.
+    pub fn new<T>(payload: T) -> Self
+    where
+        T: AsRef<[u8]>,
+    {
+        Self {
+            payload: payload.as_ref().to_vec(),
+            text: std::str::from_utf8(payload.as_ref()).is_ok(),
+        }
+    }
+
+    /// Creates a new binary message with the given payload.
+    pub fn new_binary<T>(payload: T) -> Self
+    where
+        T: AsRef<[u8]>,
+    {
+        Self {
+            payload: payload.as_ref().to_vec(),
+            text: false,
+        }
+    }
+
     /// Attemps to read a message from the given stream.
     ///
     /// Silently responds to pings with pongs, as specified in [RFC 6455 Section 5.5.2](https://datatracker.ietf.org/doc/html/rfc6455#section-5.5.2).
@@ -79,6 +104,19 @@ impl Message {
     /// Returns the payload as a slice of bytes.
     pub fn bytes(&self) -> &[u8] {
         &self.payload
+    }
+
+    /// Converts the message to a `Vec<u8>` for transmission.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        if self.text {
+            Frame::new(Opcode::Text, self.payload.clone())
+                .as_ref()
+                .to_vec()
+        } else {
+            Frame::new(Opcode::Binary, self.payload.clone())
+                .as_ref()
+                .to_vec()
+        }
     }
 }
 
