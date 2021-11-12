@@ -4,6 +4,7 @@ use crate::frame::{Frame, Opcode};
 use std::io::{Read, Write};
 
 /// Represents a WebSocket message.
+#[derive(Debug)]
 pub struct Message {
     payload: Vec<u8>,
     text: bool,
@@ -45,7 +46,7 @@ impl Message {
         let mut frames: Vec<Frame> = Vec::new();
 
         // Keep reading frames until we get the finish frame
-        while frames.last().map(|f| f.fin).unwrap_or(false) {
+        while frames.last().map(|f| !f.fin).unwrap_or(true) {
             let frame = Frame::from_stream(&mut stream)?;
 
             // If this is a ping, respond with a pong
@@ -109,13 +110,9 @@ impl Message {
     /// Converts the message to a `Vec<u8>` for transmission.
     pub fn to_bytes(&self) -> Vec<u8> {
         if self.text {
-            Frame::new(Opcode::Text, self.payload.clone())
-                .as_ref()
-                .to_vec()
+            Frame::new(Opcode::Text, self.payload.clone()).into()
         } else {
-            Frame::new(Opcode::Binary, self.payload.clone())
-                .as_ref()
-                .to_vec()
+            Frame::new(Opcode::Binary, self.payload.clone()).into()
         }
     }
 }

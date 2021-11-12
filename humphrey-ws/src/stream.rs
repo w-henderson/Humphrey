@@ -5,8 +5,6 @@ use crate::message::Message;
 use std::io::{Read, Write};
 
 /// Represents a WebSocket stream.
-///
-/// Implements `Iterator` over `Message`s for reading messages from the stream.
 pub struct WebsocketStream<T>
 where
     T: Read + Write,
@@ -29,29 +27,26 @@ where
         }
     }
 
+    pub fn recv(&mut self) -> Result<Message, WebsocketError> {
+        let message = Message::from_stream(&mut self.stream);
+
+        if let Err(WebsocketError::ConnectionClosed) = message {
+            self.closed = true;
+        }
+
+        message
+    }
+
     /// Sends a message to the client.
     pub fn send(&mut self, message: Message) -> Result<(), WebsocketError> {
         self.stream
             .write_all(&message.to_bytes())
             .map_err(|_| WebsocketError::WriteError)
     }
-}
 
-impl<T> Iterator for WebsocketStream<T>
-where
-    T: Read + Write,
-{
-    type Item = Result<Message, WebsocketError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let message = Message::from_stream(&mut self.stream);
-
-        if let Err(WebsocketError::ConnectionClosed) = message {
-            self.closed = true;
-            None
-        } else {
-            Some(message)
-        }
+    /// Returns a mutable reference to the underlying stream.
+    pub fn inner(&mut self) -> &mut T {
+        &mut self.stream
     }
 }
 
@@ -65,7 +60,11 @@ where
                 .write_all(Frame::new(Opcode::Close, Vec::new()).as_ref())
                 .ok();
 
-            self.find(|message| matches!(message, Err(WebsocketError::ConnectionClosed)));
+            loop {
+                if matches!(self.recv(), Err(WebsocketError::ConnectionClosed)) {
+                    break;
+                }
+            }
         }
     }
 }
