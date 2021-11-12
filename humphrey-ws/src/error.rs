@@ -5,6 +5,7 @@ use std::fmt::Display;
 pub enum WebsocketError {
     ReadError,
     WriteError,
+    HandshakeError,
     InvalidOpcode,
     ConnectionClosed,
 }

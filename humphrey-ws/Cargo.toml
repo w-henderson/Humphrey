@@ -12,3 +12,6 @@ categories = ["web-programming::websocket", "network-programming"]
 
 [lib]
 doctest = false
+
+[dependencies]
+humphrey = { version = "^0.2.2", path = "../humphrey" }
