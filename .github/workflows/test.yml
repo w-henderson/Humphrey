@@ -3,6 +3,7 @@ on:
     paths:
     - "humphrey/**"
     - "humphrey-server/**"
+    - "humphrey-ws/**"
   pull_request:
 
 name: CI

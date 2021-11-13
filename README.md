@@ -11,3 +11,4 @@ Humphrey is a very fast, robust and flexible HTTP/1.1 web server, with support f
 ## Contents
 - [Use Humphrey as a crate](humphrey/README.md)
 - [Use Humphrey as a standalone application](humphrey-server/README.md)
+- [Use WebSockets with Humphrey](humphrey-ws/README.md)
