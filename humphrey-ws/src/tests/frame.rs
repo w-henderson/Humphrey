@@ -28,6 +28,13 @@ pub const STANDALONE_FRAME_BYTES: [u8; 11] = [
 ];
 
 #[rustfmt::skip]
+pub const UNMASKED_BYTES: [u8; 13] = [
+    0b1000_0001, // fin, opcode text
+    0b0_0001011, // not mask, payload length 11
+    b'h', b'e', b'l', b'l', b'o', b' ', b'w', b'o', b'r', b'l', b'd' // unmasked payload "hello world"
+];
+
+#[rustfmt::skip]
 pub const MEDIUM_FRAME_BYTES: [u8; 8] = [
     0b1000_0001, // fin, opcode text
     0b1_1111110, // mask, payload length 126 (extended payload length 16 bit)
@@ -125,4 +132,21 @@ fn test_long_frame() {
     };
 
     assert_eq!(frame, expected_frame);
+}
+
+#[test]
+fn test_write() {
+    let frame = Frame {
+        fin: true,
+        rsv: [false; 3],
+        opcode: Opcode::Text,
+        mask: false,
+        masking_key: [0; 4],
+        length: 11,
+        payload: b"hello world".to_vec(),
+    };
+
+    let bytes: Vec<u8> = frame.into();
+
+    assert_eq!(bytes, UNMASKED_BYTES.to_vec());
 }

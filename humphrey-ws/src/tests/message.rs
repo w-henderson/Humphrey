@@ -1,5 +1,5 @@
 use crate::message::Message;
-use crate::tests::frame::{FRAME_1_BYTES, FRAME_2_BYTES, STANDALONE_FRAME_BYTES};
+use crate::tests::frame::{FRAME_1_BYTES, FRAME_2_BYTES, STANDALONE_FRAME_BYTES, UNMASKED_BYTES};
 use crate::tests::mock_stream::MockStream;
 
 #[test]
@@ -21,4 +21,12 @@ fn test_read_fragmented_message() {
     let expected_message = Message::new("hello world");
 
     assert_eq!(message.bytes(), expected_message.bytes());
+}
+
+#[test]
+fn test_write_message() {
+    let message = Message::new("hello world");
+    let bytes = message.to_bytes();
+
+    assert_eq!(bytes, UNMASKED_BYTES);
 }
