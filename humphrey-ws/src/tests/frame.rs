@@ -8,7 +8,7 @@ pub const FRAME_1_BYTES: [u8; 12] = [
     0b0000_0001, // not fin, opcode text
     0b1_0000110, // mask, payload length 6
     0x69, 0x69, 0x69, 0x69, // masking key 0x69696969
-    1, 12, 5, 5, 6, 73 // masked payload "hello"
+    1, 12, 5, 5, 6, 73 // masked payload "hello "
 ];
 
 #[rustfmt::skip]
@@ -17,6 +17,14 @@ pub const FRAME_2_BYTES: [u8; 11] = [
     0b1_0000101, // mask, payload length 5
     0x69, 0x69, 0x69, 0x69, // masking key 0x69696969
     30, 6, 27, 5, 13 // masked payload "world"
+];
+
+#[rustfmt::skip]
+pub const STANDALONE_FRAME_BYTES: [u8; 11] = [
+    0b1000_0001, // fin, opcode text
+    0b1_0000101, // mask, payload length 5
+    0x69, 0x69, 0x69, 0x69, // masking key 0x69696969
+    1, 12, 5, 5, 6 // masked payload "hello"
 ];
 
 #[rustfmt::skip]

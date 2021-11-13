@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::io::Read;
+use std::io::{Read, Write};
 
 pub struct MockStream {
     data: Vec<u8>,
@@ -25,5 +25,15 @@ impl Read for MockStream {
         }
 
         std::io::Result::Ok(self.index - initial_index)
+    }
+}
+
+impl Write for MockStream {
+    fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+        todo!()
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        todo!()
     }
 }
