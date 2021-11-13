@@ -5,7 +5,7 @@ use std::convert::TryInto;
 /// A trait which represents the ability to be hashed using SHA-1.
 /// This is implemented for all types which implement `AsRef<[u8]>`.
 pub trait SHA1Hash {
-    /// Hashes the self using SHA-1.
+    /// Hashes self using SHA-1.
     fn hash(&self) -> [u8; 20];
 }
 

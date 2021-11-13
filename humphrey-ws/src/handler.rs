@@ -11,6 +11,7 @@ use std::io::Write;
 use std::net::TcpStream;
 use std::sync::Arc;
 
+/// Represents a function able to handle WebSocket streams.
 pub trait WebsocketHandler<S>: Fn(WebsocketStream<TcpStream>, Arc<S>) + Send + Sync {}
 impl<T, S> WebsocketHandler<S> for T where T: Fn(WebsocketStream<TcpStream>, Arc<S>) + Send + Sync {}
 

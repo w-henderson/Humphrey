@@ -1,10 +1,16 @@
 const ALPHABET: [u8; 64] = *b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
+/// A trait which represents the ability to be base64 encoded.
+/// This trait is implemented for all types which can be converted to a slice of bytes.
 pub trait Base64Encode {
+    /// Encode self into a base64 string.
     fn encode(&self) -> String;
 }
 
+/// A trait which represents the ability to be base64 decoded.
+/// This trait is implemented for all string types.
 pub trait Base64Decode {
+    /// Attempt to decode a base64 string into a byte slice, returning `Err(())` if it is not valid base64.
     fn decode(&self) -> Result<Vec<u8>, ()>;
 }
 
