@@ -63,6 +63,7 @@ pub enum ResponseHeader {
     Pragma,
     Server,
     SetCookie,
+    Upgrade,
     Via,
     Warning,
 
@@ -142,6 +143,7 @@ impl From<&str> for ResponseHeader {
             "Pragma" => Self::Pragma,
             "Server" => Self::Server,
             "Set-Cookie" => Self::SetCookie,
+            "Upgrade" => Self::Upgrade,
             "Via" => Self::Via,
             "Warning" => Self::Warning,
             custom => Self::Custom {
@@ -215,6 +217,7 @@ impl ToString for ResponseHeader {
             ResponseHeader::Pragma => "Pragma",
             ResponseHeader::Server => "Server",
             ResponseHeader::SetCookie => "Set-Cookie",
+            ResponseHeader::Upgrade => "Upgrade",
             ResponseHeader::Via => "Via",
             ResponseHeader::Warning => "Warning",
             _ => "",
@@ -256,6 +259,7 @@ impl ResponseHeader {
             ResponseHeader::Pragma => HeaderCategory::General,
             ResponseHeader::Server => HeaderCategory::Response,
             ResponseHeader::SetCookie => HeaderCategory::Other,
+            ResponseHeader::Upgrade => HeaderCategory::General,
             ResponseHeader::Via => HeaderCategory::General,
             ResponseHeader::Warning => HeaderCategory::General,
             ResponseHeader::Custom { name: _ } => HeaderCategory::Other,

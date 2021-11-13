@@ -26,7 +26,7 @@ where
     state: Arc<State>,
     connection_handler: ConnectionHandler<State>,
     connection_condition: ConnectionCondition<State>,
-    websocket_handler: WebsocketHandler<State>,
+    websocket_handler: Box<dyn WebsocketHandler<State>>,
 }
 
 /// Represents a function able to handle a connection.
@@ -35,7 +35,7 @@ pub type ConnectionHandler<State> = fn(
     TcpStream,
     Arc<Vec<RouteHandler<State>>>,
     Arc<ErrorHandler>,
-    Arc<WebsocketHandler<State>>,
+    Arc<Box<dyn WebsocketHandler<State>>>,
     Arc<State>,
 );
 
@@ -43,7 +43,8 @@ pub type ConnectionHandler<State> = fn(
 pub type ConnectionCondition<State> = fn(&mut TcpStream, Arc<State>) -> bool;
 
 /// Represents a function able to handle a WebSocket handshake and consequent data frames.
-pub type WebsocketHandler<State> = fn(Request, TcpStream, Arc<State>);
+pub trait WebsocketHandler<State>: Fn(Request, TcpStream, Arc<State>) + Send + Sync {}
+impl<T, S> WebsocketHandler<S> for T where T: Fn(Request, TcpStream, Arc<S>) + Send + Sync {}
 
 /// Represents a function able to handle a request.
 /// It is passed the request as well as the app's state, and must return a response.
@@ -140,7 +141,7 @@ where
             state: Arc::new(State::default()),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
-            websocket_handler: |_, _, _| (),
+            websocket_handler: Box::new(|_, _, _| ()),
         }
     }
 
@@ -153,7 +154,7 @@ where
             state: Arc::new(state),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
-            websocket_handler: |_, _, _| (),
+            websocket_handler: Box::new(|_, _, _| ()),
         }
     }
 
@@ -270,8 +271,11 @@ where
 
     /// Sets the websocket handler, a function which processes WebSocket handshakes.
     /// This is passed the stream, state, and the request which triggered its calling.
-    pub fn with_websocket_handler(mut self, handler: WebsocketHandler<State>) -> Self {
-        self.websocket_handler = handler;
+    pub fn with_websocket_handler<T>(mut self, handler: T) -> Self
+    where
+        T: WebsocketHandler<State> + 'static,
+    {
+        self.websocket_handler = Box::new(handler);
         self
     }
 
@@ -296,7 +300,7 @@ fn client_handler<State>(
     mut stream: TcpStream,
     routes: Arc<Vec<RouteHandler<State>>>,
     error_handler: Arc<ErrorHandler>,
-    websocket_handler: Arc<WebsocketHandler<State>>,
+    websocket_handler: Arc<Box<dyn WebsocketHandler<State>>>,
     state: Arc<State>,
 ) {
     let addr = stream.peer_addr().unwrap();

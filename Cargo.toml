@@ -1,5 +1,6 @@
 [workspace]
 members = [
   "humphrey",
-  "humphrey-server"
+  "humphrey-server",
+  "humphrey-ws"
 ]
