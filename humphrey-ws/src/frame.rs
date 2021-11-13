@@ -75,14 +75,17 @@ impl Frame {
         let opcode = Opcode::try_from(buf[0] & 0xF)?;
         let mask = buf[1] & 0x80 != 0;
 
-        let mut length: u64 = (buf[1] as u8 & 0x7F) as u64;
+        let mut length: u64 = (buf[1] & 0x7F) as u64;
         if length == 126 {
             stream
                 .read_exact(&mut buf)
                 .map_err(|_| WebsocketError::ReadError)?;
             length = u16::from_be_bytes(buf) as u64;
         } else if length == 127 {
-            let buf: [u8; 8] = [0; 8];
+            let mut buf: [u8; 8] = [0; 8];
+            stream
+                .read_exact(&mut buf)
+                .map_err(|_| WebsocketError::ReadError)?;
             length = u64::from_be_bytes(buf);
         }
 
