@@ -26,7 +26,7 @@ where
     state: Arc<State>,
     connection_handler: ConnectionHandler<State>,
     connection_condition: ConnectionCondition<State>,
-    websocket_handler: Box<dyn WebsocketHandler<State>>,
+    websocket_handler: Arc<dyn WebsocketHandler<State>>,
 }
 
 /// Represents a function able to handle a connection.
@@ -35,7 +35,7 @@ pub type ConnectionHandler<State> = fn(
     TcpStream,
     Arc<Vec<RouteHandler<State>>>,
     Arc<ErrorHandler>,
-    Arc<Box<dyn WebsocketHandler<State>>>,
+    Arc<dyn WebsocketHandler<State>>,
     Arc<State>,
 );
 
@@ -141,7 +141,7 @@ where
             state: Arc::new(State::default()),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
-            websocket_handler: Box::new(|_, _, _| ()),
+            websocket_handler: Arc::new(|_, _, _| ()),
         }
     }
 
@@ -154,7 +154,7 @@ where
             state: Arc::new(state),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
-            websocket_handler: Box::new(|_, _, _| ()),
+            websocket_handler: Arc::new(|_, _, _| ()),
         }
     }
 
@@ -167,7 +167,6 @@ where
         let socket = TcpListener::bind(addr)?;
         let routes = Arc::new(self.routes);
         let error_handler = Arc::new(self.error_handler);
-        let websocket_handler = Arc::new(self.websocket_handler);
 
         for mut stream in socket.incoming().flatten() {
             let cloned_state = self.state.clone();
@@ -176,7 +175,7 @@ where
             if (self.connection_condition)(&mut stream, cloned_state) {
                 let cloned_state = self.state.clone();
                 let cloned_routes = routes.clone();
-                let cloned_websocket_handler = websocket_handler.clone();
+                let cloned_websocket_handler = self.websocket_handler.clone();
                 let cloned_error_handler = error_handler.clone();
                 let cloned_handler = self.connection_handler;
 
@@ -275,7 +274,7 @@ where
     where
         T: WebsocketHandler<State> + 'static,
     {
-        self.websocket_handler = Box::new(handler);
+        self.websocket_handler = Arc::new(handler);
         self
     }
 
@@ -300,7 +299,7 @@ fn client_handler<State>(
     mut stream: TcpStream,
     routes: Arc<Vec<RouteHandler<State>>>,
     error_handler: Arc<ErrorHandler>,
-    websocket_handler: Arc<Box<dyn WebsocketHandler<State>>>,
+    websocket_handler: Arc<dyn WebsocketHandler<State>>,
     state: Arc<State>,
 ) {
     let addr = stream.peer_addr().unwrap();
