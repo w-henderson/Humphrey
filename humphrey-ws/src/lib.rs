@@ -66,6 +66,7 @@ pub mod message;
 pub mod stream;
 
 pub use handler::websocket_handler;
+pub use util::restion;
 
 mod frame;
 mod util;

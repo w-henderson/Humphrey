@@ -1,7 +1,9 @@
 use crate::error::WebsocketError;
+use crate::util::restion::Restion;
 
 use std::convert::TryFrom;
 use std::io::Read;
+use std::net::TcpStream;
 
 /// Represents a frame of WebSocket data.
 /// Follows [Section 5.2 of RFC 6455](https://datatracker.ietf.org/doc/html/rfc6455#section-5.2)
@@ -59,7 +61,7 @@ impl Frame {
         }
     }
 
-    /// Attemps to read a frame from the given stream.
+    /// Attemps to read a frame from the given stream, blocking until the frame is read.
     pub fn from_stream<T>(mut stream: T) -> Result<Self, WebsocketError>
     where
         T: Read,
@@ -69,18 +71,53 @@ impl Frame {
             .read_exact(&mut buf)
             .map_err(|_| WebsocketError::ReadError)?;
 
-        // Parse header information
-        let fin = buf[0] & 0x80 != 0;
-        let rsv = [buf[0] & 0x40 != 0, buf[0] & 0x20 != 0, buf[0] & 0x10 != 0];
-        let opcode = Opcode::try_from(buf[0] & 0xF)?;
-        let mask = buf[1] & 0x80 != 0;
+        Self::from_stream_inner(stream, buf)
+    }
 
-        let mut length: u64 = (buf[1] & 0x7F) as u64;
+    /// Attemps to read a frame from the given stream, immediately returning instead of blocking if there is no frame to read.
+    pub fn from_stream_nonblocking(stream: &mut TcpStream) -> Restion<Self, WebsocketError> {
+        // Set the stream to nonblocking to read the header
+        if stream.set_nonblocking(true).is_err() {
+            return Restion::Err(WebsocketError::ReadError);
+        }
+
+        // Attempt to read the header
+        let mut buf: [u8; 2] = [0; 2];
+        let result = stream.read(&mut buf);
+
+        // Set the stream to blocking for further reads
+        if stream.set_nonblocking(false).is_err() {
+            return Restion::Err(WebsocketError::ReadError);
+        }
+
+        match result {
+            Ok(0) => Restion::None,
+            Ok(_) => Self::from_stream_inner(stream, buf).into(),
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => Restion::None,
+            Err(_) => Restion::Err(WebsocketError::ReadError),
+        }
+    }
+
+    fn from_stream_inner<T>(mut stream: T, mut header: [u8; 2]) -> Result<Self, WebsocketError>
+    where
+        T: Read,
+    {
+        // Parse header information
+        let fin = header[0] & 0x80 != 0;
+        let rsv = [
+            header[0] & 0x40 != 0,
+            header[0] & 0x20 != 0,
+            header[0] & 0x10 != 0,
+        ];
+        let opcode = Opcode::try_from(header[0] & 0xF)?;
+        let mask = header[1] & 0x80 != 0;
+
+        let mut length: u64 = (header[1] & 0x7F) as u64;
         if length == 126 {
             stream
-                .read_exact(&mut buf)
+                .read_exact(&mut header)
                 .map_err(|_| WebsocketError::ReadError)?;
-            length = u16::from_be_bytes(buf) as u64;
+            length = u16::from_be_bytes(header) as u64;
         } else if length == 127 {
             let mut buf: [u8; 8] = [0; 8];
             stream

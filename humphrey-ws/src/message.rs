@@ -1,7 +1,9 @@
 use crate::error::WebsocketError;
 use crate::frame::{Frame, Opcode};
+use crate::restion::Restion;
 
 use std::io::{Read, Write};
+use std::net::TcpStream;
 
 /// Represents a WebSocket message.
 #[derive(Debug)]
@@ -77,6 +79,62 @@ impl Message {
         });
 
         Ok(Self {
+            payload,
+            text: frames
+                .first()
+                .map(|f| f.opcode == Opcode::Text)
+                .unwrap_or(false),
+        })
+    }
+
+    pub fn from_stream_nonblocking(mut stream: &mut TcpStream) -> Restion<Self, WebsocketError> {
+        let mut frames: Vec<Frame> = Vec::new();
+        let mut is_first_frame = true;
+
+        // Keep reading frames until we get the finish frame
+        while frames.last().map(|f| !f.fin).unwrap_or(true) {
+            let frame = if is_first_frame {
+                Frame::from_stream_nonblocking(&mut stream)
+            } else {
+                Frame::from_stream(&mut stream).into()
+            };
+
+            match frame {
+                Restion::Ok(frame) => {
+                    // If this is a ping, respond with a pong
+                    if frame.opcode == Opcode::Ping {
+                        let pong = Frame::new(Opcode::Pong, frame.payload);
+                        if stream.write_all(pong.as_ref()).is_err() {
+                            return Restion::Err(WebsocketError::WriteError);
+                        }
+                        continue;
+                    }
+
+                    // If this closes the connection, return the error
+                    if frame.opcode == Opcode::Close {
+                        let close = Frame::new(Opcode::Close, frame.payload);
+                        if stream.write_all(close.as_ref()).is_err() {
+                            return Restion::Err(WebsocketError::WriteError);
+                        }
+                        return Restion::Err(WebsocketError::ConnectionClosed);
+                    }
+
+                    frames.push(frame);
+                }
+                Restion::Err(e) => return Restion::Err(e),
+                Restion::None => return Restion::None,
+            }
+
+            is_first_frame = false;
+        }
+
+        // Concatenate the payloads of all frames into a single payload
+        let payload = frames.iter().fold(Vec::new(), |mut acc, frame| {
+            acc.extend(frame.payload.iter());
+            acc
+        });
+
+        Restion::Ok(Self {
             payload,
             text: frames
                 .first()

@@ -12,6 +12,7 @@ The core Humphrey crate does not support WebSocket connections, but through its 
 - Performs WebSocket handshake and implements WebSocket according to [RFC 6455](https://datatracker.ietf.org/doc/html/rfc6455).
 - Well-integrated with the core Humphrey crate
 - Has no dependencies in accordance with Humphrey's goals of being dependency-free. This means SHA-1 ([RFC 3174](https://datatracker.ietf.org/doc/html/rfc3174)) and base64 ([RFC 4648](https://datatracker.ietf.org/doc/html/rfc4648)) are both implemented from scratch in this crate as they are required for the handshake.
+- Supports both blocking and non-blocking reads.
 
 ## Installation
 The Humphrey WebSocket crate can be installed by adding `humphrey_ws` to your dependencies in your `Cargo.toml` file.
@@ -57,3 +58,4 @@ fn my_handler(mut stream: WebsocketStream<TcpStream>, _: Arc<()>) {
 
 ## Further Examples
 - [Echo Server](https://github.com/w-henderson/Humphrey/tree/master/examples/websocket): echoes received messages back to the client with an incrementing number at the end
+- [Broadcast](https://github.com/w-henderson/Humphrey/tree/master/examples/broadcast): broadcasts messages to all connected clients using non-blocking reads
