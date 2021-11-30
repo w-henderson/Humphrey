@@ -42,3 +42,4 @@ fn contact(request: Request, _: Arc<()>) -> Response {
 - [Stateful Example](https://github.com/w-henderson/Humphrey/tree/master/examples/stateful): keeps track of button presses across sessions and devices
 - [Wildcard Example](https://github.com/w-henderson/Humphrey/tree/master/examples/wildcard): demonstrates a wildcard route
 - [Static Content Example](https://github.com/w-henderson/Humphrey/tree/master/examples/static-content): demonstrates the built-in static content handlers
+- [Database Example](https://github.com/w-henderson/Humphrey/tree/master/examples/database): integrates with JasonDB to make a basic message board
