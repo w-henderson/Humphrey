@@ -3,7 +3,7 @@ function send() {
   let message = input.value;
 
   if (message.length > 0) {
-    input.value = "";
+    input.value = "Posting...";
     input.disabled = true;
 
     fetch("/api/postMessage", {

@@ -49,7 +49,11 @@ fn home(request: Request, db: Arc<JasonDB>) -> Response {
 fn post_message(request: Request, db: Arc<JasonDB>) -> Response {
     // If the request is not a POST request, return a 405 Method Not Allowed response.
     if request.method != Method::Post {
-        return Response::new(StatusCode::MethodNotAllowed, "", &request);
+        return Response::new(
+            StatusCode::MethodNotAllowed,
+            "405 Method Not Allowed",
+            &request,
+        );
     }
 
     // Get the message from the request body.
