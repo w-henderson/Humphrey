@@ -20,12 +20,20 @@ PORTS = {
 }
 
 import os
-import json
+import shutil
 
 def main():
-    tex = ""
-    tex += core()
-    print(tex)
+    tex = core()
+    tex.update(php())
+
+    shutil.rmtree("bench", ignore_errors=True)
+    os.mkdir("bench")
+
+    for key in tex.keys():
+        with open(f"bench/{key}.tex", "w") as f:
+            f.write(tex[key])
+
+    print("Done")
 
 def core():
     results_rps = {
@@ -67,7 +75,35 @@ def core():
         results_tpr
     )
 
-    return result_rps_tex + "\n\n" + result_tpr_tex
+    return {
+        "rps": result_rps_tex,
+        "tpr": result_tpr_tex
+    }
+
+def php():
+    results = {
+        "Humphrey": [],
+        "Nginx": [],
+        "Apache": []
+    }
+
+    for server in results.keys():
+        for i in range(CORES_LIMIT):
+            print(f"Benchmarking {server} (PHP), {i + 1}/{CORES_LIMIT}...       \r", end="")
+            result = bench_cmd(REQUESTS, i + 1, True, PORTS[server], True)
+            results[server].append(parse_bench_results(result, "Requests per second") / 1000)
+
+    return {
+        "php": generate_tex(
+            "Threads",
+            "Requests Per Second (Thousands)",
+            0, 8,
+            0, 50,
+            ["0", "1", "2", "3", "4", "5", "6", "7", "8"],
+            ["0", "10", "20", "30", "40", "50"],
+            results
+        )
+    }
 
 def bench_cmd(n: int, c: int, k: bool, port: int, php: bool) -> float:
     # Generate command
