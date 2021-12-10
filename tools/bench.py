@@ -6,6 +6,7 @@ Set up:
   - Nginx running on port 8000
   - Apache running on port 8080
   - ApacheBench installed
+  - PHP-CGI installed and running
 """
 
 CORES_LIMIT = 8
@@ -19,35 +20,56 @@ PORTS = {
 }
 
 import os
+import json
 
 def main():
     tex = ""
-    tex += core_rps()
+    tex += core()
     print(tex)
 
-def core_rps():
-    results = {
+def core():
+    results_rps = {
         "Humphrey": [],
         "Nginx": [],
         "Apache": []
     }
 
-    for server in results.keys():
+    results_tpr = {
+        "Humphrey": [],
+        "Nginx": [],
+        "Apache": []
+    }
+
+    for server in results_rps.keys():
         for i in range(CORES_LIMIT):
             print(f"Benchmarking {server}, {i + 1}/{CORES_LIMIT}...       \r", end="")
-            results[server].append(bench_cmd(REQUESTS, i + 1, True, PORTS[server], "Requests per second", False) / 1000)
+            results = bench_cmd(REQUESTS, i + 1, True, PORTS[server], False)
+            results_rps[server].append(parse_bench_results(results, "Requests per second") / 1000)
+            results_tpr[server].append(parse_bench_results(results, "Time per request"))
 
-    return generate_tex(
+    result_rps_tex = generate_tex(
         "Threads",
         "Requests Per Second (Thousands)",
         0, 8,
-        0, 120,
+        0, 100,
         ["0", "1", "2", "3", "4", "5", "6", "7", "8"],
         ["0", "20", "40", "60", "80", "100"],
-        results
+        results_rps
     )
 
-def bench_cmd(n: int, c: int, k: bool, port: int, field: str, php: bool) -> float:
+    result_tpr_tex = generate_tex(
+        "Threads",
+        "Time Per Request (ms)",
+        0, 10,
+        0, 0.5,
+        ["0", "1", "2", "3", "4", "5", "6", "7", "8"],
+        ["0", "0.1", "0.2", "0.3", "0.4", "0.5"],
+        results_tpr
+    )
+
+    return result_rps_tex + "\n\n" + result_tpr_tex
+
+def bench_cmd(n: int, c: int, k: bool, port: int, php: bool) -> float:
     # Generate command
     cmd = f"ab -n {n} -c {c} -d -S -q > out.txt"
     if k: cmd += " -k"
@@ -59,13 +81,15 @@ def bench_cmd(n: int, c: int, k: bool, port: int, field: str, php: bool) -> floa
 
     # Parse output
     with open("out.txt", "r") as f:
-        for line in f:
-            if field in line:
-                f.close()
-                os.remove("out.txt")
-                return float(line[24:].split()[0])
+        output = f.read()
+        f.close()
+        os.remove("out.txt")
+        return output
 
-    os.remove("out.txt")
+def parse_bench_results(results: str, field: str) -> float:
+    for line in results.split("\n"):
+        if field in line:
+            return float(line[24:].split()[0])
 
     raise Exception("Could not find field in output")
 
