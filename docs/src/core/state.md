@@ -24,7 +24,7 @@ fn main() {}
 
 You'll notice that we derive the trait `Default` on our state struct. This is not required, but it means we don't need to explicitly define the initial state of the application in our `main` function, as it will be set to zero button presses.
 
-We can now create our `App` instance in the main function with three routes, one API endpoint to get the current number of button presses, one which increments this number by one, and a catch-all route at the bottom which serves the `static` directory if none of the other endpoints are matched. You'll see that the `serve_dir` built-in handler has an empty string as its second argument, which means it will not change the path of the request before it concatenates it with the directory path. You can read more about this in the next chapter.
+We can now create our `App` instance in the main function with three routes, one API endpoint to get the current number of button presses, one which increments this number by one, and a catch-all route at the bottom which serves the `static` directory if none of the other endpoints are matched. You'll see that we use the `serve_dir` built-in handler with the `with_path_aware_route` method, which you can read about further in the next section. We also use the `with_route` method instead of `with_stateless_route`, since we want access to the app's state.
 
 ```rs
 // --snip--
@@ -33,7 +33,7 @@ fn main() {
     let app: App<AppState> = App::new()
         .with_route("/api/getPresses", get_presses)
         .with_route("/api/incrementPresses", increment_presses)
-        .with_route("/*", serve_dir("./static", ""));
+        .with_path_aware_route("/*", serve_dir("./static"));
 
     app.run("0.0.0.0:80").unwrap();
 }
@@ -110,4 +110,4 @@ This code simply fetches the current number of button presses from the API and u
 When we run `cargo run` in the terminal and visit [http://localhost](http://localhost) in the browser, we'll see the text "Button has been pressed 0 times" and a button which increments the number of button presses by one. If you press the button, you'll see the number increase. You can refresh the page or visit from a different device, and the number will be consistent.
 
 ## Conclusion
-In this chapter, we've learnt how to create a stateful application with Humphrey. In the next chapter, we'll discuss the number of ways Humphrey provides to serve static content, one of which (`serve_dir`) we've used earlier.
+In this chapter, we've learnt how to create a stateful application with Humphrey. In the next chapter [Serving Static Content](static-content.md), we'll discuss the number of ways Humphrey provides to serve static content.

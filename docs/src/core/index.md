@@ -5,6 +5,5 @@ This section of the guide will cover the following topics:
 1. [Creating and running a basic Humphrey Core web application](getting-started.md)
 2. [Handling state between requests](state.md)
 3. [Integrating static and dynamic content](static-content.md)
-4. [Using WebSockets with Humphrey Core](websockets.md)
 
 It's recommended that you have basic familiarity with Rust before reading this section, as only Humphrey-specific concepts are explained, and knowledge of the Rust language is required to understand many of them.
