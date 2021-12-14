@@ -1,0 +1,34 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Humphrey Authentication Example</title>
+
+  <style>
+    fieldset { width: min-content; padding: 8px 16px }
+    input { padding: 8px; margin: 8px 0 }
+    input[type=button] { width: calc(50% - 2px) }
+  </style>
+</head>
+
+<body>
+  <h1>Humphrey Authentication Example</h1>
+
+  <fieldset>
+    <legend>Sign In / Sign Up</legend>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <input type="button" value="Sign In" onclick="signIn()">
+    <input type="button" value="Sign Up" onclick="signUp()">
+
+    <div id="alert"></div>
+  </fieldset>
+
+  <h2><a href="/profile">Visit Profile Page</a></h2>
+
+  <script src="main.js"></script>
+</body>
+
+</html>
