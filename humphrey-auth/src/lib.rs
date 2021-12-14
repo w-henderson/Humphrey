@@ -2,6 +2,9 @@ pub mod database;
 pub mod error;
 pub mod user;
 
+#[cfg(test)]
+mod tests;
+
 use crate::database::AuthDatabase;
 use crate::error::AuthError;
 pub use crate::user::User;
