@@ -4,8 +4,8 @@ use rand_core::{OsRng, RngCore};
 
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct Session {
-    pub(crate) token: String,
-    pub(crate) expiry: u64,
+    pub token: String,
+    pub expiry: u64,
 }
 
 impl Session {

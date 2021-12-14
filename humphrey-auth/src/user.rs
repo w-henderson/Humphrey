@@ -11,7 +11,7 @@ use uuid::Uuid;
 pub struct User {
     pub uid: String,
     pub session: Option<Session>,
-    password_hash: String,
+    pub password_hash: String,
 }
 
 impl User {

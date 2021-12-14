@@ -1,3 +1,4 @@
+pub mod app;
 pub mod database;
 pub mod error;
 pub mod session;
@@ -13,7 +14,7 @@ use crate::session::Session;
 pub use crate::user::User;
 
 #[derive(Default)]
-pub struct AuthProvider<T>
+pub struct AuthProvider<T = Vec<User>>
 where
     T: AuthDatabase,
 {
