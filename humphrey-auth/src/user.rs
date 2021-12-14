@@ -1,4 +1,5 @@
 use crate::error::AuthError;
+use crate::session::Session;
 
 use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
@@ -9,7 +10,8 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct User {
     pub uid: String,
-    pub password_hash: String,
+    pub session: Option<Session>,
+    password_hash: String,
 }
 
 impl User {
@@ -23,7 +25,11 @@ impl User {
             .map_err(|_| AuthError::GenericError)?
             .to_string();
 
-        Ok(Self { uid, password_hash })
+        Ok(Self {
+            uid,
+            session: None,
+            password_hash,
+        })
     }
 
     pub fn verify(&self, password: impl AsRef<str>) -> bool {
@@ -32,5 +38,11 @@ impl User {
         let password_hash = PasswordHash::new(self.password_hash.as_str()).unwrap();
 
         argon2.verify_password(password, &password_hash).is_ok()
+    }
+}
+
+impl AsRef<str> for User {
+    fn as_ref(&self) -> &str {
+        self.uid.as_ref()
     }
 }
