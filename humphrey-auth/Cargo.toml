@@ -1,0 +1,15 @@
+[package]
+name = "humphrey_auth"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+humphrey = { version = "^0.2.2", path = "../humphrey" }
+argon2 = "0.3"
+uuid = { version = "0.8", features = [ "v4" ] }
+rand_core = { version = "0.6", features = ["std"] }
+
+[lib]
+doctest = false

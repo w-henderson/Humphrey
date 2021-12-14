@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "humphrey",
+  "humphrey-auth",
   "humphrey-server",
   "humphrey-ws"
 ]
