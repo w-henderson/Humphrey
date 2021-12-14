@@ -4,13 +4,13 @@ use crate::{AuthProvider, User};
 fn integration_test() {
     let mut provider: AuthProvider<Vec<User>> = AuthProvider::default();
 
-    let user = provider.create("hunter42").unwrap();
+    let uid = provider.create_user("hunter42").unwrap();
 
-    assert!(provider.exists(&user.uid));
-    assert!(provider.verify(user.uid.as_str(), "hunter42"));
-    assert!(!provider.verify(user.uid.as_str(), "hunter43"));
+    assert!(provider.exists(&uid));
+    assert!(provider.verify(&uid, "hunter42"));
+    assert!(!provider.verify(&uid, "hunter43"));
 
-    provider.remove(user.uid.as_str()).unwrap();
+    provider.remove_user(&uid).unwrap();
 
-    assert!(!provider.exists(&user.uid));
+    assert!(!provider.exists(&uid));
 }
