@@ -41,8 +41,8 @@ where
             if let Some(cookie) = request.headers.get(&RequestHeader::Cookie) {
                 let token = cookie
                     .split(';')
-                    .find(|s| s.starts_with("HumphreyToken="))
-                    .map(|s| s.strip_prefix("HumphreyToken=").unwrap());
+                    .find(|s| s.trim().starts_with("HumphreyToken="))
+                    .map(|s| s.trim().strip_prefix("HumphreyToken=").unwrap());
 
                 if let Some(token) = token {
                     let uid = state.auth_provider().get_uid_by_token(token);
