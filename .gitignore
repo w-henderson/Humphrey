@@ -6,6 +6,7 @@ humphrey.log
 Cargo.lock
 pkg/
 bench/
+database.jdb
 
 *.conf
 !/humphrey-server/src/tests/testcases/*.conf
