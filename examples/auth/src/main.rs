@@ -11,6 +11,7 @@ use humphrey::App;
 use humphrey_auth::app::{AuthApp, AuthState};
 use humphrey_auth::AuthProvider;
 
+use jasondb::prelude::*;
 use jasondb::{Database, JasonDB};
 
 use std::error::Error;
@@ -40,7 +41,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let app = App::new_with_config(32, state)
         .with_route("/api/login", login)
         .with_route("/api/signup", signup)
-        .with_auth_route("/profile", profile)
+        .with_auth_route("/api/signout", sign_out)
+        .with_auth_route("/api/deleteAccount", delete_account)
+        .with_auth_route("/profile.html", profile)
         .with_path_aware_route("/*", serve_dir("./static"));
 
     app.run("0.0.0.0:80")?;
@@ -49,8 +52,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn login(request: Request, state: Arc<AppState>) -> Response {
-    println!("login request");
-
     if request.method != Method::Post {
         return Response::new(
             StatusCode::MethodNotAllowed,
@@ -64,8 +65,6 @@ fn login(request: Request, state: Arc<AppState>) -> Response {
     let username = body_split.next().unwrap();
     let password = body_split.next().unwrap();
 
-    println!("username={} password={}", username, password);
-
     let db = state.db.0.read();
     let users = db.collection("users").unwrap();
 
@@ -78,19 +77,15 @@ fn login(request: Request, state: Arc<AppState>) -> Response {
     drop(db);
 
     if let Some(uid) = uid {
-        println!("uid={}", uid);
-
         let mut provider = state.auth.lock().unwrap();
         let verify = provider.verify(&uid, password);
 
         if verify {
             if let Ok(token) = provider.create_session(uid) {
-                println!("token={}", token);
-
                 return Response::empty(StatusCode::OK)
                     .with_header(
                         ResponseHeader::SetCookie,
-                        format!("HumphreyToken={}; Path=/", token),
+                        format!("HumphreyToken={}; Path=/; MaxAge=3600", token),
                     )
                     .with_bytes(b"OK")
                     .with_request_compatibility(&request)
@@ -107,8 +102,6 @@ fn login(request: Request, state: Arc<AppState>) -> Response {
 }
 
 fn signup(request: Request, state: Arc<AppState>) -> Response {
-    println!("signup request");
-
     if request.method != Method::Post {
         return Response::new(
             StatusCode::MethodNotAllowed,
@@ -122,22 +115,16 @@ fn signup(request: Request, state: Arc<AppState>) -> Response {
     let username = body_split.next().unwrap();
     let password = body_split.next().unwrap();
 
-    println!("username={} password={}", username, password);
-
     let db = state.db.0.write();
     let users = db.collection("users").unwrap();
 
     if !users.list().iter().any(|doc| doc.json == username) {
         drop(db);
 
-        println!("no existing uid");
-
         let uid = {
             let mut provider = state.auth.lock().unwrap();
             provider.create_user(password).unwrap()
         };
-
-        println!("uid={}", uid);
 
         let mut db = state.db.0.write();
         let users = db.collection_mut("users").unwrap();
@@ -149,8 +136,53 @@ fn signup(request: Request, state: Arc<AppState>) -> Response {
     Response::new(StatusCode::NotFound, b"User not found", &request)
 }
 
-fn profile(request: Request, _: Arc<AppState>, uid: String) -> Response {
-    Response::new(StatusCode::OK, b"Hello", &request)
+fn sign_out(request: Request, state: Arc<AppState>, uid: String) -> Response {
+    let mut provider = state.auth.lock().unwrap();
+    provider.invalidate_user_session(uid);
+
+    Response::empty(StatusCode::Found)
+        .with_bytes("OK")
+        .with_header(ResponseHeader::Location, "/".into())
+        .with_header(
+            ResponseHeader::SetCookie,
+            "HumphreyToken=deleted; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT".into(),
+        )
+        .with_request_compatibility(&request)
+        .with_generated_headers()
+}
+
+fn delete_account(request: Request, state: Arc<AppState>, uid: String) -> Response {
+    let mut db = state.db.0.write();
+    let users = db.collection_mut("users").unwrap();
+    users.remove(&uid);
+
+    drop(db);
+
+    let mut provider = state.auth.lock().unwrap();
+    provider.remove_user(&uid).unwrap();
+
+    Response::empty(StatusCode::Found)
+        .with_bytes("OK")
+        .with_header(ResponseHeader::Location, "/".into())
+        .with_header(
+            ResponseHeader::SetCookie,
+            "HumphreyToken=deleted; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT".into(),
+        )
+        .with_request_compatibility(&request)
+        .with_generated_headers()
+}
+
+fn profile(request: Request, state: Arc<AppState>, uid: String) -> Response {
+    let db = state.db.0.read();
+    let user = document!(&*db, &format!("users/{}", uid));
+
+    let html = include_str!("../static/profile.html").replace("{username}", &user.json);
+
+    Response::empty(StatusCode::OK)
+        .with_header(ResponseHeader::ContentType, "text/html".into())
+        .with_bytes(html)
+        .with_request_compatibility(&request)
+        .with_generated_headers()
 }
 
 /// Create a new database, automatically starting the background thread to synchronize the database to disk.

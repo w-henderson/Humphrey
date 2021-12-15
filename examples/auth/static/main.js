@@ -4,6 +4,7 @@ function getAndResetInputs() {
 
   document.getElementById("username").value = "";
   document.getElementById("password").value = "";
+  document.getElementById("alert").innerHTML = "Loading...";
 
   return {
     username,
@@ -41,7 +42,10 @@ function signUp() {
   })
 }
 
-window.onload = () => {
-  let signedIn = document.cookie.includes("HumphreyToken=");
-  document.getElementById("alert").innerHTML = `Status: ${signedIn ? "signed in" : "not signed in"}`;
+function signOut() {
+  window.location = "/api/signout";
+}
+
+function deleteAccount() {
+  window.location = "/api/deleteAccount";
 }

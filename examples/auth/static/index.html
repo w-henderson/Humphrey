@@ -26,9 +26,15 @@
     <div id="alert"></div>
   </fieldset>
 
-  <h2><a href="/profile">Visit Profile Page</a></h2>
+  <h2><a href="/profile.html">Visit Profile Page</a></h2>
 
   <script src="main.js"></script>
+  <script>
+    window.onload = () => {
+      let signedIn = document.cookie.includes("HumphreyToken=");
+      document.getElementById("alert").innerHTML = `Status: ${signedIn ? "auth cookie exists" : "auth cookie does not exist"}`;
+    }
+  </script>
 </body>
 
 </html>
