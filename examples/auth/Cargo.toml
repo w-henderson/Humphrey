@@ -8,6 +8,6 @@ edition = "2021"
 [dependencies]
 humphrey = { path = "../../humphrey" }
 humphrey_auth = { path = "../../humphrey-auth" }
-jasondb = { version = "0.1.1", default-features = false }
+jasondb = { version = "0.1.2", default-features = false }
 
 [workspace]
