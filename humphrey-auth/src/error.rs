@@ -1,12 +1,18 @@
 use std::error::Error;
 use std::fmt::Display;
 
+/// Represents an error with authentication.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthError {
+    /// An unknown error.
     GenericError,
+    /// The given user could not be found.
     UserNotFound,
+    /// The given user already exists.
     UserAlreadyExists,
+    /// The given token does not exist or has expired.
     InvalidToken,
+    /// A session for the given user already exists.
     SessionAlreadyExists,
 }
 

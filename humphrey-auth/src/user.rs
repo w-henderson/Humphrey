@@ -7,14 +7,20 @@ use argon2::Argon2;
 
 use uuid::Uuid;
 
+/// Represents a user.
 #[derive(Clone)]
 pub struct User {
+    /// The unique ID of the user.
     pub uid: String,
+    /// The user's current session, if they have one.
     pub session: Option<Session>,
+    /// The Argon2 hashed password of the user.
     pub password_hash: String,
 }
 
 impl User {
+    /// Creates a user with the given password.
+    /// Returns the user object of the new user.
     pub fn create(password: impl AsRef<str>) -> Result<User, AuthError> {
         let uid = Uuid::new_v4().to_string();
         let password = password.as_ref();
@@ -32,6 +38,7 @@ impl User {
         })
     }
 
+    /// Verifies that the given password matches the password of the user.
     pub fn verify(&self, password: impl AsRef<str>) -> bool {
         let password = password.as_ref().as_bytes();
         let argon2 = Argon2::default();
