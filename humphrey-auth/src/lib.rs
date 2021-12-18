@@ -1,4 +1,5 @@
 pub mod app;
+pub mod config;
 pub mod database;
 pub mod error;
 pub mod session;
@@ -7,6 +8,7 @@ pub mod user;
 #[cfg(test)]
 mod tests;
 
+use crate::config::AuthConfig;
 use crate::database::AuthDatabase;
 use crate::error::AuthError;
 use crate::session::Session;
@@ -25,6 +27,7 @@ where
     T: AuthDatabase,
 {
     users: T,
+    config: AuthConfig,
 }
 
 impl<T> AuthProvider<T>
@@ -33,12 +36,21 @@ where
 {
     /// Create a new authentication provider with the given database.
     pub fn new(users: T) -> Self {
-        AuthProvider { users }
+        AuthProvider {
+            users,
+            config: AuthConfig::default(),
+        }
+    }
+
+    /// Use the given configuration for this authentication provider.
+    pub fn with_config(mut self, config: AuthConfig) -> Self {
+        self.config = config;
+        self
     }
 
     /// Create a user with the given password. Returns the UID of the new user.
     pub fn create_user(&mut self, password: impl AsRef<str>) -> Result<String, AuthError> {
-        let new_user = User::create(password)?;
+        let new_user = User::create(password, self.config.pepper.as_ref().map(|p| p.as_ref()))?;
         self.users.add_user(new_user.clone())?;
 
         Ok(new_user.uid)
@@ -53,7 +65,7 @@ where
     pub fn verify(&self, uid: impl AsRef<str>, password: impl AsRef<str>) -> bool {
         self.users
             .get_user_by_uid(&uid)
-            .map(|user| user.verify(&password))
+            .map(|user| user.verify(&password, self.config.pepper.as_ref().map(|p| p.as_ref())))
             .unwrap_or(false)
     }
 
@@ -64,8 +76,7 @@ where
 
     /// Creates a new session for the user with the given UID, returning the token.
     ///
-    /// The session will expire after one hour. To use a different session duration,
-    ///   consider using the `create_session_with_lifetime` method.
+    /// The session will expire after the configured duration.
     pub fn create_session(&mut self, uid: impl AsRef<str>) -> Result<String, AuthError> {
         let mut user = self
             .users
@@ -73,7 +84,7 @@ where
             .ok_or(AuthError::UserNotFound)?;
 
         if !user.session.map(|t| t.valid()).unwrap_or(false) {
-            let token = Session::create();
+            let token = Session::create_with_lifetime(self.config.default_lifetime);
             user.session = Some(token.clone());
             self.users.update_user(user)?;
 
@@ -108,7 +119,7 @@ where
     }
 
     /// Refreshes the session with the given token.
-    /// If successful, the token will be set to expire an hour after the current time.
+    /// If successful, the token will be set to expire after the configured duration.
     pub fn refresh_session(&mut self, token: impl AsRef<str>) -> Result<(), AuthError> {
         let mut user = self
             .users
@@ -116,7 +127,7 @@ where
             .ok_or(AuthError::InvalidToken)?;
 
         let mut session = user.session.unwrap();
-        session.refresh(3600);
+        session.refresh(self.config.default_refresh_lifetime);
 
         user.session = Some(session);
         self.users.update_user(user)?;

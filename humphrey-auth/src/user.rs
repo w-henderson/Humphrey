@@ -3,7 +3,7 @@ use crate::session::Session;
 
 use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
-use argon2::Argon2;
+use argon2::{Algorithm, Argon2, Params, Version};
 
 use uuid::Uuid;
 
@@ -21,11 +21,12 @@ pub struct User {
 impl User {
     /// Creates a user with the given password.
     /// Returns the user object of the new user.
-    pub fn create(password: impl AsRef<str>) -> Result<User, AuthError> {
+    pub fn create(password: impl AsRef<str>, pepper: Option<&[u8]>) -> Result<User, AuthError> {
         let uid = Uuid::new_v4().to_string();
         let password = password.as_ref();
         let salt = SaltString::generate(&mut OsRng);
-        let argon2 = Argon2::default();
+        let argon2 = create_argon2_instance(pepper);
+
         let password_hash = argon2
             .hash_password(password.as_bytes(), &salt)
             .map_err(|_| AuthError::GenericError)?
@@ -39,13 +40,28 @@ impl User {
     }
 
     /// Verifies that the given password matches the password of the user.
-    pub fn verify(&self, password: impl AsRef<str>) -> bool {
+    pub fn verify(&self, password: impl AsRef<str>, pepper: Option<&[u8]>) -> bool {
         let password = password.as_ref().as_bytes();
-        let argon2 = Argon2::default();
+        let argon2 = create_argon2_instance(pepper);
+
         let password_hash = PasswordHash::new(self.password_hash.as_str()).unwrap();
 
         argon2.verify_password(password, &password_hash).is_ok()
     }
+}
+
+fn create_argon2_instance(pepper: Option<&[u8]>) -> Argon2<'_> {
+    pepper
+        .map(|pepper| {
+            Argon2::new_with_secret(
+                pepper,
+                Algorithm::default(),
+                Version::default(),
+                Params::default(),
+            )
+            .unwrap()
+        })
+        .unwrap_or_default()
 }
 
 impl AsRef<str> for User {
