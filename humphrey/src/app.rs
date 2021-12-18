@@ -381,15 +381,34 @@ fn call_handler<State>(
 ) -> Response {
     let host = request.headers.get(&RequestHeader::Host).unwrap();
 
-    subapps
-        .iter() // Iterate over the sub-apps
-        .find(|subapp| wildcard_match(&subapp.host, host)) // Find the sub-app that matches the host
-        .unwrap_or(default_subapp) // If no sub-app matches, use the default sub-app
-        .routes // Get the routes of the sub-app
-        .iter() // Iterate over the routes
-        .find(|route| route.route.route_matches(&request.uri)) // Find the route that matches
-        .map(|handler| (handler.handler)(request.clone(), state)) // Call the handler
-        .unwrap_or_else(|| error_handler(Some(request.clone()), StatusCode::NotFound))
+    // Iterate over the sub-apps and find the one which matches the host
+    if let Some(subapp) = subapps
+        .iter()
+        .find(|subapp| wildcard_match(&subapp.host, host))
+    {
+        // If the sub-app has a handler for this route, call it
+        if let Some(response) = subapp
+            .routes // Get the routes of the sub-app
+            .iter() // Iterate over the routes
+            .find(|route| route.route.route_matches(&request.uri)) // Find the route that matches
+            .map(|handler| (handler.handler)(request.clone(), state.clone()))
+        {
+            return response;
+        }
+    }
+
+    // If no sub-app was found, try to use the handler on the default sub-app
+    if let Some(response) = default_subapp
+        .routes
+        .iter()
+        .find(|route| route.route.route_matches(&request.uri))
+        .map(|handler| (handler.handler)(request.clone(), state))
+    {
+        return response;
+    }
+
+    // Otherwise return an error
+    error_handler(Some(request.clone()), StatusCode::NotFound)
 }
 
 /// The default error handler for every Humphrey app.
