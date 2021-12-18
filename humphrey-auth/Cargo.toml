@@ -2,8 +2,13 @@
 name = "humphrey_auth"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT"
+homepage = "https://github.com/w-henderson/Humphrey"
+repository = "https://github.com/w-henderson/Humphrey"
+readme = "README.md"
+description = "User authentication for the Humphrey web server."
+keywords = ["authentication"]
+categories = ["authentication"]
 
 [dependencies]
 humphrey = { version = "^0.2.2", path = "../humphrey" }
