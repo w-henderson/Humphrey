@@ -1,13 +1,87 @@
-use crate::app::RequestHandler;
+use crate::app::{PathAwareRequestHandler, RequestHandler, StatelessRequestHandler};
 use crate::krauss;
 
 use std::fs::metadata;
 use std::path::PathBuf;
 
+/// Represents a sub-app to run for a specific host.
+pub struct SubApp<State> {
+    pub host: String,
+    pub routes: Vec<RouteHandler<State>>,
+}
+
 /// Encapsulates a route and its handler.
 pub struct RouteHandler<State> {
     pub route: String,
     pub handler: Box<dyn RequestHandler<State>>,
+}
+
+impl<State> Default for SubApp<State> {
+    fn default() -> Self {
+        SubApp {
+            host: "*".to_string(),
+            routes: Vec::new(),
+        }
+    }
+}
+
+impl<State> SubApp<State> {
+    /// Create a new sub-app with no routes.
+    pub fn new() -> Self {
+        SubApp::default()
+    }
+
+    /// Adds a route and associated handler to the sub-app.
+    /// Routes can include wildcards, for example `/blog/*`.
+    ///
+    /// ## Panics
+    /// This function will panic if the route string cannot be converted to a `Uri` object.
+    pub fn with_route<T>(mut self, route: &str, handler: T) -> Self
+    where
+        T: RequestHandler<State> + 'static,
+    {
+        self.routes.push(RouteHandler {
+            route: route.parse().unwrap(),
+            handler: Box::new(handler),
+        });
+        self
+    }
+
+    /// Adds a route and associated handler to the sub-app.
+    /// Does not pass the state to the handler.
+    /// Routes can include wildcards, for example `/blog/*`.
+    ///
+    /// If you want to access the app's state in the handler, consider using `with_route`.
+    ///
+    /// ## Panics
+    /// This function will panic if the route string cannot be converted to a `Uri` object.
+    pub fn with_stateless_route<T>(mut self, route: &str, handler: T) -> Self
+    where
+        T: StatelessRequestHandler<State> + 'static,
+    {
+        self.routes.push(RouteHandler {
+            route: route.parse().unwrap(),
+            handler: Box::new(move |request, _| handler(request)),
+        });
+        self
+    }
+
+    /// Adds a path-aware route and associated handler to the sub-app.
+    /// Routes can include wildcards, for example `/blog/*`.
+    /// Will also pass the route to the handler at runtime.
+    ///
+    /// ## Panics
+    /// This function will panic if the route string cannot be converted to a `Uri` object.
+    pub fn with_path_aware_route<T>(mut self, route: &'static str, handler: T) -> Self
+    where
+        T: PathAwareRequestHandler<State> + 'static,
+    {
+        self.routes.push(RouteHandler {
+            route: route.parse().unwrap(),
+            handler: Box::new(move |request, state| handler(request, state, route)),
+        });
+        self
+    }
 }
 
 /// An object that can represent a route, currently only `String`.
