@@ -1,0 +1,20 @@
+[package]
+name = "humphrey_auth"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+homepage = "https://github.com/w-henderson/Humphrey"
+repository = "https://github.com/w-henderson/Humphrey"
+readme = "README.md"
+description = "User authentication for the Humphrey web server."
+keywords = ["authentication"]
+categories = ["authentication"]
+
+[dependencies]
+humphrey = { version = "^0.2.2", path = "../humphrey" }
+argon2 = "0.3"
+uuid = { version = "0.8", features = [ "v4" ] }
+rand_core = { version = "0.6", features = ["std"] }
+
+[lib]
+doctest = false
