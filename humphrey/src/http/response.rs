@@ -171,12 +171,10 @@ impl Response {
             }
         }
 
-        if !self.body.is_empty() {
-            match self.headers.entry(ResponseHeader::ContentLength) {
-                Entry::Occupied(_) => (),
-                Entry::Vacant(v) => {
-                    v.insert(self.body.len().to_string());
-                }
+        match self.headers.entry(ResponseHeader::ContentLength) {
+            Entry::Occupied(_) => (),
+            Entry::Vacant(v) => {
+                v.insert(self.body.len().to_string());
             }
         }
 
