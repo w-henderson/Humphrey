@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Add a path-aware route to serve the static directory.
         .with_path_aware_route("/*", handlers::serve_dir("./static"))
         // Add a WebSocket handler to handle connections.
-        .with_websocket_handler(websocket_handler(broadcast_handler));
+        .with_websocket_route("/ws", websocket_handler(broadcast_handler));
     app.run("0.0.0.0:80")?;
 
     Ok(())
