@@ -28,19 +28,12 @@ where
     state: Arc<State>,
     connection_handler: ConnectionHandler<State>,
     connection_condition: ConnectionCondition<State>,
-    websocket_handler: Arc<dyn WebsocketHandler<State>>,
 }
 
 /// Represents a function able to handle a connection.
 /// In most cases, the default connection handler should be used.
-pub type ConnectionHandler<State> = fn(
-    TcpStream,
-    Arc<Vec<SubApp<State>>>,
-    Arc<SubApp<State>>,
-    Arc<ErrorHandler>,
-    Arc<dyn WebsocketHandler<State>>,
-    Arc<State>,
-);
+pub type ConnectionHandler<State> =
+    fn(TcpStream, Arc<Vec<SubApp<State>>>, Arc<SubApp<State>>, Arc<ErrorHandler>, Arc<State>);
 
 /// Represents a function able to calculate whether a connection will be accepted.
 pub type ConnectionCondition<State> = fn(&mut TcpStream, Arc<State>) -> bool;
@@ -145,7 +138,6 @@ where
             state: Arc::new(State::default()),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
-            websocket_handler: Arc::new(|_, _, _| ()),
         }
     }
 
@@ -159,7 +151,6 @@ where
             state: Arc::new(state),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
-            websocket_handler: Arc::new(|_, _, _| ()),
         }
     }
 
@@ -182,7 +173,6 @@ where
                 let cloned_state = self.state.clone();
                 let cloned_subapps = subapps.clone();
                 let cloned_default_subapp = default_subapp.clone();
-                let cloned_websocket_handler = self.websocket_handler.clone();
                 let cloned_error_handler = error_handler.clone();
                 let cloned_handler = self.connection_handler;
 
@@ -193,7 +183,6 @@ where
                         cloned_subapps,
                         cloned_default_subapp,
                         cloned_error_handler,
-                        cloned_websocket_handler,
                         cloned_state,
                     )
                 });
@@ -230,9 +219,6 @@ where
 
     /// Adds a route and associated handler to the server.
     /// Routes can include wildcards, for example `/blog/*`.
-    ///
-    /// ## Panics
-    /// This function will panic if the route string cannot be converted to a `Uri` object.
     pub fn with_route<T>(mut self, route: &str, handler: T) -> Self
     where
         T: RequestHandler<State> + 'static,
@@ -246,9 +232,6 @@ where
     /// Routes can include wildcards, for example `/blog/*`.
     ///
     /// If you want to access the app's state in the handler, consider using `with_route`.
-    ///
-    /// ## Panics
-    /// This function will panic if the route string cannot be converted to a `Uri` object.
     pub fn with_stateless_route<T>(mut self, route: &str, handler: T) -> Self
     where
         T: StatelessRequestHandler<State> + 'static,
@@ -260,14 +243,22 @@ where
     /// Adds a path-aware route and associated handler to the server.
     /// Routes can include wildcards, for example `/blog/*`.
     /// Will also pass the route to the handler at runtime.
-    ///
-    /// ## Panics
-    /// This function will panic if the route string cannot be converted to a `Uri` object.
     pub fn with_path_aware_route<T>(mut self, route: &'static str, handler: T) -> Self
     where
         T: PathAwareRequestHandler<State> + 'static,
     {
         self.default_subapp = self.default_subapp.with_path_aware_route(route, handler);
+        self
+    }
+
+    /// Adds a WebSocket route and associated handler to the server.
+    /// Routes can include wildcards, for example `/ws/*`.
+    /// The handler is passed the stream, state, and the request which triggered its calling.
+    pub fn with_websocket_route<T>(mut self, route: &str, handler: T) -> Self
+    where
+        T: WebsocketHandler<State> + 'static,
+    {
+        self.default_subapp = self.default_subapp.with_websocket_route(route, handler);
         self
     }
 
@@ -284,13 +275,17 @@ where
         self
     }
 
-    /// Sets the websocket handler, a function which processes WebSocket handshakes.
-    /// This is passed the stream, state, and the request which triggered its calling.
+    /// Adds a global WebSocket handler to the server.
+    ///
+    /// ## Deprecated
+    /// This function is deprecated and will be removed in a future version.
+    /// Please use `with_websocket_route` intead.
+    #[deprecated(since = "0.3.0", note = "Please use `with_websocket_route` instead")]
     pub fn with_websocket_handler<T>(mut self, handler: T) -> Self
     where
         T: WebsocketHandler<State> + 'static,
     {
-        self.websocket_handler = Arc::new(handler);
+        self.default_subapp = self.default_subapp.with_websocket_route("*", handler);
         self
     }
 
@@ -316,7 +311,6 @@ fn client_handler<State>(
     subapps: Arc<Vec<SubApp<State>>>,
     default_subapp: Arc<SubApp<State>>,
     error_handler: Arc<ErrorHandler>,
-    websocket_handler: Arc<dyn WebsocketHandler<State>>,
     state: Arc<State>,
 ) {
     let addr = stream.peer_addr().unwrap();
@@ -329,7 +323,7 @@ fn client_handler<State>(
         // If the request is valid an is a WebSocket request, call the corresponding handler
         if let Ok(req) = &request {
             if req.headers.get(&RequestHeader::Upgrade) == Some(&"websocket".to_string()) {
-                (websocket_handler)(req.clone(), stream, cloned_state);
+                call_websocket_handler(req, &subapps, &default_subapp, cloned_state, stream);
                 break;
             }
         }
@@ -409,6 +403,42 @@ fn call_handler<State>(
 
     // Otherwise return an error
     error_handler(Some(request.clone()), StatusCode::NotFound)
+}
+
+/// Calls the correct WebSocket handler for the given request.
+fn call_websocket_handler<State>(
+    request: &Request,
+    subapps: &[SubApp<State>],
+    default_subapp: &SubApp<State>,
+    state: Arc<State>,
+    stream: TcpStream,
+) {
+    let host = request.headers.get(&RequestHeader::Host).unwrap();
+
+    // Iterate over the sub-apps and find the one which matches the host
+    if let Some(subapp) = subapps
+        .iter()
+        .find(|subapp| wildcard_match(&subapp.host, host))
+    {
+        // If the sub-app has a handler for this route, call it
+        if let Some(handler) = subapp
+            .websocket_routes // Get the WebSocket routes of the sub-app
+            .iter() // Iterate over the routes
+            .find(|route| route.route.route_matches(&request.uri))
+        {
+            (handler.handler)(request.clone(), stream, state);
+            return;
+        }
+    }
+
+    // If no sub-app was found, try to use the handler on the default sub-app
+    if let Some(handler) = default_subapp
+        .websocket_routes
+        .iter()
+        .find(|route| route.route.route_matches(&request.uri))
+    {
+        (handler.handler)(request.clone(), stream, state)
+    }
 }
 
 /// The default error handler for every Humphrey app.

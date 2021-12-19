@@ -1,4 +1,6 @@
-use crate::app::{PathAwareRequestHandler, RequestHandler, StatelessRequestHandler};
+use crate::app::{
+    PathAwareRequestHandler, RequestHandler, StatelessRequestHandler, WebsocketHandler,
+};
 use crate::krauss;
 
 use std::fs::metadata;
@@ -8,6 +10,7 @@ use std::path::PathBuf;
 pub struct SubApp<State> {
     pub host: String,
     pub routes: Vec<RouteHandler<State>>,
+    pub websocket_routes: Vec<WebsocketRouteHandler<State>>,
 }
 
 /// Encapsulates a route and its handler.
@@ -16,11 +19,18 @@ pub struct RouteHandler<State> {
     pub handler: Box<dyn RequestHandler<State>>,
 }
 
+/// Encapsulates a route and its WebSocket handler.
+pub struct WebsocketRouteHandler<State> {
+    pub route: String,
+    pub handler: Box<dyn WebsocketHandler<State>>,
+}
+
 impl<State> Default for SubApp<State> {
     fn default() -> Self {
         SubApp {
             host: "*".to_string(),
             routes: Vec::new(),
+            websocket_routes: Vec::new(),
         }
     }
 }
@@ -33,15 +43,12 @@ impl<State> SubApp<State> {
 
     /// Adds a route and associated handler to the sub-app.
     /// Routes can include wildcards, for example `/blog/*`.
-    ///
-    /// ## Panics
-    /// This function will panic if the route string cannot be converted to a `Uri` object.
     pub fn with_route<T>(mut self, route: &str, handler: T) -> Self
     where
         T: RequestHandler<State> + 'static,
     {
         self.routes.push(RouteHandler {
-            route: route.parse().unwrap(),
+            route: route.to_string(),
             handler: Box::new(handler),
         });
         self
@@ -52,15 +59,12 @@ impl<State> SubApp<State> {
     /// Routes can include wildcards, for example `/blog/*`.
     ///
     /// If you want to access the app's state in the handler, consider using `with_route`.
-    ///
-    /// ## Panics
-    /// This function will panic if the route string cannot be converted to a `Uri` object.
     pub fn with_stateless_route<T>(mut self, route: &str, handler: T) -> Self
     where
         T: StatelessRequestHandler<State> + 'static,
     {
         self.routes.push(RouteHandler {
-            route: route.parse().unwrap(),
+            route: route.to_string(),
             handler: Box::new(move |request, _| handler(request)),
         });
         self
@@ -69,16 +73,27 @@ impl<State> SubApp<State> {
     /// Adds a path-aware route and associated handler to the sub-app.
     /// Routes can include wildcards, for example `/blog/*`.
     /// Will also pass the route to the handler at runtime.
-    ///
-    /// ## Panics
-    /// This function will panic if the route string cannot be converted to a `Uri` object.
     pub fn with_path_aware_route<T>(mut self, route: &'static str, handler: T) -> Self
     where
         T: PathAwareRequestHandler<State> + 'static,
     {
         self.routes.push(RouteHandler {
-            route: route.parse().unwrap(),
+            route: route.to_string(),
             handler: Box::new(move |request, state| handler(request, state, route)),
+        });
+        self
+    }
+
+    /// Adds a WebSocket route and associated handler to the sub-app.
+    /// Routes can include wildcards, for example `/ws/*`.
+    /// The handler is passed the stream, state, and the request which triggered its calling.
+    pub fn with_websocket_route<T>(mut self, route: &str, handler: T) -> Self
+    where
+        T: WebsocketHandler<State> + 'static,
+    {
+        self.websocket_routes.push(WebsocketRouteHandler {
+            route: route.to_string(),
+            handler: Box::new(handler),
         });
         self
     }
