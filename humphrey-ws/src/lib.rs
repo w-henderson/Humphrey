@@ -33,7 +33,7 @@
 //!
 //! fn main() {
 //!     let app: App<()> = App::new()
-//!         .with_websocket_handler(websocket_handler(my_handler));
+//!         .with_websocket_route("/", websocket_handler(my_handler));
 //!     app.run("0.0.0.0:80").unwrap();
 //! }
 //!

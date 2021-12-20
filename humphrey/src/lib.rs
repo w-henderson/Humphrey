@@ -52,3 +52,4 @@ pub mod thread;
 mod tests;
 
 pub use app::App;
+pub use route::SubApp;

@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Serve the `static` directory to regular HTTP requests.
         .with_path_aware_route("/*", handlers::serve_dir("./static"))
         // Use the `humphrey_ws` WebSocket handler to wrap our own echo handler.
-        .with_websocket_handler(websocket_handler(echo_handler));
+        .with_websocket_route("/ws", websocket_handler(echo_handler));
     app.run("0.0.0.0:80")?;
 
     Ok(())

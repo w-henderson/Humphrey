@@ -1,0 +1,32 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Humphrey Host Example</title>
+</head>
+
+<body>
+  <h1>Humphrey Host Example</h1>
+  This page is accessible through any host.
+
+  <ul>
+    <li><a href="/different_response">/different_response</a> is accessible through both <code>localhost</code> and <code>127.0.0.1</code>, but shows a different response for each.</li>
+    <li><a href="/localhost_only">/localhost_only</a> is only accessible through <code>localhost</code>.</li>
+    <li><a href="/localip_only">/localip_only</a> is only accessible through <code>127.0.0.1</code>.</li>
+  </ul>
+
+  <h3>Convenience Links</h3>
+  <ul>
+    <li><a href="http://localhost/different_response">http://localhost/different_response</a> will work</li>
+    <li><a href="http://127.0.0.1/different_response">http://127.0.0.1/different_response</a> will work</li>
+    <li><a href="http://localhost/localhost_only">http://localhost/localhost_only</a> will work</li>
+    <li><a href="http://127.0.0.1/localhost_only">http://127.0.0.1/localhost_only</a> will not work</li>
+    <li><a href="http://127.0.0.1/localip_only">http://127.0.0.1/localip_only</a> will work</li>
+    <li><a href="http://localhost/localip_only">http://localhost/localip_only</a> will not work</li>
+  </ul>
+  
+</body>
+
+</html>

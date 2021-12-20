@@ -1,4 +1,4 @@
-const ws = new WebSocket(`ws://${window.location.hostname}`);
+const ws = new WebSocket(`ws://${window.location.hostname}/ws`);
 
 function write(message) {
   document.querySelector("div").innerText += `[server]  ${message}`;
