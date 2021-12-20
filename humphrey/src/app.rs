@@ -1,6 +1,7 @@
 #![allow(clippy::new_without_default)]
 
-use crate::http::headers::RequestHeader;
+use crate::http::date::DateTime;
+use crate::http::headers::{RequestHeader, ResponseHeader};
 use crate::http::request::{Request, RequestError};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
@@ -8,6 +9,7 @@ use crate::krauss::wildcard_match;
 use crate::route::{Route, SubApp};
 use crate::thread::pool::ThreadPool;
 
+use std::collections::btree_map::Entry;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
@@ -95,23 +97,17 @@ impl<T, S> PathAwareRequestHandler<S> for T where
 ///
 /// ## Example
 /// ```
-/// fn error_handler(request: Option<Request>, status_code: StatusCode) -> Response {
+/// fn error_handler(status_code: StatusCode) -> Response {
 ///     let body = format!(
 ///         "<html><body><h1>{} {}</h1></body></html>",
 ///         Into::<u16>::into(status_code.clone()),
 ///         Into::<&str>::into(status_code.clone())
 ///     );
 ///     
-///     if let Some(request) = request {
-///         Response::new(status_code, body.as_bytes(), &request)
-///     } else {
-///         Response::empty(status_code)
-///             .with_bytes(body.as_bytes())
-///             .with_generated_headers()
-///     }
+///     Response::new(status_code, body.as_bytes())
 /// }
 /// ```
-pub type ErrorHandler = fn(Option<Request>, StatusCode) -> Response;
+pub type ErrorHandler = fn(StatusCode) -> Response;
 
 /// Represents a generic error with the program.
 pub type HumphreyError = Box<dyn std::error::Error>;
@@ -349,8 +345,48 @@ fn client_handler<State>(
 
         // Generate the response based on the handlers
         let response = match request {
-            Ok(request) => call_handler(&request, &subapps, &default_subapp, state.clone()),
-            Err(_) => error_handler(None, StatusCode::BadRequest),
+            Ok(request) => {
+                let mut response = call_handler(&request, &subapps, &default_subapp, state.clone());
+
+                // Automatically generate required headers
+                match response.headers.entry(ResponseHeader::Connection) {
+                    Entry::Occupied(_) => (),
+                    Entry::Vacant(v) => {
+                        if let Some(connection) = &request.headers.get(&RequestHeader::Connection) {
+                            v.insert(connection.to_string());
+                        } else {
+                            v.insert("Close".to_string());
+                        }
+                    }
+                }
+
+                match response.headers.entry(ResponseHeader::Server) {
+                    Entry::Occupied(_) => (),
+                    Entry::Vacant(v) => {
+                        v.insert("Humphrey".to_string());
+                    }
+                }
+
+                match response.headers.entry(ResponseHeader::Date) {
+                    Entry::Occupied(_) => (),
+                    Entry::Vacant(v) => {
+                        v.insert(DateTime::now().to_string());
+                    }
+                }
+
+                match response.headers.entry(ResponseHeader::ContentLength) {
+                    Entry::Occupied(_) => (),
+                    Entry::Vacant(v) => {
+                        v.insert(response.body.len().to_string());
+                    }
+                }
+
+                // Set HTTP version
+                response.version = request.version.clone();
+
+                response
+            }
+            Err(_) => error_handler(StatusCode::BadRequest),
         };
 
         // Write the response to the stream
@@ -402,7 +438,7 @@ fn call_handler<State>(
     }
 
     // Otherwise return an error
-    error_handler(Some(request.clone()), StatusCode::NotFound)
+    error_handler(StatusCode::NotFound)
 }
 
 /// Calls the correct WebSocket handler for the given request.
@@ -443,18 +479,12 @@ fn call_websocket_handler<State>(
 
 /// The default error handler for every Humphrey app.
 /// This can be overridden by using the `with_error_handler` method when building the app.
-pub(crate) fn error_handler(request: Option<Request>, status_code: StatusCode) -> Response {
+pub(crate) fn error_handler(status_code: StatusCode) -> Response {
     let body = format!(
         "<html><body><h1>{} {}</h1></body></html>",
         Into::<u16>::into(status_code.clone()),
         Into::<&str>::into(status_code.clone())
     );
 
-    if let Some(request) = request {
-        Response::new(status_code, body.as_bytes(), &request)
-    } else {
-        Response::empty(status_code)
-            .with_bytes(body.as_bytes().to_vec())
-            .with_generated_headers()
-    }
+    Response::new(status_code, body.as_bytes())
 }

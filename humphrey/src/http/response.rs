@@ -66,7 +66,7 @@ impl Response {
     /// ## Note about Headers
     /// If you want to add headers to a response, ideally use `Response::empty` and the builder pattern
     ///   so as to not accidentally override important generated headers such as content length and connection.
-    pub fn new<T>(status_code: StatusCode, bytes: T, request: &Request) -> Self
+    pub fn new<T>(status_code: StatusCode, bytes: T) -> Self
     where
         T: AsRef<[u8]>,
     {
@@ -76,8 +76,6 @@ impl Response {
             headers: ResponseHeaderMap::new(),
             body: bytes.as_ref().to_vec(),
         }
-        .with_request_compatibility(request)
-        .with_generated_headers()
     }
 
     /// Creates a new response object with the given status code.
@@ -92,14 +90,12 @@ impl Response {
     }
 
     /// Creates a redirect response to the given location.
-    pub fn redirect<T>(location: T, request: &Request) -> Self
+    pub fn redirect<T>(location: T) -> Self
     where
         T: AsRef<str>,
     {
         Self::empty(StatusCode::MovedPermanently)
             .with_header(ResponseHeader::Location, location.as_ref().to_string())
-            .with_request_compatibility(request)
-            .with_generated_headers()
     }
 
     /// Adds the given header to the response.
@@ -124,6 +120,14 @@ impl Response {
     ///   strongly recommended to fully comply with the browser's request.
     ///
     /// Returns itself for use in a builder pattern.
+    ///
+    /// ## Deprecated
+    /// This function is deprecated and will be removed in a future release. It is automatically performed
+    ///   on every response before being sent, so you can safely remove it.
+    #[deprecated(
+        since = "0.3.0",
+        note = "This is automatically performed on every response."
+    )]
     pub fn with_request_compatibility(mut self, request: &Request) -> Self {
         if let Some(connection) = request.headers.get(&RequestHeader::Connection) {
             self.headers
@@ -149,6 +153,14 @@ impl Response {
     /// - `Connection`: will be set to `Close` unless previously set, for example in `.with_request_compatibility(request)`
     ///
     /// Returns itself for use in a builder pattern.
+    ///
+    /// ## Deprecated
+    /// This function is deprecated and will be removed in a future release. It is automatically performed
+    ///   on every response before being sent, so you can safely remove it.
+    #[deprecated(
+        since = "0.3.0",
+        note = "This is automatically performed on every response."
+    )]
     pub fn with_generated_headers(mut self) -> Self {
         match self.headers.entry(ResponseHeader::Server) {
             Entry::Occupied(_) => (),
