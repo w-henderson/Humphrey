@@ -11,7 +11,7 @@ keywords = ["authentication"]
 categories = ["authentication"]
 
 [dependencies]
-humphrey = { version = "^0.2.2", path = "../humphrey" }
+humphrey = { version = "^0.3", path = "../humphrey" }
 argon2 = "0.3"
 uuid = { version = "0.8", features = [ "v4" ] }
 rand_core = { version = "0.6", features = ["std"] }
