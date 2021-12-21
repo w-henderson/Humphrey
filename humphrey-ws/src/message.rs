@@ -94,7 +94,7 @@ impl Message {
         // Keep reading frames until we get the finish frame
         while frames.last().map(|f| !f.fin).unwrap_or(true) {
             let frame = if is_first_frame {
-                Frame::from_stream_nonblocking(&mut stream)
+                Frame::from_stream_nonblocking(stream)
             } else {
                 Frame::from_stream(&mut stream).into()
             };
