@@ -49,7 +49,7 @@ impl From<Config> for AppState {
 pub fn main(config: Config) {
     let app: App<AppState> = App::new_with_config(config.threads, AppState::from(config))
         .with_connection_condition(verify_connection)
-        .with_websocket_handler(websocket_handler)
+        .with_websocket_route("/*", websocket_handler)
         .with_route("/*", request_handler);
 
     let state = app.get_state();
@@ -142,7 +142,7 @@ fn inner_request_handler(request: Request, state: Arc<AppState>) -> Response {
         }
     }
 
-    not_found(&request)
+    not_found()
 }
 
 fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppState>) {

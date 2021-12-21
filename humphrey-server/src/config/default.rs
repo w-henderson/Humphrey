@@ -1,6 +1,4 @@
-use crate::config::{
-    BlacklistConfig, BlacklistMode, CacheConfig, Config, LoggingConfig, RouteConfig,
-};
+use crate::config::{BlacklistConfig, BlacklistMode, Config, LoggingConfig, RouteConfig};
 use crate::server::logger::LogLevel;
 
 impl Default for Config {
@@ -35,15 +33,6 @@ impl Default for LoggingConfig {
             level: LogLevel::Info,
             console: true,
             file: None,
-        }
-    }
-}
-
-impl Default for CacheConfig {
-    fn default() -> Self {
-        Self {
-            size_limit: Default::default(),
-            time_limit: Default::default(),
         }
     }
 }

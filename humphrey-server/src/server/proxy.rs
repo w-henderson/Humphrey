@@ -71,8 +71,6 @@ pub fn proxy_handler(
         Response::empty(StatusCode::Forbidden)
             .with_header(ResponseHeader::ContentType, "text/html".into())
             .with_bytes(b"<h1>403 Forbidden</h1>")
-            .with_request_compatibility(&request)
-            .with_generated_headers()
     } else {
         // Gets a load balancer target using the thread-safe `Mutex`
         let mut load_balancer_lock = load_balancer.lock().unwrap();

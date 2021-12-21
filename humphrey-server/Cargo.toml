@@ -1,6 +1,6 @@
 [package]
 name = "humphrey_server"
-version = "0.2.6"
+version = "0.3.0"
 edition = "2018"
 license = "MIT"
 homepage = "https://github.com/w-henderson/Humphrey"

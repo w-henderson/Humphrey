@@ -244,7 +244,7 @@ fn include(path: &str, containing_file: &str, line: u64) -> Result<Vec<ConfigNod
 
 /// Cleans up a line by removing comments and trailing whitespace.
 fn clean_up(line: &str) -> &str {
-    line.splitn(2, '#').next().unwrap().trim()
+    line.split_once('#').map_or(line, |x| x.0).trim()
 }
 
 /// Parses a size string into its corresponding number of bytes.

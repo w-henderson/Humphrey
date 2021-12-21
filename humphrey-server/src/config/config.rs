@@ -80,7 +80,7 @@ pub struct LoggingConfig {
 }
 
 /// Represents configuration for the cache.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct CacheConfig {
     /// The maximum size of the cache, in bytes
     pub size_limit: usize,

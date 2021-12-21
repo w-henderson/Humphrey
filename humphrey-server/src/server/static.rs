@@ -60,8 +60,6 @@ pub fn directory_handler(
                 ));
                 Response::empty(StatusCode::MovedPermanently)
                     .with_header(ResponseHeader::Location, format!("{}/", &request.uri))
-                    .with_request_compatibility(&request)
-                    .with_generated_headers()
             }
             LocatedPath::File(path) => inner_file_handler(request, state, path),
         }
@@ -70,7 +68,7 @@ pub fn directory_handler(
             "{}: 404 Not Found {}",
             request.address, request.uri
         ));
-        not_found(&request)
+        not_found()
     }
 }
 
@@ -86,8 +84,6 @@ pub fn redirect_handler(request: Request, state: Arc<AppState>, target: &str) ->
     ));
     Response::empty(StatusCode::MovedPermanently)
         .with_header(ResponseHeader::Location, target.into())
-        .with_request_compatibility(&request)
-        .with_generated_headers()
 }
 
 fn inner_file_handler(request: Request, state: Arc<AppState>, path: PathBuf) -> Response {
@@ -115,8 +111,6 @@ fn inner_file_handler(request: Request, state: Arc<AppState>, path: PathBuf) -> 
     Response::empty(StatusCode::OK)
         .with_header(ResponseHeader::ContentType, mime_type.into())
         .with_bytes(contents)
-        .with_request_compatibility(&request)
-        .with_generated_headers()
 }
 
 fn blacklist_check(request: &Request, state: Arc<AppState>) -> Option<Response> {
@@ -134,9 +128,7 @@ fn blacklist_check(request: &Request, state: Arc<AppState>) -> Option<Response> 
         return Some(
             Response::empty(StatusCode::Forbidden)
                 .with_header(ResponseHeader::ContentType, "text/html".into())
-                .with_bytes(b"<h1>403 Forbidden</h1>")
-                .with_request_compatibility(request)
-                .with_generated_headers(),
+                .with_bytes(b"<h1>403 Forbidden</h1>"),
         );
     }
 
@@ -154,9 +146,7 @@ fn cache_check(request: &Request, state: Arc<AppState>) -> Option<Response> {
             return Some(
                 Response::empty(StatusCode::OK)
                     .with_header(ResponseHeader::ContentType, cached.mime_type.into())
-                    .with_bytes(cached.data.clone())
-                    .with_request_compatibility(request)
-                    .with_generated_headers(),
+                    .with_bytes(cached.data.clone()),
             );
         }
         drop(cache);
@@ -165,10 +155,8 @@ fn cache_check(request: &Request, state: Arc<AppState>) -> Option<Response> {
     None
 }
 
-pub fn not_found(request: &Request) -> Response {
+pub fn not_found() -> Response {
     Response::empty(StatusCode::NotFound)
         .with_header(ResponseHeader::ContentType, "text/html".into())
         .with_bytes(b"<h1>404 Not Found</h1>")
-        .with_request_compatibility(request)
-        .with_generated_headers()
 }
