@@ -1,5 +1,4 @@
 use humphrey::http::{Request, Response};
-use humphrey::krauss::wildcard_match;
 use humphrey::App;
 
 #[cfg(feature = "plugins")]
@@ -13,7 +12,7 @@ use crate::cache::Cache;
 use crate::config::{BlacklistMode, Config, RouteConfig};
 use crate::logger::Logger;
 use crate::proxy::proxy_handler;
-use crate::r#static::{directory_handler, file_handler, not_found, redirect_handler};
+use crate::r#static::{directory_handler, file_handler, redirect_handler};
 use crate::server::pipe::pipe;
 
 use std::io::Write;
@@ -47,10 +46,33 @@ impl From<Config> for AppState {
 
 /// Main function for the static server.
 pub fn main(config: Config) {
-    let app: App<AppState> = App::new_with_config(config.threads, AppState::from(config))
+    let mut app: App<AppState> = App::new_with_config(config.threads, AppState::from(config))
         .with_connection_condition(verify_connection)
-        .with_websocket_route("/*", websocket_handler)
-        .with_route("/*", request_handler);
+        .with_websocket_route("/*", websocket_handler);
+
+    let app_state = app.get_state();
+    for (i, route) in app_state.config.routes.iter().enumerate() {
+        match route {
+            RouteConfig::Directory {
+                matches,
+                directory: _,
+            } => {
+                app = app.with_route(matches, move |req, state| request_handler(req, state, i));
+            }
+            RouteConfig::File { matches, file: _ } => {
+                app = app.with_route(matches, move |req, state| request_handler(req, state, i));
+            }
+            RouteConfig::Proxy {
+                matches,
+                load_balancer: _,
+            } => {
+                app = app.with_route(matches, move |req, state| request_handler(req, state, i));
+            }
+            RouteConfig::Redirect { matches, target: _ } => {
+                app = app.with_route(matches, move |req, state| request_handler(req, state, i));
+            }
+        }
+    }
 
     let state = app.get_state();
 
@@ -92,12 +114,12 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
 }
 
 #[cfg(feature = "plugins")]
-fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
+fn request_handler(mut request: Request, state: Arc<AppState>, route: usize) -> Response {
     let plugins = state.plugin_manager.read().unwrap();
 
     let mut response = plugins
         .on_request(&mut request, state.clone()) // If the plugin overrides the response, return it
-        .unwrap_or_else(|| inner_request_handler(request, state.clone())); // If no plugin overrides the response, generate it in the normal way
+        .unwrap_or_else(|| inner_request_handler(request, state.clone(), route)); // If no plugin overrides the response, generate it in the normal way
 
     // Pass the response to plugins before it is sent to the client
     plugins.on_response(&mut response, state.clone());
@@ -106,43 +128,26 @@ fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
 }
 
 #[cfg(not(feature = "plugins"))]
-fn request_handler(request: Request, state: Arc<AppState>) -> Response {
-    inner_request_handler(request, state)
+fn request_handler(request: Request, state: Arc<AppState>, route: usize) -> Response {
+    inner_request_handler(request, state, route)
 }
 
-fn inner_request_handler(request: Request, state: Arc<AppState>) -> Response {
-    for route in &state.config.routes {
-        match route {
-            RouteConfig::File { matches, file } => {
-                if wildcard_match(matches, &request.uri) {
-                    return file_handler(request, state.clone(), file);
-                }
-            }
+fn inner_request_handler(request: Request, state: Arc<AppState>, route: usize) -> Response {
+    let route = &state.config.routes[route];
 
-            RouteConfig::Directory { matches, directory } => {
-                if wildcard_match(matches, &request.uri) {
-                    return directory_handler(request, state.clone(), directory, matches);
-                }
-            }
-
-            RouteConfig::Proxy {
-                matches,
-                load_balancer,
-            } => {
-                if wildcard_match(matches, &request.uri) {
-                    return proxy_handler(request, state.clone(), load_balancer, matches);
-                }
-            }
-
-            RouteConfig::Redirect { matches, target } => {
-                if wildcard_match(matches, &request.uri) {
-                    return redirect_handler(request, state.clone(), target);
-                }
-            }
+    match route {
+        RouteConfig::File { matches: _, file } => file_handler(request, state.clone(), file),
+        RouteConfig::Directory { matches, directory } => {
+            directory_handler(request, state.clone(), directory, matches)
+        }
+        RouteConfig::Proxy {
+            matches,
+            load_balancer,
+        } => proxy_handler(request, state.clone(), load_balancer, matches),
+        RouteConfig::Redirect { matches: _, target } => {
+            redirect_handler(request, state.clone(), target)
         }
     }
-
-    not_found()
 }
 
 fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppState>) {
