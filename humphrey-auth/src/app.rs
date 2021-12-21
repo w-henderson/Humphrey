@@ -88,11 +88,11 @@ where
                 }
             }
 
-            forbidden(request)
+            forbidden()
         })
     }
 }
 
-fn forbidden(request: Request) -> Response {
-    Response::new(StatusCode::Unauthorized, "401 Unauthorized", &request)
+fn forbidden() -> Response {
+    Response::new(StatusCode::Unauthorized, "401 Unauthorized")
 }

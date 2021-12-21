@@ -11,15 +11,15 @@ const INDEX_FILES: [&str; 2] = ["index.html", "index.htm"];
 
 /// Serve the specified file, or a default error 404 if not found.
 pub fn serve_file<T>(file_path: &'static str) -> impl Fn(Request, Arc<T>) -> Response {
-    move |request: Request, _| {
+    move |_, _| {
         if let Ok(mut file) = File::open(file_path) {
             let mut buf = Vec::new();
             if file.read_to_end(&mut buf).is_ok() {
-                return Response::new(StatusCode::OK, buf, &request);
+                return Response::new(StatusCode::OK, buf);
             }
         }
 
-        error_handler(Some(request), StatusCode::NotFound)
+        error_handler(StatusCode::NotFound)
     }
 }
 
@@ -40,11 +40,11 @@ pub fn serve_as_file_path<T>(directory_path: &'static str) -> impl Fn(Request, A
         if let Ok(mut file) = File::open(path) {
             let mut buf = Vec::new();
             if file.read_to_end(&mut buf).is_ok() {
-                return Response::new(StatusCode::OK, buf, &request);
+                return Response::new(StatusCode::OK, buf);
             }
         }
 
-        error_handler(Some(request), StatusCode::NotFound)
+        error_handler(StatusCode::NotFound)
     }
 }
 
@@ -66,27 +66,25 @@ pub fn serve_dir<T>(directory_path: &'static str) -> impl Fn(Request, Arc<T>, &s
         if let Some(located) = located {
             match located {
                 LocatedPath::Directory => Response::empty(StatusCode::MovedPermanently)
-                    .with_header(ResponseHeader::Location, format!("{}/", &request.uri))
-                    .with_request_compatibility(&request)
-                    .with_generated_headers(),
+                    .with_header(ResponseHeader::Location, format!("{}/", &request.uri)),
                 LocatedPath::File(path) => {
                     if let Ok(mut file) = File::open(path) {
                         let mut buf = Vec::new();
                         if file.read_to_end(&mut buf).is_ok() {
-                            return Response::new(StatusCode::OK, buf, &request);
+                            return Response::new(StatusCode::OK, buf);
                         }
                     }
 
-                    error_handler(Some(request), StatusCode::InternalError)
+                    error_handler(StatusCode::InternalError)
                 }
             }
         } else {
-            error_handler(Some(request), StatusCode::NotFound)
+            error_handler(StatusCode::NotFound)
         }
     }
 }
 
 /// Redirects requests to the given location with status code 301.
 pub fn redirect<T>(location: &'static str) -> impl Fn(Request, Arc<T>) -> Response {
-    move |request: Request, _| Response::redirect(location, &request)
+    move |_, _| Response::redirect(location)
 }
