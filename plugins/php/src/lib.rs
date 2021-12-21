@@ -279,12 +279,8 @@ impl PhpPlugin {
                 request.address, status_code_number, status_code_string, request.uri
             ));
 
-            // Add final headers and return the response
-            Some(
-                response
-                    .with_request_compatibility(request)
-                    .with_generated_headers(),
-            )
+            // Return the response
+            Some(response)
         } else {
             // If the file requested was not found, allow Humphrey to handle the error
 
