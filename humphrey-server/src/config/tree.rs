@@ -173,7 +173,7 @@ fn parse_section(
                     // If the section is a host section, parse it as such
                     let host_name = {
                         let raw = section_name.splitn(2, ' ').last().unwrap().trim();
-                        if raw.starts_with("\"") && raw.ends_with("\"") {
+                        if raw.starts_with('\"') && raw.ends_with('\"') {
                             raw[1..raw.len() - 1].to_string()
                         } else {
                             raw.to_string()

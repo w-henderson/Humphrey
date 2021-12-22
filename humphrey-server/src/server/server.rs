@@ -168,9 +168,9 @@ fn inner_request_handler(
     };
 
     match route {
-        RouteConfig::File { matches: _, file } => file_handler(request, state.clone(), file),
+        RouteConfig::File { matches: _, file } => file_handler(request, state.clone(), file, host),
         RouteConfig::Directory { matches, directory } => {
-            directory_handler(request, state.clone(), directory, matches)
+            directory_handler(request, state.clone(), directory, matches, host)
         }
         RouteConfig::Proxy {
             matches,

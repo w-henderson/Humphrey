@@ -15,6 +15,7 @@ pub struct Cache {
 /// Represents a cached item.
 pub struct CachedItem {
     pub route: String,
+    pub host: usize,
     pub mime_type: MimeType,
     pub cache_time: u64,
     pub data: Vec<u8>,
@@ -23,13 +24,16 @@ pub struct CachedItem {
 impl Cache {
     /// Attempts to get an item from the cache.
     /// If the item is not present, or it is stale, returns `None`.
-    pub fn get(&self, route: &str) -> Option<&CachedItem> {
+    pub fn get(&self, route: &str, host: usize) -> Option<&CachedItem> {
         let time = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs();
 
-        let index = self.data.iter().position(|item| item.route == route);
+        let index = self
+            .data
+            .iter()
+            .position(|item| item.route == route && item.host == host);
 
         if let Some(index) = index {
             let item = &self.data[index];
@@ -45,7 +49,7 @@ impl Cache {
 
     /// Sets an item in the cache.
     /// Overwrites older versions if needed.
-    pub fn set(&mut self, route: &str, value: Vec<u8>, mime_type: MimeType) {
+    pub fn set(&mut self, route: &str, host: usize, value: Vec<u8>, mime_type: MimeType) {
         while self.cache_size + value.len() > self.cache_limit {
             self.cache_size -= self.data[0].data.len();
             self.data.pop_front();
@@ -60,6 +64,7 @@ impl Cache {
 
         self.data.push_back(CachedItem {
             route: route.into(),
+            host,
             data: value,
             mime_type,
             cache_time: SystemTime::now()
