@@ -22,8 +22,10 @@ pub struct Config {
     pub threads: usize,
     /// Address to forward WebSocket connections to
     pub websocket_proxy: Option<String>,
-    /// The configuration for different routes
-    pub routes: Vec<RouteConfig>,
+    /// The configuration for different hosts
+    pub hosts: Vec<HostConfig>,
+    /// The configuration for the default host
+    pub default_host: HostConfig,
     /// The configuration for any plugins
     #[cfg(feature = "plugins")]
     pub plugins: Vec<PluginConfig>,
@@ -33,6 +35,14 @@ pub struct Config {
     pub cache: CacheConfig,
     /// Blacklist configuration
     pub blacklist: BlacklistConfig,
+}
+
+#[derive(Debug, Default, PartialEq)]
+pub struct HostConfig {
+    /// Wildcard string specifying what hosts to match, e.g. `*.example.com`
+    pub matches: String,
+    /// The routes to use for this host
+    pub routes: Vec<RouteConfig>,
 }
 
 /// Represents configuration for a specific route.
@@ -215,73 +225,17 @@ impl Config {
         };
 
         // Get and validate the configuration for the different routes
-        let routes = {
-            let routes_map = tree.get_routes();
-            let mut routes: Vec<RouteConfig> = Vec::with_capacity(routes_map.len());
+        let default_host = parse_host("*", &tree)?;
 
-            for (wild, conf) in routes_map {
-                for wild in wild.split(',').map(|s| s.trim()) {
-                    if conf.contains_key("file") {
-                        // This is a regular file-serving route
+        let hosts = {
+            let hosts_map = tree.get_hosts();
+            let mut hosts: Vec<HostConfig> = Vec::with_capacity(hosts_map.len());
 
-                        let file = conf.get_compulsory("file", "").unwrap();
-
-                        routes.push(RouteConfig::File {
-                            matches: wild.to_string(),
-                            file,
-                        });
-                    } else if conf.contains_key("directory") {
-                        // This is a regular directory-serving route
-
-                        let directory = conf.get_compulsory("directory", "").unwrap();
-
-                        routes.push(RouteConfig::Directory {
-                            matches: wild.to_string(),
-                            directory,
-                        });
-                    } else if conf.contains_key("proxy") {
-                        // This is a proxy route
-
-                        let targets: Vec<String> = conf
-                            .get_compulsory("proxy", "")
-                            .unwrap()
-                            .split(',')
-                            .map(|s| s.to_owned())
-                            .collect();
-
-                        let load_balancer_mode =
-                            conf.get_optional("load_balancer_mode", "round-robin".into());
-                        let load_balancer_mode = match load_balancer_mode.as_str() {
-                            "round-robin" => LoadBalancerMode::RoundRobin,
-                            "random" => LoadBalancerMode::Random,
-                            _ => return Err("Invalid load balancer mode, valid options are `round-robin` or `random`"),
-                        };
-
-                        routes.push(RouteConfig::Proxy {
-                            matches: wild.to_string(),
-                            load_balancer: EqMutex::new(LoadBalancer {
-                                targets,
-                                mode: load_balancer_mode,
-                                lcg: Lcg::new(),
-                                index: 0,
-                            }),
-                        })
-                    } else if conf.contains_key("redirect") {
-                        // This is a redirect route
-
-                        let target = conf.get_compulsory("redirect", "").unwrap();
-
-                        routes.push(RouteConfig::Redirect {
-                            matches: wild.to_string(),
-                            target,
-                        });
-                    } else {
-                        return Err("Invalid route configuration, every route must contain either the `file`, `directory`, `proxy` or `redirect` field");
-                    }
-                }
+            for (host, conf) in hosts_map {
+                hosts.push(parse_host(&host, &conf)?);
             }
 
-            routes
+            hosts
         };
 
         // Get and validate plugin configuration
@@ -314,7 +268,8 @@ impl Config {
             port,
             threads,
             websocket_proxy,
-            routes,
+            default_host,
+            hosts,
             #[cfg(feature = "plugins")]
             plugins,
             logging,
@@ -361,4 +316,91 @@ fn load_list_file(path: Option<String>) -> Result<Vec<String>, &'static str> {
         // Return an empty `Vec` if no file was supplied
         Ok(Vec::new())
     }
+}
+
+/// Parses a node which contains the configuration for a host.
+fn parse_host(wild: &str, node: &ConfigNode) -> Result<HostConfig, &'static str> {
+    let routes_map = node.get_routes();
+    let mut routes: Vec<RouteConfig> = Vec::with_capacity(routes_map.len());
+
+    for (wild, conf) in routes_map {
+        routes.extend(parse_route(&wild, conf)?);
+    }
+
+    Ok(HostConfig {
+        matches: wild.to_string(),
+        routes,
+    })
+}
+
+/// Parses a route.
+fn parse_route(
+    wild: &str,
+    conf: HashMap<String, ConfigNode>,
+) -> Result<Vec<RouteConfig>, &'static str> {
+    let mut routes: Vec<RouteConfig> = Vec::new();
+
+    for wild in wild.split(',').map(|s| s.trim()) {
+        if conf.contains_key("file") {
+            // This is a regular file-serving route
+
+            let file = conf.get_compulsory("file", "").unwrap();
+
+            routes.push(RouteConfig::File {
+                matches: wild.to_string(),
+                file,
+            });
+        } else if conf.contains_key("directory") {
+            // This is a regular directory-serving route
+
+            let directory = conf.get_compulsory("directory", "").unwrap();
+
+            routes.push(RouteConfig::Directory {
+                matches: wild.to_string(),
+                directory,
+            });
+        } else if conf.contains_key("proxy") {
+            // This is a proxy route
+
+            let targets: Vec<String> = conf
+                .get_compulsory("proxy", "")
+                .unwrap()
+                .split(',')
+                .map(|s| s.to_owned())
+                .collect();
+
+            let load_balancer_mode = conf.get_optional("load_balancer_mode", "round-robin".into());
+            let load_balancer_mode =
+                match load_balancer_mode.as_str() {
+                    "round-robin" => LoadBalancerMode::RoundRobin,
+                    "random" => LoadBalancerMode::Random,
+                    _ => return Err(
+                        "Invalid load balancer mode, valid options are `round-robin` or `random`",
+                    ),
+                };
+
+            routes.push(RouteConfig::Proxy {
+                matches: wild.to_string(),
+                load_balancer: EqMutex::new(LoadBalancer {
+                    targets,
+                    mode: load_balancer_mode,
+                    lcg: Lcg::new(),
+                    index: 0,
+                }),
+            })
+        } else if conf.contains_key("redirect") {
+            // This is a redirect route
+
+            let target = conf.get_compulsory("redirect", "").unwrap();
+
+            routes.push(RouteConfig::Redirect {
+                matches: wild.to_string(),
+                target,
+            });
+        } else {
+            return Err("Invalid route configuration, every route must contain either the `file`, `directory`, `proxy` or `redirect` field");
+        }
+    }
+
+    Ok(routes)
 }

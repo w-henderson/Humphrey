@@ -9,7 +9,7 @@ use crate::plugins::plugin::PluginLoadResult;
 use std::process::exit;
 
 use crate::cache::Cache;
-use crate::config::{BlacklistMode, Config, RouteConfig};
+use crate::config::{BlacklistMode, Config, HostConfig, RouteConfig};
 use crate::logger::Logger;
 use crate::proxy::proxy_handler;
 use crate::r#static::{directory_handler, file_handler, redirect_handler};
@@ -50,31 +50,12 @@ pub fn main(config: Config) {
         .with_connection_condition(verify_connection)
         .with_websocket_route("/*", websocket_handler);
 
-    let app_state = app.get_state();
-    for (i, route) in app_state.config.routes.iter().enumerate() {
-        match route {
-            RouteConfig::Directory {
-                matches,
-                directory: _,
-            } => {
-                app = app.with_route(matches, move |req, state| request_handler(req, state, i));
-            }
-            RouteConfig::File { matches, file: _ } => {
-                app = app.with_route(matches, move |req, state| request_handler(req, state, i));
-            }
-            RouteConfig::Proxy {
-                matches,
-                load_balancer: _,
-            } => {
-                app = app.with_route(matches, move |req, state| request_handler(req, state, i));
-            }
-            RouteConfig::Redirect { matches, target: _ } => {
-                app = app.with_route(matches, move |req, state| request_handler(req, state, i));
-            }
-        }
-    }
-
     let state = app.get_state();
+
+    app = init_app_routes(app, &state.config.default_host, 0);
+    for (host_index, host) in state.config.hosts.iter().enumerate() {
+        app = init_app_routes(app, host, host_index + 1);
+    }
 
     let addr = format!("{}:{}", state.config.address, state.config.port);
     let logger = &state.logger;
@@ -91,6 +72,41 @@ pub fn main(config: Config) {
     logger.debug(&format!("Configuration: {:?}", state.config));
 
     app.run(addr).unwrap();
+}
+
+fn init_app_routes(mut app: App<AppState>, host: &HostConfig, host_index: usize) -> App<AppState> {
+    for (route_index, route) in host.routes.iter().enumerate() {
+        match route {
+            RouteConfig::Directory {
+                matches,
+                directory: _,
+            } => {
+                app = app.with_route(matches, move |request, state| {
+                    request_handler(request, state, host_index, route_index)
+                });
+            }
+            RouteConfig::File { matches, file: _ } => {
+                app = app.with_route(matches, move |request, state| {
+                    request_handler(request, state, host_index, route_index)
+                });
+            }
+            RouteConfig::Proxy {
+                matches,
+                load_balancer: _,
+            } => {
+                app = app.with_route(matches, move |request, state| {
+                    request_handler(request, state, host_index, route_index)
+                });
+            }
+            RouteConfig::Redirect { matches, target: _ } => {
+                app = app.with_route(matches, move |request, state| {
+                    request_handler(request, state, host_index, route_index)
+                });
+            }
+        }
+    }
+
+    app
 }
 
 /// Verifies that the client is allowed to connect by checking with the blacklist config.
@@ -128,12 +144,23 @@ fn request_handler(mut request: Request, state: Arc<AppState>, route: usize) -> 
 }
 
 #[cfg(not(feature = "plugins"))]
-fn request_handler(request: Request, state: Arc<AppState>, route: usize) -> Response {
-    inner_request_handler(request, state, route)
+fn request_handler(request: Request, state: Arc<AppState>, host: usize, route: usize) -> Response {
+    inner_request_handler(request, state, host, route)
 }
 
-fn inner_request_handler(request: Request, state: Arc<AppState>, route: usize) -> Response {
-    let route = &state.config.routes[route];
+fn inner_request_handler(
+    request: Request,
+    state: Arc<AppState>,
+    host: usize,
+    route: usize,
+) -> Response {
+    let route = {
+        if host == 0 {
+            &state.config.default_host.routes[route]
+        } else {
+            &state.config.hosts[host - 1].routes[route]
+        }
+    };
 
     match route {
         RouteConfig::File { matches: _, file } => file_handler(request, state.clone(), file),

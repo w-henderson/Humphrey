@@ -8,7 +8,8 @@ impl Default for Config {
             port: 80,
             threads: 32,
             websocket_proxy: None,
-            routes: vec![Default::default()],
+            hosts: vec![Default::default()],
+            default_host: Default::default(),
             #[cfg(feature = "plugins")]
             plugins: Vec::new(),
             logging: Default::default(),
