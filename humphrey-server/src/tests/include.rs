@@ -1,7 +1,7 @@
 use humphrey_server::config::tree::parse_conf;
 use humphrey_server::config::{
-    BlacklistConfig, BlacklistMode, CacheConfig, Config, LoadBalancerMode, LoggingConfig,
-    RouteConfig,
+    BlacklistConfig, BlacklistMode, CacheConfig, Config, HostConfig, LoadBalancerMode,
+    LoggingConfig, RouteConfig,
 };
 use humphrey_server::logger::LogLevel;
 use humphrey_server::proxy::{EqMutex, LoadBalancer};
@@ -24,10 +24,14 @@ fn include_route() {
         port: 80,
         threads: 32,
         websocket_proxy: None,
-        routes: vec![RouteConfig::Directory {
-            matches: "/*".into(),
-            directory: "/var/www".into(),
-        }],
+        default_host: HostConfig {
+            matches: "*".into(),
+            routes: vec![RouteConfig::Directory {
+                matches: "/*".into(),
+                directory: "/var/www".into(),
+            }],
+        },
+        hosts: Vec::new(),
         #[cfg(feature = "plugins")]
         plugins: Vec::new(),
         logging: LoggingConfig {
@@ -62,15 +66,19 @@ fn nested_include() {
         port: 80,
         threads: 32,
         websocket_proxy: None,
-        routes: vec![RouteConfig::Proxy {
-            matches: "/test".into(),
-            load_balancer: EqMutex::new(LoadBalancer {
-                targets: vec!["127.0.0.1".into()],
-                mode: LoadBalancerMode::Random,
-                index: 0,
-                lcg: Lcg::new(),
-            }),
-        }],
+        default_host: HostConfig {
+            matches: "*".into(),
+            routes: vec![RouteConfig::Proxy {
+                matches: "/test".into(),
+                load_balancer: EqMutex::new(LoadBalancer {
+                    targets: vec!["127.0.0.1".into()],
+                    mode: LoadBalancerMode::Random,
+                    index: 0,
+                    lcg: Lcg::new(),
+                }),
+            }],
+        },
+        hosts: Vec::new(),
         #[cfg(feature = "plugins")]
         plugins: Vec::new(),
         logging: LoggingConfig {
