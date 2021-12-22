@@ -55,7 +55,11 @@ impl Cache {
             self.data.pop_front();
         }
 
-        if let Some(existing_item) = self.data.iter().position(|item| item.route == route) {
+        if let Some(existing_item) = self
+            .data
+            .iter()
+            .position(|item| item.route == route && item.host == host)
+        {
             self.cache_size -= self.data[existing_item].data.len();
             self.data.remove(existing_item);
         }
