@@ -1,5 +1,5 @@
 use humphrey::http::{Request, Response};
-use humphrey::App;
+use humphrey::{App, SubApp};
 
 #[cfg(feature = "plugins")]
 use crate::plugins::manager::PluginManager;
@@ -52,9 +52,12 @@ pub fn main(config: Config) {
 
     let state = app.get_state();
 
-    app = init_app_routes(app, &state.config.default_host, 0);
+    for route in init_app_routes(&state.config.default_host, 0).routes {
+        app = app.with_route(&route.route, route.handler);
+    }
+
     for (host_index, host) in state.config.hosts.iter().enumerate() {
-        app = init_app_routes(app, host, host_index + 1);
+        app = app.with_host(&host.matches, init_app_routes(host, host_index + 1));
     }
 
     let addr = format!("{}:{}", state.config.address, state.config.port);
@@ -74,19 +77,21 @@ pub fn main(config: Config) {
     app.run(addr).unwrap();
 }
 
-fn init_app_routes(mut app: App<AppState>, host: &HostConfig, host_index: usize) -> App<AppState> {
+fn init_app_routes(host: &HostConfig, host_index: usize) -> SubApp<AppState> {
+    let mut subapp: SubApp<AppState> = SubApp::new();
+
     for (route_index, route) in host.routes.iter().enumerate() {
         match route {
             RouteConfig::Directory {
                 matches,
                 directory: _,
             } => {
-                app = app.with_route(matches, move |request, state| {
+                subapp = subapp.with_route(matches, move |request, state| {
                     request_handler(request, state, host_index, route_index)
                 });
             }
             RouteConfig::File { matches, file: _ } => {
-                app = app.with_route(matches, move |request, state| {
+                subapp = subapp.with_route(matches, move |request, state| {
                     request_handler(request, state, host_index, route_index)
                 });
             }
@@ -94,19 +99,19 @@ fn init_app_routes(mut app: App<AppState>, host: &HostConfig, host_index: usize)
                 matches,
                 load_balancer: _,
             } => {
-                app = app.with_route(matches, move |request, state| {
+                subapp = subapp.with_route(matches, move |request, state| {
                     request_handler(request, state, host_index, route_index)
                 });
             }
             RouteConfig::Redirect { matches, target: _ } => {
-                app = app.with_route(matches, move |request, state| {
+                subapp = subapp.with_route(matches, move |request, state| {
                     request_handler(request, state, host_index, route_index)
                 });
             }
         }
     }
 
-    app
+    subapp
 }
 
 /// Verifies that the client is allowed to connect by checking with the blacklist config.
