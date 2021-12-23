@@ -19,7 +19,6 @@ server {
   address   "0.0.0.0"        # Address to host the server on
   port      80               # Port to host the server on
   threads   32               # Number of threads to use for the server
-  websocket "localhost:1234" # Where to proxy WebSocket connections to
 
   plugins {
     include "php.conf"       # Include PHP configuration (see below)
@@ -39,6 +38,16 @@ server {
   cache {
     size 128M # Size limit of the cache
     time 60   # Max time to cache files for, in seconds
+  }
+
+  host "127.0.0.1" { # Configuration for connecting through the host 127.0.0.1
+    route /* {
+      redirect "http://localhost/" # Redirect to localhost
+    }
+  }
+
+  route /ws {
+    websocket "localhost:1234" # Address to connect to for WebSocket connections
   }
 
   route /proxy/* {
