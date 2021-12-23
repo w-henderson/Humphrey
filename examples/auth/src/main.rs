@@ -65,11 +65,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn login(request: Request, state: Arc<AppState>) -> Response {
     // If the request is not a POST, return a 405 error.
     if request.method != Method::Post {
-        return Response::new(
-            StatusCode::MethodNotAllowed,
-            b"Method Not Allowed",
-            &request,
-        );
+        return Response::new(StatusCode::MethodNotAllowed, b"Method Not Allowed");
     }
 
     // Get the username and password from the request body.
@@ -106,34 +102,28 @@ fn login(request: Request, state: Arc<AppState>) -> Response {
                         ResponseHeader::SetCookie,
                         format!("HumphreyToken={}; Path=/; MaxAge=3600", token),
                     )
-                    .with_bytes(b"OK")
-                    .with_request_compatibility(&request)
-                    .with_generated_headers();
+                    .with_bytes(b"OK");
             } else {
                 // If the session could not be created, return an error.
 
-                return Response::new(StatusCode::NotFound, b"Already logged in", &request);
+                return Response::new(StatusCode::NotFound, b"Already logged in");
             }
         } else {
             // If the password was incorrect, return an error.
 
-            return Response::new(StatusCode::NotFound, b"Invalid credentials", &request);
+            return Response::new(StatusCode::NotFound, b"Invalid credentials");
         }
     }
 
     // If the user was not found, return an error.
-    Response::new(StatusCode::NotFound, b"User not found", &request)
+    Response::new(StatusCode::NotFound, b"User not found")
 }
 
 /// Sign up API endpoint handler.
 fn signup(request: Request, state: Arc<AppState>) -> Response {
     // If the request is not a POST, return a 405 error.
     if request.method != Method::Post {
-        return Response::new(
-            StatusCode::MethodNotAllowed,
-            b"Method Not Allowed",
-            &request,
-        );
+        return Response::new(StatusCode::MethodNotAllowed, b"Method Not Allowed");
     }
 
     // Get the username and password from the request body.
@@ -166,15 +156,15 @@ fn signup(request: Request, state: Arc<AppState>) -> Response {
         users.set(uid, username);
 
         // Return a successful response.
-        return Response::new(StatusCode::OK, b"OK", &request);
+        return Response::new(StatusCode::OK, b"OK");
     }
 
     // If a user already exists with the given username, return an error.
-    Response::new(StatusCode::NotFound, b"User not found", &request)
+    Response::new(StatusCode::NotFound, b"User not found")
 }
 
 /// Sign out API endpoint handler.
-fn sign_out(request: Request, state: Arc<AppState>, uid: String) -> Response {
+fn sign_out(_: Request, state: Arc<AppState>, uid: String) -> Response {
     // Use the auth provider to invalidate the user's session.
     let mut provider = state.auth.lock().unwrap();
     provider.invalidate_user_session(uid);
@@ -187,12 +177,10 @@ fn sign_out(request: Request, state: Arc<AppState>, uid: String) -> Response {
             ResponseHeader::SetCookie,
             "HumphreyToken=deleted; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT".into(),
         )
-        .with_request_compatibility(&request)
-        .with_generated_headers()
 }
 
 /// Delete account API endpoint handler.
-fn delete_account(request: Request, state: Arc<AppState>, uid: String) -> Response {
+fn delete_account(_: Request, state: Arc<AppState>, uid: String) -> Response {
     // Remove the user from the users section of the database.
     {
         let mut db = state.db.0.write();
@@ -212,12 +200,10 @@ fn delete_account(request: Request, state: Arc<AppState>, uid: String) -> Respon
             ResponseHeader::SetCookie,
             "HumphreyToken=deleted; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT".into(),
         )
-        .with_request_compatibility(&request)
-        .with_generated_headers()
 }
 
 /// Profile page handler.
-fn profile(request: Request, state: Arc<AppState>, uid: String) -> Response {
+fn profile(_: Request, state: Arc<AppState>, uid: String) -> Response {
     // Use the database to get the username of the authenticated user.
     let db = state.db.0.read();
     let user = document!(&*db, &format!("users/{}", uid));
@@ -229,8 +215,6 @@ fn profile(request: Request, state: Arc<AppState>, uid: String) -> Response {
     Response::empty(StatusCode::OK)
         .with_header(ResponseHeader::ContentType, "text/html".into())
         .with_bytes(html)
-        .with_request_compatibility(&request)
-        .with_generated_headers()
 }
 
 /// Create a new database, automatically starting the background thread to synchronize the database to disk.
