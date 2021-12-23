@@ -9,7 +9,7 @@ use crate::plugins::plugin::PluginLoadResult;
 use std::process::exit;
 
 use crate::cache::Cache;
-use crate::config::{BlacklistMode, Config, HostConfig, RouteConfig};
+use crate::config::{BlacklistMode, Config, HostConfig, RouteType};
 use crate::logger::Logger;
 use crate::proxy::proxy_handler;
 use crate::r#static::{directory_handler, file_handler, redirect_handler};
@@ -81,34 +81,9 @@ fn init_app_routes(host: &HostConfig, host_index: usize) -> SubApp<AppState> {
     let mut subapp: SubApp<AppState> = SubApp::new();
 
     for (route_index, route) in host.routes.iter().enumerate() {
-        match route {
-            RouteConfig::Directory {
-                matches,
-                directory: _,
-            } => {
-                subapp = subapp.with_route(matches, move |request, state| {
-                    request_handler(request, state, host_index, route_index)
-                });
-            }
-            RouteConfig::File { matches, file: _ } => {
-                subapp = subapp.with_route(matches, move |request, state| {
-                    request_handler(request, state, host_index, route_index)
-                });
-            }
-            RouteConfig::Proxy {
-                matches,
-                load_balancer: _,
-            } => {
-                subapp = subapp.with_route(matches, move |request, state| {
-                    request_handler(request, state, host_index, route_index)
-                });
-            }
-            RouteConfig::Redirect { matches, target: _ } => {
-                subapp = subapp.with_route(matches, move |request, state| {
-                    request_handler(request, state, host_index, route_index)
-                });
-            }
-        }
+        subapp = subapp.with_route(&route.matches, move |request, state| {
+            request_handler(request, state, host_index, route_index)
+        });
     }
 
     subapp
@@ -167,17 +142,23 @@ fn inner_request_handler(
         }
     };
 
-    match route {
-        RouteConfig::File { matches: _, file } => file_handler(request, state.clone(), file, host),
-        RouteConfig::Directory { matches, directory } => {
-            directory_handler(request, state.clone(), directory, matches, host)
-        }
-        RouteConfig::Proxy {
-            matches,
-            load_balancer,
-        } => proxy_handler(request, state.clone(), load_balancer, matches),
-        RouteConfig::Redirect { matches: _, target } => {
-            redirect_handler(request, state.clone(), target)
+    match route.route_type {
+        RouteType::File => file_handler(request, state.clone(), route.path.as_ref().unwrap(), host),
+        RouteType::Directory => directory_handler(
+            request,
+            state.clone(),
+            route.path.as_ref().unwrap(),
+            &route.matches,
+            host,
+        ),
+        RouteType::Proxy => proxy_handler(
+            request,
+            state.clone(),
+            route.load_balancer.as_ref().unwrap(),
+            &route.matches,
+        ),
+        RouteType::Redirect => {
+            redirect_handler(request, state.clone(), route.path.as_ref().unwrap())
         }
     }
 }

@@ -1,4 +1,6 @@
-use crate::config::{BlacklistConfig, BlacklistMode, Config, LoggingConfig, RouteConfig};
+use crate::config::{
+    BlacklistConfig, BlacklistMode, Config, LoggingConfig, RouteConfig, RouteType,
+};
 use crate::server::logger::LogLevel;
 
 impl Default for Config {
@@ -21,9 +23,11 @@ impl Default for Config {
 
 impl Default for RouteConfig {
     fn default() -> Self {
-        Self::Directory {
+        Self {
+            route_type: RouteType::Directory,
             matches: "/*".into(),
-            directory: '.'.into(),
+            path: Some('.'.into()),
+            load_balancer: None,
         }
     }
 }

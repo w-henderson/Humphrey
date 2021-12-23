@@ -45,37 +45,26 @@ pub struct HostConfig {
     pub routes: Vec<RouteConfig>,
 }
 
+/// Represents the type of a route.
+#[derive(Debug, PartialEq)]
+pub enum RouteType {
+    File,
+    Directory,
+    Proxy,
+    Redirect,
+}
+
 /// Represents configuration for a specific route.
 #[derive(Debug, PartialEq)]
-pub enum RouteConfig {
-    /// Serve a single file
-    File {
-        /// Wildcard string specifying what URIs to match
-        matches: String,
-        /// File to serve
-        file: String,
-    },
-    /// Serve files from a directory
-    Directory {
-        /// Wildcard string specifying what URIs to match
-        matches: String,
-        /// Directory to serve files from
-        directory: String,
-    },
-    /// Proxy connections to the specified target(s), load balancing if necessary
-    Proxy {
-        /// Wildcard string specifying what URIs to match
-        matches: String,
-        /// Load balancer instance
-        load_balancer: EqMutex<LoadBalancer>,
-    },
-    /// Redirects requests to the target
-    Redirect {
-        /// Wildcard string specifying what URIs to match
-        matches: String,
-        /// Target URI to redirect to
-        target: String,
-    },
+pub struct RouteConfig {
+    /// The type of the route
+    pub route_type: RouteType,
+    /// The URL to match
+    pub matches: String,
+    /// The path to the file, directory or redirect target
+    pub path: Option<String>,
+    /// The load balancer to use for proxying
+    pub load_balancer: Option<EqMutex<LoadBalancer>>,
 }
 
 /// Represents configuration for the logger.
@@ -346,18 +335,22 @@ fn parse_route(
 
             let file = conf.get_compulsory("file", "").unwrap();
 
-            routes.push(RouteConfig::File {
+            routes.push(RouteConfig {
+                route_type: RouteType::File,
                 matches: wild.to_string(),
-                file,
+                path: Some(file),
+                load_balancer: None,
             });
         } else if conf.contains_key("directory") {
             // This is a regular directory-serving route
 
             let directory = conf.get_compulsory("directory", "").unwrap();
 
-            routes.push(RouteConfig::Directory {
+            routes.push(RouteConfig {
+                route_type: RouteType::Directory,
                 matches: wild.to_string(),
-                directory,
+                path: Some(directory),
+                load_balancer: None,
             });
         } else if conf.contains_key("proxy") {
             // This is a proxy route
@@ -379,23 +372,29 @@ fn parse_route(
                     ),
                 };
 
-            routes.push(RouteConfig::Proxy {
+            let load_balancer = EqMutex::new(LoadBalancer {
+                targets,
+                mode: load_balancer_mode,
+                lcg: Lcg::new(),
+                index: 0,
+            });
+
+            routes.push(RouteConfig {
+                route_type: RouteType::Proxy,
                 matches: wild.to_string(),
-                load_balancer: EqMutex::new(LoadBalancer {
-                    targets,
-                    mode: load_balancer_mode,
-                    lcg: Lcg::new(),
-                    index: 0,
-                }),
-            })
+                path: None,
+                load_balancer: Some(load_balancer),
+            });
         } else if conf.contains_key("redirect") {
             // This is a redirect route
 
             let target = conf.get_compulsory("redirect", "").unwrap();
 
-            routes.push(RouteConfig::Redirect {
+            routes.push(RouteConfig {
+                route_type: RouteType::Redirect,
                 matches: wild.to_string(),
-                target,
+                path: Some(target),
+                load_balancer: None,
             });
         } else {
             return Err("Invalid route configuration, every route must contain either the `file`, `directory`, `proxy` or `redirect` field");
