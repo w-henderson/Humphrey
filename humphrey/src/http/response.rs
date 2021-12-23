@@ -12,7 +12,7 @@ use std::io::{BufRead, BufReader, Read};
 ///
 /// ## Simple Creation
 /// ```
-/// Response::new(StatusCode::OK, b"Success", &request)
+/// Response::new(StatusCode::OK, b"Success")
 /// ```
 ///
 /// ## Advanced Creation
@@ -20,8 +20,6 @@ use std::io::{BufRead, BufReader, Read};
 /// Response::empty(StatusCode::OK)
 ///     .with_bytes(b"Success")
 ///     .with_header(ResponseHeader::ContentType, "text/plain".into())
-///     .with_request_compatibility(&request)
-///     .with_generated_headers()
 /// ```
 #[derive(Debug)]
 pub struct Response {
@@ -57,10 +55,7 @@ impl Response {
     /// Functionally equivalent to the following (but with some allocation optimisations not shown):
     ///
     /// ```
-    /// Response::empty(status_code)
-    ///     .with_bytes(bytes)
-    ///     .with_request_compatibility(request)
-    ///     .with_generated_headers()
+    /// Response::empty(status_code).with_bytes(bytes)
     /// ```
     ///
     /// ## Note about Headers

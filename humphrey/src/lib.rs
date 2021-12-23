@@ -26,12 +26,12 @@
 //!     Ok(())
 //! }
 //!
-//! fn home(request: Request) -> Response {
-//!     Response::new(StatusCode::OK, b"<html><body><h1>Home</h1></body></html>", &request)
+//! fn home(_: Request) -> Response {
+//!     Response::new(StatusCode::OK, b"<html><body><h1>Home</h1></body></html>")
 //! }
 //!
-//! fn contact(request: Request) -> Response {
-//!     Response::new(StatusCode::OK, b"<html><body><h1>Contact</h1></body></html>", &request)
+//! fn contact(_: Request) -> Response {
+//!     Response::new(StatusCode::OK, b"<html><body><h1>Contact</h1></body></html>")
 //! }
 //! ```
 //!

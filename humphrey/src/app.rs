@@ -50,8 +50,8 @@ impl<T, S> WebsocketHandler<S> for T where T: Fn(Request, TcpStream, Arc<S>) + S
 /// ## Example
 /// The most basic request handler would be as follows:
 /// ```
-/// fn handler(request: Request, _: Arc<()>) -> Response {
-///     Response::new(StatusCode::OK, b"Success", &request)
+/// fn handler(_: Request, _: Arc<()>) -> Response {
+///     Response::new(StatusCode::OK, b"Success")
 /// }
 /// ```
 pub trait RequestHandler<State>: Fn(Request, Arc<State>) -> Response + Send + Sync {}
@@ -64,8 +64,8 @@ impl<T, S> RequestHandler<S> for T where T: Fn(Request, Arc<S>) -> Response + Se
 /// ## Example
 /// The most basic stateless request handler would be as follows:
 /// ```
-/// fn handler(request: Request) -> Response {
-///     Response::new(StatusCode::OK, b"Success", &request)
+/// fn handler(_: Request) -> Response {
+///     Response::new(StatusCode::OK, b"Success")
 /// }
 /// ```
 pub trait StatelessRequestHandler<State>: Fn(Request) -> Response + Send + Sync {}
@@ -77,8 +77,8 @@ impl<T, S> StatelessRequestHandler<S> for T where T: Fn(Request) -> Response + S
 /// ## Example
 /// The most basic path-aware request handler would be as follows:
 /// ```
-/// fn handler(request: Request, _: Arc<()>, route: &str) -> Response {
-///     Response::new(StatusCode::OK, format!("Success matching route {}", route), &request)
+/// fn handler(_: Request, _: Arc<()>, route: &str) -> Response {
+///     Response::new(StatusCode::OK, format!("Success matching route {}", route))
 /// }
 /// ```
 #[rustfmt::skip]
