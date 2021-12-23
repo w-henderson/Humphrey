@@ -1,4 +1,6 @@
-use crate::config::{BlacklistConfig, BlacklistMode, Config, LoggingConfig, RouteConfig};
+use crate::config::{
+    BlacklistConfig, BlacklistMode, Config, LoggingConfig, RouteConfig, RouteType,
+};
 use crate::server::logger::LogLevel;
 
 impl Default for Config {
@@ -7,8 +9,9 @@ impl Default for Config {
             address: "0.0.0.0".into(),
             port: 80,
             threads: 32,
-            websocket_proxy: None,
-            routes: vec![Default::default()],
+            default_websocket_proxy: None,
+            hosts: vec![Default::default()],
+            default_host: Default::default(),
             #[cfg(feature = "plugins")]
             plugins: Vec::new(),
             logging: Default::default(),
@@ -20,9 +23,12 @@ impl Default for Config {
 
 impl Default for RouteConfig {
     fn default() -> Self {
-        Self::Directory {
+        Self {
+            route_type: RouteType::Directory,
             matches: "/*".into(),
-            directory: '.'.into(),
+            path: Some('.'.into()),
+            load_balancer: None,
+            websocket_proxy: None,
         }
     }
 }

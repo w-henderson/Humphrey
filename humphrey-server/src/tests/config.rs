@@ -5,6 +5,7 @@ use humphrey_server::config::config::{
     RouteConfig,
 };
 use humphrey_server::config::tree::{parse_conf, ConfigNode};
+use humphrey_server::config::{HostConfig, RouteType};
 use humphrey_server::logger::LogLevel;
 
 #[cfg(feature = "plugins")]
@@ -32,22 +33,32 @@ fn test_parse_config() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
-        websocket_proxy: Some("localhost:1234".into()),
-        routes: vec![
-            RouteConfig::Directory {
-                matches: "/static/*".into(),
-                directory: "/var/www".into(),
-            },
-            RouteConfig::Proxy {
-                matches: "/*".into(),
-                load_balancer: EqMutex::new(LoadBalancer {
-                    targets: vec!["127.0.0.1:8000".into(), "127.0.0.1:8080".into()],
-                    mode: LoadBalancerMode::RoundRobin,
-                    index: 0,
-                    lcg: Lcg::new(),
-                }),
-            },
-        ],
+        default_websocket_proxy: Some("localhost:1234".into()),
+        default_host: HostConfig {
+            matches: "*".into(),
+            routes: vec![
+                RouteConfig {
+                    route_type: RouteType::Directory,
+                    matches: "/static/*".into(),
+                    path: Some("/var/www".into()),
+                    load_balancer: None,
+                    websocket_proxy: None,
+                },
+                RouteConfig {
+                    route_type: RouteType::Proxy,
+                    matches: "/*".into(),
+                    path: None,
+                    load_balancer: Some(EqMutex::new(LoadBalancer {
+                        targets: vec!["127.0.0.1:8000".into(), "127.0.0.1:8080".into()],
+                        mode: LoadBalancerMode::RoundRobin,
+                        index: 0,
+                        lcg: Lcg::new(),
+                    })),
+                    websocket_proxy: None,
+                },
+            ],
+        },
+        hosts: Vec::new(),
         #[cfg(feature = "plugins")]
         plugins: vec![PluginConfig {
             name: "php".into(),
@@ -73,6 +84,68 @@ fn test_parse_config() {
 }
 
 #[test]
+fn test_host_config() {
+    let tree = parse_conf(include_str!("testcases/hosts.conf"), "hosts.conf").unwrap();
+    let conf = Config::from_tree(tree).unwrap();
+
+    let expected_conf = Config {
+        address: "0.0.0.0".into(),
+        port: 80,
+        threads: 32,
+        default_websocket_proxy: None,
+        default_host: HostConfig {
+            matches: "*".into(),
+            routes: vec![RouteConfig {
+                route_type: RouteType::Directory,
+                matches: "/*".into(),
+                path: Some("/var/www".into()),
+                load_balancer: None,
+                websocket_proxy: None,
+            }],
+        },
+        hosts: vec![
+            HostConfig {
+                matches: "localhost".into(),
+                routes: vec![RouteConfig {
+                    route_type: RouteType::Redirect,
+                    matches: "/".into(),
+                    path: Some("/app/dev".into()),
+                    load_balancer: None,
+                    websocket_proxy: None,
+                }],
+            },
+            HostConfig {
+                matches: "*.example.com".into(),
+                routes: vec![RouteConfig {
+                    route_type: RouteType::Redirect,
+                    matches: "/".into(),
+                    path: Some("/app/prod".into()),
+                    load_balancer: None,
+                    websocket_proxy: None,
+                }],
+            },
+        ],
+        #[cfg(feature = "plugins")]
+        plugins: Vec::new(),
+        logging: LoggingConfig {
+            level: LogLevel::Warn,
+            console: true,
+            file: None,
+        },
+        cache: CacheConfig {
+            size_limit: 0,
+            time_limit: 0,
+        },
+        blacklist: BlacklistConfig {
+            list: Vec::new(),
+            mode: BlacklistMode::Block,
+        },
+    };
+
+    assert_eq!(conf, expected_conf);
+}
+
+#[test]
 fn comma_separated_routes() {
     let tree = parse_conf(include_str!("testcases/commas.conf"), "commas.conf").unwrap();
     let conf = Config::from_tree(tree).unwrap();
@@ -81,17 +154,27 @@ fn comma_separated_routes() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
-        websocket_proxy: None,
-        routes: vec![
-            RouteConfig::Directory {
-                matches: "/example/*".into(),
-                directory: "/var/www".into(),
-            },
-            RouteConfig::Directory {
-                matches: "/test/*".into(),
-                directory: "/var/www".into(),
-            },
-        ],
+        default_websocket_proxy: None,
+        default_host: HostConfig {
+            matches: "*".into(),
+            routes: vec![
+                RouteConfig {
+                    route_type: RouteType::Directory,
+                    matches: "/example/*".into(),
+                    path: Some("/var/www".into()),
+                    load_balancer: None,
+                    websocket_proxy: None,
+                },
+                RouteConfig {
+                    route_type: RouteType::Directory,
+                    matches: "/test/*".into(),
+                    path: Some("/var/www".into()),
+                    load_balancer: None,
+                    websocket_proxy: None,
+                },
+            ],
+        },
+        hosts: Vec::new(),
         #[cfg(feature = "plugins")]
         plugins: Vec::new(),
         logging: LoggingConfig {

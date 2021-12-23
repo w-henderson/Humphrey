@@ -1,7 +1,7 @@
 use humphrey_server::config::tree::parse_conf;
 use humphrey_server::config::{
-    BlacklistConfig, BlacklistMode, CacheConfig, Config, LoadBalancerMode, LoggingConfig,
-    RouteConfig,
+    BlacklistConfig, BlacklistMode, CacheConfig, Config, HostConfig, LoadBalancerMode,
+    LoggingConfig, RouteConfig, RouteType,
 };
 use humphrey_server::logger::LogLevel;
 use humphrey_server::proxy::{EqMutex, LoadBalancer};
@@ -23,11 +23,18 @@ fn include_route() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
-        websocket_proxy: None,
-        routes: vec![RouteConfig::Directory {
-            matches: "/*".into(),
-            directory: "/var/www".into(),
-        }],
+        default_websocket_proxy: None,
+        default_host: HostConfig {
+            matches: "*".into(),
+            routes: vec![RouteConfig {
+                route_type: RouteType::Directory,
+                matches: "/*".into(),
+                path: Some("/var/www".into()),
+                load_balancer: None,
+                websocket_proxy: None,
+            }],
+        },
+        hosts: Vec::new(),
         #[cfg(feature = "plugins")]
         plugins: Vec::new(),
         logging: LoggingConfig {
@@ -61,16 +68,23 @@ fn nested_include() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
-        websocket_proxy: None,
-        routes: vec![RouteConfig::Proxy {
-            matches: "/test".into(),
-            load_balancer: EqMutex::new(LoadBalancer {
-                targets: vec!["127.0.0.1".into()],
-                mode: LoadBalancerMode::Random,
-                index: 0,
-                lcg: Lcg::new(),
-            }),
-        }],
+        default_websocket_proxy: None,
+        default_host: HostConfig {
+            matches: "*".into(),
+            routes: vec![RouteConfig {
+                route_type: RouteType::Proxy,
+                matches: "/test".into(),
+                path: None,
+                load_balancer: Some(EqMutex::new(LoadBalancer {
+                    targets: vec!["127.0.0.1".into()],
+                    mode: LoadBalancerMode::Random,
+                    index: 0,
+                    lcg: Lcg::new(),
+                })),
+                websocket_proxy: None,
+            }],
+        },
+        hosts: Vec::new(),
         #[cfg(feature = "plugins")]
         plugins: Vec::new(),
         logging: LoggingConfig {

@@ -1,6 +1,5 @@
 use humphrey::http::{Request, Response};
-use humphrey::krauss::wildcard_match;
-use humphrey::App;
+use humphrey::{App, SubApp};
 
 #[cfg(feature = "plugins")]
 use crate::plugins::manager::PluginManager;
@@ -10,10 +9,10 @@ use crate::plugins::plugin::PluginLoadResult;
 use std::process::exit;
 
 use crate::cache::Cache;
-use crate::config::{BlacklistMode, Config, RouteConfig};
+use crate::config::{BlacklistMode, Config, HostConfig, RouteType};
 use crate::logger::Logger;
 use crate::proxy::proxy_handler;
-use crate::r#static::{directory_handler, file_handler, not_found, redirect_handler};
+use crate::r#static::{directory_handler, file_handler, redirect_handler};
 use crate::server::pipe::pipe;
 
 use std::io::Write;
@@ -47,12 +46,22 @@ impl From<Config> for AppState {
 
 /// Main function for the static server.
 pub fn main(config: Config) {
-    let app: App<AppState> = App::new_with_config(config.threads, AppState::from(config))
-        .with_connection_condition(verify_connection)
-        .with_websocket_route("/*", websocket_handler)
-        .with_route("/*", request_handler);
+    let mut app: App<AppState> = App::new_with_config(config.threads, AppState::from(config))
+        .with_connection_condition(verify_connection);
 
     let state = app.get_state();
+
+    for route in init_app_routes(&state.config.default_host, 0).routes {
+        app = app.with_route(&route.route, route.handler);
+    }
+
+    for (host_index, host) in state.config.hosts.iter().enumerate() {
+        app = app.with_host(&host.matches, init_app_routes(host, host_index + 1));
+    }
+
+    if let Some(proxy) = state.config.default_websocket_proxy.as_ref() {
+        app = app.with_websocket_route("/*", websocket_handler(proxy.to_string()));
+    }
 
     let addr = format!("{}:{}", state.config.address, state.config.port);
     let logger = &state.logger;
@@ -69,6 +78,23 @@ pub fn main(config: Config) {
     logger.debug(&format!("Configuration: {:?}", state.config));
 
     app.run(addr).unwrap();
+}
+
+fn init_app_routes(host: &HostConfig, host_index: usize) -> SubApp<AppState> {
+    let mut subapp: SubApp<AppState> = SubApp::new();
+
+    for (route_index, route) in host.routes.iter().enumerate() {
+        subapp = subapp.with_route(&route.matches, move |request, state| {
+            request_handler(request, state, host_index, route_index)
+        });
+
+        if let Some(proxy) = route.websocket_proxy.as_ref() {
+            subapp =
+                subapp.with_websocket_route(&route.matches, websocket_handler(proxy.to_string()));
+        }
+    }
+
+    subapp
 }
 
 /// Verifies that the client is allowed to connect by checking with the blacklist config.
@@ -92,12 +118,18 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
 }
 
 #[cfg(feature = "plugins")]
-fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
+fn request_handler(
+    mut request: Request,
+    state: Arc<AppState>,
+    host: usize,
+    route: usize,
+) -> Response {
     let plugins = state.plugin_manager.read().unwrap();
 
+    let route_config = state.config.get_route(host, route);
     let mut response = plugins
-        .on_request(&mut request, state.clone()) // If the plugin overrides the response, return it
-        .unwrap_or_else(|| inner_request_handler(request, state.clone())); // If no plugin overrides the response, generate it in the normal way
+        .on_request(&mut request, state.clone(), route_config) // If the plugin overrides the response, return it
+        .unwrap_or_else(|| inner_request_handler(request, state.clone(), host, route)); // If no plugin overrides the response, generate it in the normal way
 
     // Pass the response to plugins before it is sent to the client
     plugins.on_response(&mut response, state.clone());
@@ -106,95 +138,87 @@ fn request_handler(mut request: Request, state: Arc<AppState>) -> Response {
 }
 
 #[cfg(not(feature = "plugins"))]
-fn request_handler(request: Request, state: Arc<AppState>) -> Response {
-    inner_request_handler(request, state)
+fn request_handler(request: Request, state: Arc<AppState>, host: usize, route: usize) -> Response {
+    inner_request_handler(request, state, host, route)
 }
 
-fn inner_request_handler(request: Request, state: Arc<AppState>) -> Response {
-    for route in &state.config.routes {
-        match route {
-            RouteConfig::File { matches, file } => {
-                if wildcard_match(matches, &request.uri) {
-                    return file_handler(request, state.clone(), file);
-                }
-            }
+fn inner_request_handler(
+    request: Request,
+    state: Arc<AppState>,
+    host: usize,
+    route: usize,
+) -> Response {
+    let route = state.config.get_route(host, route);
 
-            RouteConfig::Directory { matches, directory } => {
-                if wildcard_match(matches, &request.uri) {
-                    return directory_handler(request, state.clone(), directory, matches);
-                }
-            }
-
-            RouteConfig::Proxy {
-                matches,
-                load_balancer,
-            } => {
-                if wildcard_match(matches, &request.uri) {
-                    return proxy_handler(request, state.clone(), load_balancer, matches);
-                }
-            }
-
-            RouteConfig::Redirect { matches, target } => {
-                if wildcard_match(matches, &request.uri) {
-                    return redirect_handler(request, state.clone(), target);
-                }
-            }
+    match route.route_type {
+        RouteType::File => file_handler(request, state.clone(), route.path.as_ref().unwrap(), host),
+        RouteType::Directory => directory_handler(
+            request,
+            state.clone(),
+            route.path.as_ref().unwrap(),
+            &route.matches,
+            host,
+        ),
+        RouteType::Proxy => proxy_handler(
+            request,
+            state.clone(),
+            route.load_balancer.as_ref().unwrap(),
+            &route.matches,
+        ),
+        RouteType::Redirect => {
+            redirect_handler(request, state.clone(), route.path.as_ref().unwrap())
         }
     }
-
-    not_found()
 }
 
-fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppState>) {
+fn websocket_handler(target: String) -> impl Fn(Request, TcpStream, Arc<AppState>) {
+    move |request: Request, source: TcpStream, state: Arc<AppState>| {
+        proxy_websocket(request, source, &target, state)
+    }
+}
+
+fn proxy_websocket(request: Request, mut source: TcpStream, target: &str, state: Arc<AppState>) {
     let source_addr = request.address.origin_addr.to_string();
+    let bytes: Vec<u8> = request.into();
 
-    if let Some(address) = &state.config.websocket_proxy {
-        let bytes: Vec<u8> = request.into();
+    if let Ok(mut destination) = TcpStream::connect(target) {
+        // The target was successfully connected to
 
-        if let Ok(mut destination) = TcpStream::connect(address) {
-            // The target was successfully connected to
+        destination.write_all(&bytes).unwrap();
 
-            destination.write_all(&bytes).unwrap();
-
-            let mut source_clone = source.try_clone().unwrap();
-            let mut destination_clone = destination.try_clone().unwrap();
-            state.logger.info(&format!(
-                "{}: WebSocket connected, proxying data",
-                source_addr
-            ));
-
-            // Pipe data in both directions
-            let forward = spawn(move || pipe(&mut source, &mut destination));
-            let backward = spawn(move || pipe(&mut destination_clone, &mut source_clone));
-
-            // Log any errors
-            if forward.join().unwrap().is_err() {
-                state.logger.error(&format!(
-                    "{}: Error proxying WebSocket from client to target, connection closed",
-                    source_addr
-                ));
-            }
-            if backward.join().unwrap().is_err() {
-                state.logger.error(&format!(
-                    "{}: Error proxying WebSocket from target to client, connection closed",
-                    source_addr
-                ));
-            }
-
-            state.logger.info(&format!(
-                "{}: WebSocket session complete, connection closed",
-                source_addr
-            ));
-        } else {
-            state
-                .logger
-                .error(&format!("{}: Could not connect to WebSocket", source_addr));
-        }
-    } else {
-        state.logger.warn(&format!(
-            "{}: WebSocket connection attempted but no handler provided",
+        let mut source_clone = source.try_clone().unwrap();
+        let mut destination_clone = destination.try_clone().unwrap();
+        state.logger.info(&format!(
+            "{}: WebSocket connected, proxying data",
             source_addr
-        ))
+        ));
+
+        // Pipe data in both directions
+        let forward = spawn(move || pipe(&mut source, &mut destination));
+        let backward = spawn(move || pipe(&mut destination_clone, &mut source_clone));
+
+        // Log any errors
+        if forward.join().unwrap().is_err() {
+            state.logger.error(&format!(
+                "{}: Error proxying WebSocket from client to target, connection closed",
+                source_addr
+            ));
+        }
+        if backward.join().unwrap().is_err() {
+            state.logger.error(&format!(
+                "{}: Error proxying WebSocket from target to client, connection closed",
+                source_addr
+            ));
+        }
+
+        state.logger.info(&format!(
+            "{}: WebSocket session complete, connection closed",
+            source_addr
+        ));
+    } else {
+        state
+            .logger
+            .error(&format!("{}: Could not connect to WebSocket", source_addr));
     }
 }
 

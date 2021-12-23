@@ -20,10 +20,12 @@ pub struct Config {
     pub port: u16,
     /// The number of threads to host the server on
     pub threads: usize,
-    /// Address to forward WebSocket connections to
-    pub websocket_proxy: Option<String>,
-    /// The configuration for different routes
-    pub routes: Vec<RouteConfig>,
+    /// Address to forward WebSocket connections to, unless otherwise specified by the route
+    pub default_websocket_proxy: Option<String>,
+    /// The configuration for different hosts
+    pub hosts: Vec<HostConfig>,
+    /// The configuration for the default host
+    pub default_host: HostConfig,
     /// The configuration for any plugins
     #[cfg(feature = "plugins")]
     pub plugins: Vec<PluginConfig>,
@@ -35,37 +37,36 @@ pub struct Config {
     pub blacklist: BlacklistConfig,
 }
 
+#[derive(Debug, Default, PartialEq)]
+pub struct HostConfig {
+    /// Wildcard string specifying what hosts to match, e.g. `*.example.com`
+    pub matches: String,
+    /// The routes to use for this host
+    pub routes: Vec<RouteConfig>,
+}
+
+/// Represents the type of a route.
+#[derive(Debug, PartialEq)]
+pub enum RouteType {
+    File,
+    Directory,
+    Proxy,
+    Redirect,
+}
+
 /// Represents configuration for a specific route.
 #[derive(Debug, PartialEq)]
-pub enum RouteConfig {
-    /// Serve a single file
-    File {
-        /// Wildcard string specifying what URIs to match
-        matches: String,
-        /// File to serve
-        file: String,
-    },
-    /// Serve files from a directory
-    Directory {
-        /// Wildcard string specifying what URIs to match
-        matches: String,
-        /// Directory to serve files from
-        directory: String,
-    },
-    /// Proxy connections to the specified target(s), load balancing if necessary
-    Proxy {
-        /// Wildcard string specifying what URIs to match
-        matches: String,
-        /// Load balancer instance
-        load_balancer: EqMutex<LoadBalancer>,
-    },
-    /// Redirects requests to the target
-    Redirect {
-        /// Wildcard string specifying what URIs to match
-        matches: String,
-        /// Target URI to redirect to
-        target: String,
-    },
+pub struct RouteConfig {
+    /// The type of the route
+    pub route_type: RouteType,
+    /// The URL to match
+    pub matches: String,
+    /// The path to the file, directory or redirect target
+    pub path: Option<String>,
+    /// The load balancer to use for proxying
+    pub load_balancer: Option<EqMutex<LoadBalancer>>,
+    /// The WebSocket proxy target for WebSocket connections to this route
+    pub websocket_proxy: Option<String>,
 }
 
 /// Represents configuration for the logger.
@@ -152,7 +153,7 @@ impl Config {
         let port: u16 = hashmap.get_optional_parsed("server.port", 80, "Invalid port")?;
         let threads: usize =
             hashmap.get_optional_parsed("server.threads", 32, "Invalid number of threads")?;
-        let websocket_proxy = hashmap.get_owned("server.websocket");
+        let default_websocket_proxy = hashmap.get_owned("server.websocket");
 
         // Get and validate the blacklist file and mode
         let blacklist = {
@@ -215,73 +216,17 @@ impl Config {
         };
 
         // Get and validate the configuration for the different routes
-        let routes = {
-            let routes_map = tree.get_routes();
-            let mut routes: Vec<RouteConfig> = Vec::with_capacity(routes_map.len());
+        let default_host = parse_host("*", &tree)?;
 
-            for (wild, conf) in routes_map {
-                for wild in wild.split(',').map(|s| s.trim()) {
-                    if conf.contains_key("file") {
-                        // This is a regular file-serving route
+        let hosts = {
+            let hosts_map = tree.get_hosts();
+            let mut hosts: Vec<HostConfig> = Vec::with_capacity(hosts_map.len());
 
-                        let file = conf.get_compulsory("file", "").unwrap();
-
-                        routes.push(RouteConfig::File {
-                            matches: wild.to_string(),
-                            file,
-                        });
-                    } else if conf.contains_key("directory") {
-                        // This is a regular directory-serving route
-
-                        let directory = conf.get_compulsory("directory", "").unwrap();
-
-                        routes.push(RouteConfig::Directory {
-                            matches: wild.to_string(),
-                            directory,
-                        });
-                    } else if conf.contains_key("proxy") {
-                        // This is a proxy route
-
-                        let targets: Vec<String> = conf
-                            .get_compulsory("proxy", "")
-                            .unwrap()
-                            .split(',')
-                            .map(|s| s.to_owned())
-                            .collect();
-
-                        let load_balancer_mode =
-                            conf.get_optional("load_balancer_mode", "round-robin".into());
-                        let load_balancer_mode = match load_balancer_mode.as_str() {
-                            "round-robin" => LoadBalancerMode::RoundRobin,
-                            "random" => LoadBalancerMode::Random,
-                            _ => return Err("Invalid load balancer mode, valid options are `round-robin` or `random`"),
-                        };
-
-                        routes.push(RouteConfig::Proxy {
-                            matches: wild.to_string(),
-                            load_balancer: EqMutex::new(LoadBalancer {
-                                targets,
-                                mode: load_balancer_mode,
-                                lcg: Lcg::new(),
-                                index: 0,
-                            }),
-                        })
-                    } else if conf.contains_key("redirect") {
-                        // This is a redirect route
-
-                        let target = conf.get_compulsory("redirect", "").unwrap();
-
-                        routes.push(RouteConfig::Redirect {
-                            matches: wild.to_string(),
-                            target,
-                        });
-                    } else {
-                        return Err("Invalid route configuration, every route must contain either the `file`, `directory`, `proxy` or `redirect` field");
-                    }
-                }
+            for (host, conf) in hosts_map {
+                hosts.push(parse_host(&host, &conf)?);
             }
 
-            routes
+            hosts
         };
 
         // Get and validate plugin configuration
@@ -313,14 +258,24 @@ impl Config {
             address,
             port,
             threads,
-            websocket_proxy,
-            routes,
+            default_websocket_proxy,
+            default_host,
+            hosts,
             #[cfg(feature = "plugins")]
             plugins,
             logging,
             cache,
             blacklist,
         })
+    }
+
+    /// Get the route at the given host and route indices.
+    pub fn get_route(&self, host: usize, route: usize) -> &RouteConfig {
+        if host == 0 {
+            &self.default_host.routes[route]
+        } else {
+            &self.hosts[host - 1].routes[route]
+        }
     }
 }
 
@@ -361,4 +316,107 @@ fn load_list_file(path: Option<String>) -> Result<Vec<String>, &'static str> {
         // Return an empty `Vec` if no file was supplied
         Ok(Vec::new())
     }
+}
+
+/// Parses a node which contains the configuration for a host.
+fn parse_host(wild: &str, node: &ConfigNode) -> Result<HostConfig, &'static str> {
+    let routes_map = node.get_routes();
+    let mut routes: Vec<RouteConfig> = Vec::with_capacity(routes_map.len());
+
+    for (wild, conf) in routes_map {
+        routes.extend(parse_route(&wild, conf)?);
+    }
+
+    Ok(HostConfig {
+        matches: wild.to_string(),
+        routes,
+    })
+}
+
+/// Parses a route.
+fn parse_route(
+    wild: &str,
+    conf: HashMap<String, ConfigNode>,
+) -> Result<Vec<RouteConfig>, &'static str> {
+    let mut routes: Vec<RouteConfig> = Vec::new();
+
+    for wild in wild.split(',').map(|s| s.trim()) {
+        let websocket_proxy = conf.get_owned("websocket");
+
+        if conf.contains_key("file") {
+            // This is a regular file-serving route
+
+            let file = conf.get_compulsory("file", "").unwrap();
+
+            routes.push(RouteConfig {
+                route_type: RouteType::File,
+                matches: wild.to_string(),
+                path: Some(file),
+                load_balancer: None,
+                websocket_proxy,
+            });
+        } else if conf.contains_key("directory") {
+            // This is a regular directory-serving route
+
+            let directory = conf.get_compulsory("directory", "").unwrap();
+
+            routes.push(RouteConfig {
+                route_type: RouteType::Directory,
+                matches: wild.to_string(),
+                path: Some(directory),
+                load_balancer: None,
+                websocket_proxy,
+            });
+        } else if conf.contains_key("proxy") {
+            // This is a proxy route
+
+            let targets: Vec<String> = conf
+                .get_compulsory("proxy", "")
+                .unwrap()
+                .split(',')
+                .map(|s| s.to_owned())
+                .collect();
+
+            let load_balancer_mode = conf.get_optional("load_balancer_mode", "round-robin".into());
+            let load_balancer_mode =
+                match load_balancer_mode.as_str() {
+                    "round-robin" => LoadBalancerMode::RoundRobin,
+                    "random" => LoadBalancerMode::Random,
+                    _ => return Err(
+                        "Invalid load balancer mode, valid options are `round-robin` or `random`",
+                    ),
+                };
+
+            let load_balancer = EqMutex::new(LoadBalancer {
+                targets,
+                mode: load_balancer_mode,
+                lcg: Lcg::new(),
+                index: 0,
+            });
+
+            routes.push(RouteConfig {
+                route_type: RouteType::Proxy,
+                matches: wild.to_string(),
+                path: None,
+                load_balancer: Some(load_balancer),
+                websocket_proxy,
+            });
+        } else if conf.contains_key("redirect") {
+            // This is a redirect route
+
+            let target = conf.get_compulsory("redirect", "").unwrap();
+
+            routes.push(RouteConfig {
+                route_type: RouteType::Redirect,
+                matches: wild.to_string(),
+                path: Some(target),
+                load_balancer: None,
+                websocket_proxy,
+            });
+        } else if !conf.contains_key("websocket") {
+            return Err("Invalid route configuration, every route must contain either the `file`, `directory`, `proxy` or `redirect` field, unless it defines a WebSocket proxy with the `websocket` field");
+        }
+    }
+
+    Ok(routes)
 }

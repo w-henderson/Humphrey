@@ -14,6 +14,7 @@ pub enum ConfigNode {
     Boolean(String, String),
     String(String, String),
     Section(String, Vec<ConfigNode>),
+    Host(String, Vec<ConfigNode>),
     Route(String, Vec<ConfigNode>),
 }
 
@@ -38,9 +39,37 @@ impl ConfigNode {
         }
     }
 
+    pub fn get_hosts(&self) -> Vec<(String, Self)> {
+        let mut hosts: Vec<(String, Self)> = Vec::new();
+
+        if let ConfigNode::Section(_, children) = self {
+            for child in children {
+                if let ConfigNode::Host(wild, _) = child {
+                    hosts.push((wild.clone(), child.clone()));
+                }
+            }
+        }
+
+        hosts
+    }
+
     pub fn get_routes(&self) -> Vec<(String, HashMap<String, Self>)> {
         let mut routes: Vec<(String, HashMap<String, Self>)> = Vec::new();
+
         if let ConfigNode::Section(_, children) = self {
+            for child in children {
+                if let ConfigNode::Route(wild, inner_children) = child {
+                    let mut inner_hashmap: HashMap<String, Self> = HashMap::new();
+                    for inner_child in inner_children {
+                        inner_child.flatten(&mut inner_hashmap, &Vec::new());
+                    }
+
+                    routes.push((wild.clone(), inner_hashmap));
+                }
+            }
+        }
+
+        if let ConfigNode::Host(_, children) = self {
             for child in children {
                 if let ConfigNode::Route(wild, inner_children) = child {
                     let mut inner_hashmap: HashMap<String, Self> = HashMap::new();
@@ -139,6 +168,21 @@ fn parse_section(
                     let section = parse_section(route_name, lines, filename)?;
                     if let ConfigNode::Section(route_name, inner_values) = section {
                         values.push(ConfigNode::Route(route_name, inner_values));
+                    }
+                } else if section_name.starts_with("host ") && section_name != "host {" {
+                    // If the section is a host section, parse it as such
+                    let host_name = {
+                        let raw = section_name.splitn(2, ' ').last().unwrap().trim();
+                        if raw.starts_with('\"') && raw.ends_with('\"') {
+                            raw[1..raw.len() - 1].to_string()
+                        } else {
+                            raw.to_string()
+                        }
+                    };
+
+                    let section = parse_section(&host_name, lines, filename)?;
+                    if let ConfigNode::Section(host_name, inner_values) = section {
+                        values.push(ConfigNode::Host(host_name, inner_values));
                     }
                 } else {
                     // If the section is just a regular section, parse it in the normal way

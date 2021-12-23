@@ -101,6 +101,7 @@ impl ExtendedMap<&'static str, String> for HashMap<String, ConfigNode> {
                 ConfigNode::Number(_, n) => n.parse().map_err(|_| ()),
                 ConfigNode::Section(_, _) => Err(()),
                 ConfigNode::Route(_, _) => Err(()),
+                ConfigNode::Host(_, _) => Err(()),
             })
             .unwrap_or(Ok(default))
             .map_err(|_| error)
@@ -121,6 +122,7 @@ impl ExtendedMap<&'static str, String> for HashMap<String, ConfigNode> {
                 ConfigNode::Number(_, n) => n.parse().map_err(|_| ()),
                 ConfigNode::Section(_, _) => Err(()),
                 ConfigNode::Route(_, _) => Err(()),
+                ConfigNode::Host(_, _) => Err(()),
             })
             .unwrap_or(Err(()))
             .map_err(|_| error)
