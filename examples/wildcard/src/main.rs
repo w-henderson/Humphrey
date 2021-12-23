@@ -1,24 +1,24 @@
 use humphrey::http::{Request, Response, StatusCode};
 use humphrey::App;
-use std::{error::Error, sync::Arc};
+use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let app = App::new()
-        .with_route("/", home)
-        .with_route("/wildcard/*", wildcard);
+    let app: App<()> = App::new()
+        .with_stateless_route("/", home)
+        .with_stateless_route("/wildcard/*", wildcard);
 
     app.run("127.0.0.1:80")?;
 
     Ok(())
 }
 
-fn home(request: Request, _: Arc<()>) -> Response {
+fn home(_: Request) -> Response {
     let html = include_str!("index.html");
 
-    Response::new(StatusCode::OK, html, &request)
+    Response::new(StatusCode::OK, html)
 }
 
-fn wildcard(request: Request, _: Arc<()>) -> Response {
+fn wildcard(request: Request) -> Response {
     let wildcard_path = request
         .uri // get the URI of the request
         .strip_prefix("/wildcard/") // remove the initial slash
@@ -29,5 +29,5 @@ fn wildcard(request: Request, _: Arc<()>) -> Response {
         wildcard_path
     );
 
-    Response::new(StatusCode::OK, html, &request)
+    Response::new(StatusCode::OK, html)
 }
