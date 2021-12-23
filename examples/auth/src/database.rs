@@ -1,7 +1,7 @@
 use humphrey_auth::database::AuthDatabase as AuthDatabaseTrait;
 use humphrey_auth::error::AuthError;
 use humphrey_auth::session::Session;
-use humphrey_auth::User;
+use humphrey_auth::user::User;
 
 use std::sync::Arc;
 
@@ -18,7 +18,7 @@ impl WrappedDatabase {
 }
 
 impl AuthDatabaseTrait for WrappedDatabase {
-    fn get_user_by_uid(&self, uid: impl AsRef<str>) -> Option<humphrey_auth::User> {
+    fn get_user_by_uid(&self, uid: impl AsRef<str>) -> Option<User> {
         let db = self.0.read();
         let auth = db.collection("auth").unwrap();
         let user = auth.get(uid);
@@ -26,7 +26,7 @@ impl AuthDatabaseTrait for WrappedDatabase {
         user.map(deserialize_user)
     }
 
-    fn get_user_by_token(&self, token: impl AsRef<str>) -> Option<humphrey_auth::User> {
+    fn get_user_by_token(&self, token: impl AsRef<str>) -> Option<User> {
         let db = self.0.read();
         let auth = db.collection("auth").unwrap();
         let user = auth.list().iter().find(|user| {
@@ -39,18 +39,12 @@ impl AuthDatabaseTrait for WrappedDatabase {
         user.map(deserialize_user)
     }
 
-    fn get_session_by_token(
-        &self,
-        token: impl AsRef<str>,
-    ) -> Option<humphrey_auth::session::Session> {
+    fn get_session_by_token(&self, token: impl AsRef<str>) -> Option<Session> {
         self.get_user_by_token(token)
             .map(|user| user.session.unwrap())
     }
 
-    fn update_user(
-        &mut self,
-        user: humphrey_auth::User,
-    ) -> Result<(), humphrey_auth::error::AuthError> {
+    fn update_user(&mut self, user: User) -> Result<(), AuthError> {
         let mut db = self.0.write();
         let auth = db.collection_mut("auth").unwrap();
 
@@ -61,14 +55,11 @@ impl AuthDatabaseTrait for WrappedDatabase {
         }
     }
 
-    fn add_user(
-        &mut self,
-        user: humphrey_auth::User,
-    ) -> Result<(), humphrey_auth::error::AuthError> {
+    fn add_user(&mut self, user: User) -> Result<(), AuthError> {
         self.update_user(user)
     }
 
-    fn remove_user(&mut self, uid: impl AsRef<str>) -> Result<(), humphrey_auth::error::AuthError> {
+    fn remove_user(&mut self, uid: impl AsRef<str>) -> Result<(), AuthError> {
         let mut db = self.0.write();
         let auth = db.collection_mut("auth").unwrap();
 

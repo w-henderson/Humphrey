@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Request handler for the `/` path.
-fn index(request: Request, state: Arc<AppState>) -> Response {
+fn index(_: Request, state: Arc<AppState>) -> Response {
     // Get the number of button presses using the thread-safe `AtomicUsize`
     let presses = state.button_presses.load(Ordering::SeqCst);
 
@@ -34,21 +34,21 @@ fn index(request: Request, state: Arc<AppState>) -> Response {
     let html = include_str!("index.html").replace("{presses}", &presses.to_string());
 
     // Generate and return the response
-    Response::new(StatusCode::OK, html, &request)
+    Response::new(StatusCode::OK, html)
 }
 
-fn add_press(request: Request, state: Arc<AppState>) -> Response {
+fn add_press(_: Request, state: Arc<AppState>) -> Response {
     // Increment the number of button presses using the thread-safe `AtomicUsize`
     state.button_presses.fetch_add(1, Ordering::SeqCst);
 
     // Generate and return the response
-    Response::new(StatusCode::OK, b"OK", &request)
+    Response::new(StatusCode::OK, b"OK")
 }
 
-fn get_presses(request: Request, state: Arc<AppState>) -> Response {
+fn get_presses(_: Request, state: Arc<AppState>) -> Response {
     // Get the number of button presses using the thread-safe `AtomicUsize`
     let presses = state.button_presses.load(Ordering::SeqCst);
 
     // Generate and return the response
-    Response::new(StatusCode::OK, presses.to_string(), &request)
+    Response::new(StatusCode::OK, presses.to_string())
 }

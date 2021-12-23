@@ -7,6 +7,6 @@ edition = "2018"
 
 [dependencies]
 humphrey = { path = "../../humphrey" }
-jasondb = { version = "0.1.1", default-features = false }
+jasondb = { version = "^0.1.2", default-features = false }
 
 [workspace]

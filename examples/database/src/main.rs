@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// The handler for the root path.
-fn home(request: Request, db: Arc<JasonDB>) -> Response {
+fn home(_: Request, db: Arc<JasonDB>) -> Response {
     let messages = collection!(db.read(), "messages") // Use the `collection!` macro to get a collection from the database.
         .list() // List the documents in the collection.
         .iter() // Iterate over the documents, using `fold` to join together the document values.
@@ -42,18 +42,14 @@ fn home(request: Request, db: Arc<JasonDB>) -> Response {
     // Render the template with the messages.
     let html = include_str!("../static/index.html").replace("{messages}", &messages);
 
-    Response::new(StatusCode::OK, html, &request)
+    Response::new(StatusCode::OK, html)
 }
 
 /// The handler for the API endpoint to add a message to the database.
 fn post_message(request: Request, db: Arc<JasonDB>) -> Response {
     // If the request is not a POST request, return a 405 Method Not Allowed response.
     if request.method != Method::Post {
-        return Response::new(
-            StatusCode::MethodNotAllowed,
-            "405 Method Not Allowed",
-            &request,
-        );
+        return Response::new(StatusCode::MethodNotAllowed, "405 Method Not Allowed");
     }
 
     // Get the message from the request body.
@@ -65,7 +61,7 @@ fn post_message(request: Request, db: Arc<JasonDB>) -> Response {
     }
 
     // Return a 200 OK response.
-    Response::new(StatusCode::OK, b"OK", &request)
+    Response::new(StatusCode::OK, b"OK")
 }
 
 /// Create a new database, automatically starting the background thread to synchronize the database to disk.
