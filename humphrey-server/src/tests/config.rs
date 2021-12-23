@@ -33,7 +33,7 @@ fn test_parse_config() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
-        websocket_proxy: Some("localhost:1234".into()),
+        default_websocket_proxy: Some("localhost:1234".into()),
         default_host: HostConfig {
             matches: "*".into(),
             routes: vec![
@@ -42,6 +42,7 @@ fn test_parse_config() {
                     matches: "/static/*".into(),
                     path: Some("/var/www".into()),
                     load_balancer: None,
+                    websocket_proxy: None,
                 },
                 RouteConfig {
                     route_type: RouteType::Proxy,
@@ -53,6 +54,7 @@ fn test_parse_config() {
                         index: 0,
                         lcg: Lcg::new(),
                     })),
+                    websocket_proxy: None,
                 },
             ],
         },
@@ -90,7 +92,7 @@ fn test_host_config() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
-        websocket_proxy: None,
+        default_websocket_proxy: None,
         default_host: HostConfig {
             matches: "*".into(),
             routes: vec![RouteConfig {
@@ -98,6 +100,7 @@ fn test_host_config() {
                 matches: "/*".into(),
                 path: Some("/var/www".into()),
                 load_balancer: None,
+                websocket_proxy: None,
             }],
         },
         hosts: vec![
@@ -108,6 +111,7 @@ fn test_host_config() {
                     matches: "/".into(),
                     path: Some("/app/dev".into()),
                     load_balancer: None,
+                    websocket_proxy: None,
                 }],
             },
             HostConfig {
@@ -117,6 +121,7 @@ fn test_host_config() {
                     matches: "/".into(),
                     path: Some("/app/prod".into()),
                     load_balancer: None,
+                    websocket_proxy: None,
                 }],
             },
         ],
@@ -149,7 +154,7 @@ fn comma_separated_routes() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
-        websocket_proxy: None,
+        default_websocket_proxy: None,
         default_host: HostConfig {
             matches: "*".into(),
             routes: vec![
@@ -158,12 +163,14 @@ fn comma_separated_routes() {
                     matches: "/example/*".into(),
                     path: Some("/var/www".into()),
                     load_balancer: None,
+                    websocket_proxy: None,
                 },
                 RouteConfig {
                     route_type: RouteType::Directory,
                     matches: "/test/*".into(),
                     path: Some("/var/www".into()),
                     load_balancer: None,
+                    websocket_proxy: None,
                 },
             ],
         },

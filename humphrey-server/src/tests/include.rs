@@ -23,7 +23,7 @@ fn include_route() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
-        websocket_proxy: None,
+        default_websocket_proxy: None,
         default_host: HostConfig {
             matches: "*".into(),
             routes: vec![RouteConfig {
@@ -31,6 +31,7 @@ fn include_route() {
                 matches: "/*".into(),
                 path: Some("/var/www".into()),
                 load_balancer: None,
+                websocket_proxy: None,
             }],
         },
         hosts: Vec::new(),
@@ -67,7 +68,7 @@ fn nested_include() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
-        websocket_proxy: None,
+        default_websocket_proxy: None,
         default_host: HostConfig {
             matches: "*".into(),
             routes: vec![RouteConfig {
@@ -80,6 +81,7 @@ fn nested_include() {
                     index: 0,
                     lcg: Lcg::new(),
                 })),
+                websocket_proxy: None,
             }],
         },
         hosts: Vec::new(),
