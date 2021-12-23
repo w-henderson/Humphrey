@@ -9,7 +9,7 @@ impl Default for Config {
             address: "0.0.0.0".into(),
             port: 80,
             threads: 32,
-            websocket_proxy: None,
+            default_websocket_proxy: None,
             hosts: vec![Default::default()],
             default_host: Default::default(),
             #[cfg(feature = "plugins")]
@@ -28,6 +28,7 @@ impl Default for RouteConfig {
             matches: "/*".into(),
             path: Some('.'.into()),
             load_balancer: None,
+            websocket_proxy: None,
         }
     }
 }

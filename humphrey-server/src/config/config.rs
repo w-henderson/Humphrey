@@ -20,8 +20,8 @@ pub struct Config {
     pub port: u16,
     /// The number of threads to host the server on
     pub threads: usize,
-    /// Address to forward WebSocket connections to
-    pub websocket_proxy: Option<String>,
+    /// Address to forward WebSocket connections to, unless otherwise specified by the route
+    pub default_websocket_proxy: Option<String>,
     /// The configuration for different hosts
     pub hosts: Vec<HostConfig>,
     /// The configuration for the default host
@@ -65,6 +65,8 @@ pub struct RouteConfig {
     pub path: Option<String>,
     /// The load balancer to use for proxying
     pub load_balancer: Option<EqMutex<LoadBalancer>>,
+    /// The WebSocket proxy target for WebSocket connections to this route
+    pub websocket_proxy: Option<String>,
 }
 
 /// Represents configuration for the logger.
@@ -151,7 +153,7 @@ impl Config {
         let port: u16 = hashmap.get_optional_parsed("server.port", 80, "Invalid port")?;
         let threads: usize =
             hashmap.get_optional_parsed("server.threads", 32, "Invalid number of threads")?;
-        let websocket_proxy = hashmap.get_owned("server.websocket");
+        let default_websocket_proxy = hashmap.get_owned("server.websocket");
 
         // Get and validate the blacklist file and mode
         let blacklist = {
@@ -256,7 +258,7 @@ impl Config {
             address,
             port,
             threads,
-            websocket_proxy,
+            default_websocket_proxy,
             default_host,
             hosts,
             #[cfg(feature = "plugins")]
@@ -330,6 +332,8 @@ fn parse_route(
     let mut routes: Vec<RouteConfig> = Vec::new();
 
     for wild in wild.split(',').map(|s| s.trim()) {
+        let websocket_proxy = conf.get_owned("websocket");
+
         if conf.contains_key("file") {
             // This is a regular file-serving route
 
@@ -340,6 +344,7 @@ fn parse_route(
                 matches: wild.to_string(),
                 path: Some(file),
                 load_balancer: None,
+                websocket_proxy,
             });
         } else if conf.contains_key("directory") {
             // This is a regular directory-serving route
@@ -351,6 +356,7 @@ fn parse_route(
                 matches: wild.to_string(),
                 path: Some(directory),
                 load_balancer: None,
+                websocket_proxy,
             });
         } else if conf.contains_key("proxy") {
             // This is a proxy route
@@ -384,6 +390,7 @@ fn parse_route(
                 matches: wild.to_string(),
                 path: None,
                 load_balancer: Some(load_balancer),
+                websocket_proxy,
             });
         } else if conf.contains_key("redirect") {
             // This is a redirect route
@@ -395,9 +402,10 @@ fn parse_route(
                 matches: wild.to_string(),
                 path: Some(target),
                 load_balancer: None,
+                websocket_proxy,
             });
-        } else {
-            return Err("Invalid route configuration, every route must contain either the `file`, `directory`, `proxy` or `redirect` field");
+        } else if !conf.contains_key("websocket") {
+            return Err("Invalid route configuration, every route must contain either the `file`, `directory`, `proxy` or `redirect` field, unless it defines a WebSocket proxy with the `websocket` field");
         }
     }
 

@@ -47,8 +47,7 @@ impl From<Config> for AppState {
 /// Main function for the static server.
 pub fn main(config: Config) {
     let mut app: App<AppState> = App::new_with_config(config.threads, AppState::from(config))
-        .with_connection_condition(verify_connection)
-        .with_websocket_route("/*", websocket_handler);
+        .with_connection_condition(verify_connection);
 
     let state = app.get_state();
 
@@ -58,6 +57,10 @@ pub fn main(config: Config) {
 
     for (host_index, host) in state.config.hosts.iter().enumerate() {
         app = app.with_host(&host.matches, init_app_routes(host, host_index + 1));
+    }
+
+    if let Some(proxy) = state.config.default_websocket_proxy.as_ref() {
+        app = app.with_websocket_route("/*", websocket_handler(proxy.to_string()));
     }
 
     let addr = format!("{}:{}", state.config.address, state.config.port);
@@ -84,6 +87,11 @@ fn init_app_routes(host: &HostConfig, host_index: usize) -> SubApp<AppState> {
         subapp = subapp.with_route(&route.matches, move |request, state| {
             request_handler(request, state, host_index, route_index)
         });
+
+        if let Some(proxy) = route.websocket_proxy.as_ref() {
+            subapp =
+                subapp.with_websocket_route(&route.matches, websocket_handler(proxy.to_string()));
+        }
     }
 
     subapp
@@ -163,56 +171,54 @@ fn inner_request_handler(
     }
 }
 
-fn websocket_handler(request: Request, mut source: TcpStream, state: Arc<AppState>) {
+fn websocket_handler(target: String) -> impl Fn(Request, TcpStream, Arc<AppState>) {
+    move |request: Request, source: TcpStream, state: Arc<AppState>| {
+        proxy_websocket(request, source, &target, state)
+    }
+}
+
+fn proxy_websocket(request: Request, mut source: TcpStream, target: &str, state: Arc<AppState>) {
     let source_addr = request.address.origin_addr.to_string();
+    let bytes: Vec<u8> = request.into();
 
-    if let Some(address) = &state.config.websocket_proxy {
-        let bytes: Vec<u8> = request.into();
+    if let Ok(mut destination) = TcpStream::connect(target) {
+        // The target was successfully connected to
 
-        if let Ok(mut destination) = TcpStream::connect(address) {
-            // The target was successfully connected to
+        destination.write_all(&bytes).unwrap();
 
-            destination.write_all(&bytes).unwrap();
-
-            let mut source_clone = source.try_clone().unwrap();
-            let mut destination_clone = destination.try_clone().unwrap();
-            state.logger.info(&format!(
-                "{}: WebSocket connected, proxying data",
-                source_addr
-            ));
-
-            // Pipe data in both directions
-            let forward = spawn(move || pipe(&mut source, &mut destination));
-            let backward = spawn(move || pipe(&mut destination_clone, &mut source_clone));
-
-            // Log any errors
-            if forward.join().unwrap().is_err() {
-                state.logger.error(&format!(
-                    "{}: Error proxying WebSocket from client to target, connection closed",
-                    source_addr
-                ));
-            }
-            if backward.join().unwrap().is_err() {
-                state.logger.error(&format!(
-                    "{}: Error proxying WebSocket from target to client, connection closed",
-                    source_addr
-                ));
-            }
-
-            state.logger.info(&format!(
-                "{}: WebSocket session complete, connection closed",
-                source_addr
-            ));
-        } else {
-            state
-                .logger
-                .error(&format!("{}: Could not connect to WebSocket", source_addr));
-        }
-    } else {
-        state.logger.warn(&format!(
-            "{}: WebSocket connection attempted but no handler provided",
+        let mut source_clone = source.try_clone().unwrap();
+        let mut destination_clone = destination.try_clone().unwrap();
+        state.logger.info(&format!(
+            "{}: WebSocket connected, proxying data",
             source_addr
-        ))
+        ));
+
+        // Pipe data in both directions
+        let forward = spawn(move || pipe(&mut source, &mut destination));
+        let backward = spawn(move || pipe(&mut destination_clone, &mut source_clone));
+
+        // Log any errors
+        if forward.join().unwrap().is_err() {
+            state.logger.error(&format!(
+                "{}: Error proxying WebSocket from client to target, connection closed",
+                source_addr
+            ));
+        }
+        if backward.join().unwrap().is_err() {
+            state.logger.error(&format!(
+                "{}: Error proxying WebSocket from target to client, connection closed",
+                source_addr
+            ));
+        }
+
+        state.logger.info(&format!(
+            "{}: WebSocket session complete, connection closed",
+            source_addr
+        ));
+    } else {
+        state
+            .logger
+            .error(&format!("{}: Could not connect to WebSocket", source_addr));
     }
 }
 
