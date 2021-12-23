@@ -268,6 +268,15 @@ impl Config {
             blacklist,
         })
     }
+
+    /// Get the route at the given host and route indices.
+    pub fn get_route(&self, host: usize, route: usize) -> &RouteConfig {
+        if host == 0 {
+            &self.default_host.routes[route]
+        } else {
+            &self.hosts[host - 1].routes[route]
+        }
+    }
 }
 
 /// Loads the configuration file.

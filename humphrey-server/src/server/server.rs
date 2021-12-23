@@ -118,12 +118,18 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
 }
 
 #[cfg(feature = "plugins")]
-fn request_handler(mut request: Request, state: Arc<AppState>, route: usize) -> Response {
+fn request_handler(
+    mut request: Request,
+    state: Arc<AppState>,
+    host: usize,
+    route: usize,
+) -> Response {
     let plugins = state.plugin_manager.read().unwrap();
 
+    let route_config = state.config.get_route(host, route);
     let mut response = plugins
-        .on_request(&mut request, state.clone()) // If the plugin overrides the response, return it
-        .unwrap_or_else(|| inner_request_handler(request, state.clone(), route)); // If no plugin overrides the response, generate it in the normal way
+        .on_request(&mut request, state.clone(), route_config) // If the plugin overrides the response, return it
+        .unwrap_or_else(|| inner_request_handler(request, state.clone(), host, route)); // If no plugin overrides the response, generate it in the normal way
 
     // Pass the response to plugins before it is sent to the client
     plugins.on_response(&mut response, state.clone());
@@ -142,13 +148,7 @@ fn inner_request_handler(
     host: usize,
     route: usize,
 ) -> Response {
-    let route = {
-        if host == 0 {
-            &state.config.default_host.routes[route]
-        } else {
-            &state.config.hosts[host - 1].routes[route]
-        }
-    };
+    let route = state.config.get_route(host, route);
 
     match route.route_type {
         RouteType::File => file_handler(request, state.clone(), route.path.as_ref().unwrap(), host),
