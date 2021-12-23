@@ -37,8 +37,8 @@ where
 ///
 /// # Example
 /// ```
-/// fn auth_req_handler(req: Request, state: Arc<MyState>, uid: String) -> Response {
-///     Response::new(StatusCode::OK, uid, &request)
+/// fn auth_req_handler(_: Request, state: Arc<MyState>, uid: String) -> Response {
+///     Response::new(StatusCode::OK, uid)
 /// }
 /// ```
 pub trait AuthRequestHandler<S>: Fn(Request, Arc<S>, String) -> Response + Send + Sync {}
@@ -55,9 +55,6 @@ where
 {
     /// Adds an authenticated route and associated handler to the server.
     /// Routes can include wildcards, such as `/blog/*`.
-    ///
-    /// ## Panics
-    /// This function will panic if the route string cannot be converted to a `Uri` object.
     fn with_auth_route<T>(self, route: &str, handler: T) -> Self
     where
         T: AuthRequestHandler<S> + 'static;
