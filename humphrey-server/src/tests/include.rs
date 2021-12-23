@@ -1,7 +1,7 @@
 use humphrey_server::config::tree::parse_conf;
 use humphrey_server::config::{
     BlacklistConfig, BlacklistMode, CacheConfig, Config, HostConfig, LoadBalancerMode,
-    LoggingConfig, RouteConfig,
+    LoggingConfig, RouteConfig, RouteType,
 };
 use humphrey_server::logger::LogLevel;
 use humphrey_server::proxy::{EqMutex, LoadBalancer};
@@ -26,9 +26,11 @@ fn include_route() {
         websocket_proxy: None,
         default_host: HostConfig {
             matches: "*".into(),
-            routes: vec![RouteConfig::Directory {
+            routes: vec![RouteConfig {
+                route_type: RouteType::Directory,
                 matches: "/*".into(),
-                directory: "/var/www".into(),
+                path: Some("/var/www".into()),
+                load_balancer: None,
             }],
         },
         hosts: Vec::new(),
@@ -68,14 +70,16 @@ fn nested_include() {
         websocket_proxy: None,
         default_host: HostConfig {
             matches: "*".into(),
-            routes: vec![RouteConfig::Proxy {
+            routes: vec![RouteConfig {
+                route_type: RouteType::Proxy,
                 matches: "/test".into(),
-                load_balancer: EqMutex::new(LoadBalancer {
+                path: None,
+                load_balancer: Some(EqMutex::new(LoadBalancer {
                     targets: vec!["127.0.0.1".into()],
                     mode: LoadBalancerMode::Random,
                     index: 0,
                     lcg: Lcg::new(),
-                }),
+                })),
             }],
         },
         hosts: Vec::new(),

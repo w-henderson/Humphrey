@@ -5,7 +5,7 @@ use humphrey_server::config::config::{
     RouteConfig,
 };
 use humphrey_server::config::tree::{parse_conf, ConfigNode};
-use humphrey_server::config::HostConfig;
+use humphrey_server::config::{HostConfig, RouteType};
 use humphrey_server::logger::LogLevel;
 
 #[cfg(feature = "plugins")]
@@ -37,18 +37,22 @@ fn test_parse_config() {
         default_host: HostConfig {
             matches: "*".into(),
             routes: vec![
-                RouteConfig::Directory {
+                RouteConfig {
+                    route_type: RouteType::Directory,
                     matches: "/static/*".into(),
-                    directory: "/var/www".into(),
+                    path: Some("/var/www".into()),
+                    load_balancer: None,
                 },
-                RouteConfig::Proxy {
+                RouteConfig {
+                    route_type: RouteType::Proxy,
                     matches: "/*".into(),
-                    load_balancer: EqMutex::new(LoadBalancer {
+                    path: None,
+                    load_balancer: Some(EqMutex::new(LoadBalancer {
                         targets: vec!["127.0.0.1:8000".into(), "127.0.0.1:8080".into()],
                         mode: LoadBalancerMode::RoundRobin,
                         index: 0,
                         lcg: Lcg::new(),
-                    }),
+                    })),
                 },
             ],
         },
@@ -89,24 +93,30 @@ fn test_host_config() {
         websocket_proxy: None,
         default_host: HostConfig {
             matches: "*".into(),
-            routes: vec![RouteConfig::Directory {
+            routes: vec![RouteConfig {
+                route_type: RouteType::Directory,
                 matches: "/*".into(),
-                directory: "/var/www".into(),
+                path: Some("/var/www".into()),
+                load_balancer: None,
             }],
         },
         hosts: vec![
             HostConfig {
                 matches: "localhost".into(),
-                routes: vec![RouteConfig::Redirect {
+                routes: vec![RouteConfig {
+                    route_type: RouteType::Redirect,
                     matches: "/".into(),
-                    target: "/app/dev".into(),
+                    path: Some("/app/dev".into()),
+                    load_balancer: None,
                 }],
             },
             HostConfig {
                 matches: "*.example.com".into(),
-                routes: vec![RouteConfig::Redirect {
+                routes: vec![RouteConfig {
+                    route_type: RouteType::Redirect,
                     matches: "/".into(),
-                    target: "/app/prod".into(),
+                    path: Some("/app/prod".into()),
+                    load_balancer: None,
                 }],
             },
         ],
@@ -143,13 +153,17 @@ fn comma_separated_routes() {
         default_host: HostConfig {
             matches: "*".into(),
             routes: vec![
-                RouteConfig::Directory {
+                RouteConfig {
+                    route_type: RouteType::Directory,
                     matches: "/example/*".into(),
-                    directory: "/var/www".into(),
+                    path: Some("/var/www".into()),
+                    load_balancer: None,
                 },
-                RouteConfig::Directory {
+                RouteConfig {
+                    route_type: RouteType::Directory,
                     matches: "/test/*".into(),
-                    directory: "/var/www".into(),
+                    path: Some("/var/www".into()),
+                    load_balancer: None,
                 },
             ],
         },
