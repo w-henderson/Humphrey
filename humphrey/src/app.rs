@@ -33,6 +33,8 @@ where
     connection_condition: ConnectionCondition<State>,
     #[cfg(feature = "tls")]
     tls_config: Option<Arc<ServerConfig>>,
+    #[cfg(feature = "tls")]
+    force_https: bool,
 }
 
 /// Represents a function able to handle a connection.
@@ -139,6 +141,8 @@ where
             connection_condition: |_, _| true,
             #[cfg(feature = "tls")]
             tls_config: None,
+            #[cfg(feature = "tls")]
+            force_https: false,
         }
     }
 
@@ -154,6 +158,8 @@ where
             connection_condition: |_, _| true,
             #[cfg(feature = "tls")]
             tls_config: None,
+            #[cfg(feature = "tls")]
+            force_https: false,
         }
     }
 
@@ -208,6 +214,11 @@ where
         let subapps = Arc::new(self.subapps);
         let default_subapp = Arc::new(self.default_subapp);
         let error_handler = Arc::new(self.error_handler);
+
+        if self.force_https {
+            self.thread_pool
+                .execute(|| force_https_thread().unwrap_or(()));
+        }
 
         for mut sock in socket.incoming().flatten() {
             let cloned_state = self.state.clone();
@@ -321,6 +332,12 @@ where
     /// For example, this could be used for implementing whitelists and blacklists.
     pub fn with_connection_condition(mut self, condition: ConnectionCondition<State>) -> Self {
         self.connection_condition = condition;
+        self
+    }
+
+    #[cfg(feature = "tls")]
+    pub fn with_forced_https(mut self, forced: bool) -> Self {
+        self.force_https = forced;
         self
     }
 
@@ -571,6 +588,34 @@ fn call_websocket_handler<State>(
     {
         (handler.handler)(request.clone(), stream, state)
     }
+}
+
+#[cfg(feature = "tls")]
+fn force_https_thread() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::http::headers::ResponseHeader;
+    use std::io::Write;
+
+    let socket = TcpListener::bind("0.0.0.0:80")?;
+
+    for mut stream in socket.incoming().flatten() {
+        let addr = stream.peer_addr()?;
+        let request = Request::from_stream(&mut stream, addr)?;
+        let response = Response::empty(StatusCode::MovedPermanently)
+            .with_header(
+                ResponseHeader::Location,
+                format!(
+                    "https://{}{}",
+                    request.headers.get(&RequestHeader::Host).unwrap(),
+                    request.uri
+                ),
+            )
+            .with_header(ResponseHeader::Connection, "Close".into());
+
+        let response_bytes: Vec<u8> = response.into();
+        stream.write_all(&response_bytes)?;
+    }
+
+    Ok(())
 }
 
 /// The default error handler for every Humphrey app.
