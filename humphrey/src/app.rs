@@ -408,6 +408,13 @@ fn client_handler<State>(
     error_handler: Arc<ErrorHandler>,
     state: Arc<State>,
 ) {
+    use std::collections::btree_map::Entry;
+    use std::io::Write;
+
+    use crate::http::date::DateTime;
+    use crate::http::headers::ResponseHeader;
+    use crate::http::request::RequestError;
+
     let addr = stream.peer_addr().unwrap();
 
     loop {
