@@ -2,84 +2,54 @@
 use rustls::ServerConnection;
 
 use std::io::{Error, Read, Write};
+use std::marker::PhantomData;
 use std::net::{SocketAddr, TcpStream};
 
-#[cfg(not(feature = "tls"))]
-pub struct Stream(TcpStream);
-
-#[cfg(feature = "tls")]
-pub struct Stream<'a>(rustls::Stream<'a, ServerConnection, TcpStream>);
-
-#[cfg(not(feature = "tls"))]
-impl Read for Stream {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.0.read(buf)
-    }
+pub enum Stream<'a> {
+    Tcp(TcpStream),
+    #[cfg(feature = "tls")]
+    Tls(rustls::Stream<'a, ServerConnection, TcpStream>),
+    Phantom(PhantomData<&'a ()>),
 }
 
-#[cfg(not(feature = "tls"))]
-impl Write for Stream {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.write(buf)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.0.flush()
-    }
-}
-
-#[cfg(feature = "tls")]
 impl<'a> Read for Stream<'a> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.0.read(buf)
+        match self {
+            Stream::Tcp(stream) => stream.read(buf),
+            #[cfg(feature = "tls")]
+            Stream::Tls(stream) => stream.read(buf),
+            Stream::Phantom(_) => panic!("Phantom data in stream enum"),
+        }
     }
 }
 
-#[cfg(feature = "tls")]
 impl<'a> Write for Stream<'a> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.write(buf)
+        match self {
+            Stream::Tcp(stream) => stream.write(buf),
+            #[cfg(feature = "tls")]
+            Stream::Tls(stream) => stream.write(buf),
+            Stream::Phantom(_) => panic!("Phantom data in stream enum"),
+        }
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        self.0.flush()
+        match self {
+            Stream::Tcp(stream) => stream.flush(),
+            #[cfg(feature = "tls")]
+            Stream::Tls(stream) => stream.flush(),
+            Stream::Phantom(_) => panic!("Phantom data in stream enum"),
+        }
     }
 }
 
-#[cfg(not(feature = "tls"))]
-impl Stream {
-    pub fn new(stream: TcpStream) -> Self {
-        Self(stream)
-    }
-
-    pub fn inner(&self) -> &TcpStream {
-        &self.0
-    }
-
-    pub fn into_inner(self) -> TcpStream {
-        self.0
-    }
-
-    pub fn peer_addr(&self) -> Result<SocketAddr, Error> {
-        self.0.peer_addr()
-    }
-}
-
-#[cfg(feature = "tls")]
 impl<'a> Stream<'a> {
-    pub fn new(stream: rustls::Stream<'a, ServerConnection, TcpStream>) -> Self {
-        Self(stream)
-    }
-
-    pub fn inner(&self) -> &rustls::Stream<'a, ServerConnection, TcpStream> {
-        &self.0
-    }
-
-    pub fn into_inner(self) -> rustls::Stream<'a, ServerConnection, TcpStream> {
-        self.0
-    }
-
     pub fn peer_addr(&self) -> Result<SocketAddr, Error> {
-        self.0.sock.peer_addr()
+        match self {
+            Stream::Tcp(stream) => stream.peer_addr(),
+            #[cfg(feature = "tls")]
+            Stream::Tls(stream) => stream.sock.peer_addr(),
+            Stream::Phantom(_) => panic!("Phantom data in stream enum"),
+        }
     }
 }

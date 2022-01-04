@@ -153,7 +153,6 @@ where
 
     /// Runs the Humphrey app on the given socket address.
     /// This function will only return if a fatal error is thrown such as the port being in use.
-    #[cfg(not(feature = "tls"))]
     pub fn run<A>(self, addr: A) -> Result<(), HumphreyError>
     where
         A: ToSocketAddrs,
@@ -177,7 +176,7 @@ where
                 // Spawn a new thread to handle the connection
                 self.thread_pool.execute(move || {
                     (cloned_handler)(
-                        Stream::new(stream),
+                        Stream::Tcp(stream),
                         cloned_subapps,
                         cloned_default_subapp,
                         cloned_error_handler,
@@ -193,7 +192,7 @@ where
     /// Runs the Humphrey app on the given socket address.
     /// This function will only return if a fatal error is thrown such as the port being in use.
     #[cfg(feature = "tls")]
-    pub fn run<A>(self, addr: A) -> Result<(), HumphreyError>
+    pub fn run_tls<A>(self, addr: A) -> Result<(), HumphreyError>
     where
         A: ToSocketAddrs,
     {
@@ -244,7 +243,7 @@ where
                 self.thread_pool.execute(move || {
                     let mut server = ServerConnection::new(cloned_config).unwrap();
                     let tls_stream = rustls::Stream::new(&mut server, &mut sock);
-                    let stream = Stream::new(tls_stream);
+                    let stream = Stream::Tls(tls_stream);
 
                     (cloned_handler)(
                         stream,
