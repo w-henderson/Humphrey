@@ -177,7 +177,7 @@ where
                 // Spawn a new thread to handle the connection
                 self.thread_pool.execute(move || {
                     (cloned_handler)(
-                        stream,
+                        Stream::new(stream),
                         cloned_subapps,
                         cloned_default_subapp,
                         cloned_error_handler,
