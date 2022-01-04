@@ -48,6 +48,9 @@ pub mod krauss;
 pub mod route;
 pub mod thread;
 
+#[cfg(feature = "tls")]
+pub mod tls;
+
 #[cfg(test)]
 mod tests;
 

@@ -1,18 +1,21 @@
 #![allow(clippy::new_without_default)]
 
-use crate::http::date::DateTime;
-use crate::http::headers::{RequestHeader, ResponseHeader};
-use crate::http::request::{Request, RequestError};
+use crate::http::headers::RequestHeader;
+use crate::http::request::Request;
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
 use crate::krauss::wildcard_match;
 use crate::route::{Route, SubApp};
 use crate::thread::pool::ThreadPool;
 
-use std::collections::btree_map::Entry;
-use std::io::Write;
+#[cfg(feature = "tls")]
+use crate::tls;
+
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
+
+#[cfg(feature = "tls")]
+use rustls::{ServerConfig, ServerConnection, Stream};
 
 /// Represents the Humphrey app.
 ///
@@ -34,6 +37,16 @@ where
 
 /// Represents a function able to handle a connection.
 /// In most cases, the default connection handler should be used.
+#[cfg(feature = "tls")]
+pub type ConnectionHandler<State> = fn(
+    TcpStream,
+    Arc<Vec<SubApp<State>>>,
+    Arc<SubApp<State>>,
+    Arc<ErrorHandler>,
+    Arc<State>,
+    Arc<ServerConfig>,
+);
+#[cfg(not(feature = "tls"))]
 pub type ConnectionHandler<State> =
     fn(TcpStream, Arc<Vec<SubApp<State>>>, Arc<SubApp<State>>, Arc<ErrorHandler>, Arc<State>);
 
@@ -41,7 +54,20 @@ pub type ConnectionHandler<State> =
 pub type ConnectionCondition<State> = fn(&mut TcpStream, Arc<State>) -> bool;
 
 /// Represents a function able to handle a WebSocket handshake and consequent data frames.
+#[cfg(feature = "tls")]
+pub trait WebsocketHandler<State>:
+    Fn(Request, Stream<ServerConnection, TcpStream>, Arc<State>) + Send + Sync
+{
+}
+#[cfg(not(feature = "tls"))]
 pub trait WebsocketHandler<State>: Fn(Request, TcpStream, Arc<State>) + Send + Sync {}
+
+#[cfg(feature = "tls")]
+impl<T, S> WebsocketHandler<S> for T where
+    T: Fn(Request, Stream<ServerConnection, TcpStream>, Arc<S>) + Send + Sync
+{
+}
+#[cfg(not(feature = "tls"))]
 impl<T, S> WebsocketHandler<S> for T where T: Fn(Request, TcpStream, Arc<S>) + Send + Sync {}
 
 /// Represents a function able to handle a request.
@@ -132,7 +158,10 @@ where
             default_subapp: SubApp::default(),
             error_handler,
             state: Arc::new(State::default()),
+            #[cfg(not(feature = "tls"))]
             connection_handler: client_handler,
+            #[cfg(feature = "tls")]
+            connection_handler: tls::client_handler,
             connection_condition: |_, _| true,
         }
     }
@@ -145,13 +174,17 @@ where
             default_subapp: SubApp::default(),
             error_handler,
             state: Arc::new(state),
+            #[cfg(not(feature = "tls"))]
             connection_handler: client_handler,
+            #[cfg(feature = "tls")]
+            connection_handler: tls::client_handler,
             connection_condition: |_, _| true,
         }
     }
 
     /// Runs the Humphrey app on the given socket address.
     /// This function will only return if a fatal error is thrown such as the port being in use.
+    #[cfg(not(feature = "tls"))]
     pub fn run<A>(self, addr: A) -> Result<(), HumphreyError>
     where
         A: ToSocketAddrs,
@@ -180,6 +213,71 @@ where
                         cloned_default_subapp,
                         cloned_error_handler,
                         cloned_state,
+                    )
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "tls")]
+    pub fn run<A>(self, addr: A) -> Result<(), HumphreyError>
+    where
+        A: ToSocketAddrs,
+    {
+        use rustls::{Certificate, PrivateKey, ServerConfig, ServerSession};
+        use rustls_pemfile::{read_one, Item};
+
+        use std::fs::File;
+        use std::io::BufReader;
+
+        let socket = TcpListener::bind(addr)?;
+        let subapps = Arc::new(self.subapps);
+        let default_subapp = Arc::new(self.default_subapp);
+        let error_handler = Arc::new(self.error_handler);
+
+        let mut cert_file = BufReader::new(File::open("keys/localhost.pem")?);
+        let mut key_file = BufReader::new(File::open("keys/localhost-key.pem")?);
+
+        let certs: Vec<Certificate> = match read_one(&mut cert_file)?.unwrap() {
+            Item::X509Certificate(cert) => vec![Certificate(cert)],
+            _ => panic!("not pog cert"),
+        };
+
+        let key: PrivateKey = match read_one(&mut key_file)?.unwrap() {
+            Item::PKCS8Key(key) => PrivateKey(key),
+            _ => panic!("not pog key"),
+        };
+
+        let config = Arc::new(
+            ServerConfig::builder()
+                .with_safe_defaults()
+                .with_no_client_auth()
+                .with_single_cert(certs, key)?,
+        );
+
+        for mut stream in socket.incoming().flatten() {
+            let cloned_state = self.state.clone();
+
+            // Check that the client is allowed to connect
+            if (self.connection_condition)(&mut stream, cloned_state) {
+                let cloned_state = self.state.clone();
+                let cloned_subapps = subapps.clone();
+                let cloned_default_subapp = default_subapp.clone();
+                let cloned_error_handler = error_handler.clone();
+                let cloned_handler = self.connection_handler;
+                let cloned_config = config.clone();
+
+                // Spawn a new thread to handle the connection
+                self.thread_pool.execute(move || {
+                    (cloned_handler)(
+                        stream,
+                        cloned_subapps,
+                        cloned_default_subapp,
+                        cloned_error_handler,
+                        cloned_state,
+                        cloned_config,
                     )
                 });
             }
@@ -302,6 +400,7 @@ where
 /// Handles a connection with a client.
 /// The connection will be opened upon the first request and closed as soon as a request is
 ///   recieved without the `Connection: Keep-Alive` header.
+#[cfg(not(feature = "tls"))]
 fn client_handler<State>(
     mut stream: TcpStream,
     subapps: Arc<Vec<SubApp<State>>>,
@@ -403,7 +502,7 @@ fn client_handler<State>(
 }
 
 /// Calls the correct handler for the given request.
-fn call_handler<State>(
+pub(crate) fn call_handler<State>(
     request: &Request,
     subapps: &[SubApp<State>],
     default_subapp: &SubApp<State>,
@@ -442,6 +541,7 @@ fn call_handler<State>(
 }
 
 /// Calls the correct WebSocket handler for the given request.
+#[cfg(not(feature = "tls"))]
 fn call_websocket_handler<State>(
     request: &Request,
     subapps: &[SubApp<State>],
