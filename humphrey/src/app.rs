@@ -31,6 +31,8 @@ where
     state: Arc<State>,
     connection_handler: ConnectionHandler<State>,
     connection_condition: ConnectionCondition<State>,
+    #[cfg(feature = "tls")]
+    tls_config: Option<Arc<ServerConfig>>,
 }
 
 /// Represents a function able to handle a connection.
@@ -135,6 +137,8 @@ where
             state: Arc::new(State::default()),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
+            #[cfg(feature = "tls")]
+            tls_config: None,
         }
     }
 
@@ -148,6 +152,8 @@ where
             state: Arc::new(state),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
+            #[cfg(feature = "tls")]
+            tls_config: None,
         }
     }
 
@@ -196,36 +202,12 @@ where
     where
         A: ToSocketAddrs,
     {
-        use rustls::{Certificate, PrivateKey, ServerConnection};
-        use rustls_pemfile::{read_one, Item};
-
-        use std::fs::File;
-        use std::io::BufReader;
+        use rustls::ServerConnection;
 
         let socket = TcpListener::bind(addr)?;
         let subapps = Arc::new(self.subapps);
         let default_subapp = Arc::new(self.default_subapp);
         let error_handler = Arc::new(self.error_handler);
-
-        let mut cert_file = BufReader::new(File::open("keys/localhost.pem")?);
-        let mut key_file = BufReader::new(File::open("keys/localhost-key.pem")?);
-
-        let certs: Vec<Certificate> = match read_one(&mut cert_file)?.unwrap() {
-            Item::X509Certificate(cert) => vec![Certificate(cert)],
-            _ => panic!("not pog cert"),
-        };
-
-        let key: PrivateKey = match read_one(&mut key_file)?.unwrap() {
-            Item::PKCS8Key(key) => PrivateKey(key),
-            _ => panic!("not pog key"),
-        };
-
-        let config = Arc::new(
-            ServerConfig::builder()
-                .with_safe_defaults()
-                .with_no_client_auth()
-                .with_single_cert(certs, key)?,
-        );
 
         for mut sock in socket.incoming().flatten() {
             let cloned_state = self.state.clone();
@@ -237,7 +219,7 @@ where
                 let cloned_default_subapp = default_subapp.clone();
                 let cloned_error_handler = error_handler.clone();
                 let cloned_handler = self.connection_handler;
-                let cloned_config = config.clone();
+                let cloned_config = self.tls_config.as_ref().unwrap().clone();
 
                 // Spawn a new thread to handle the connection
                 self.thread_pool.execute(move || {
@@ -339,6 +321,42 @@ where
     /// For example, this could be used for implementing whitelists and blacklists.
     pub fn with_connection_condition(mut self, condition: ConnectionCondition<State>) -> Self {
         self.connection_condition = condition;
+        self
+    }
+
+    #[cfg(feature = "tls")]
+    pub fn with_cert(mut self, cert_path: impl AsRef<str>, key_path: impl AsRef<str>) -> Self {
+        use rustls::{Certificate, PrivateKey};
+        use rustls_pemfile::{read_one, Item};
+
+        use std::fs::File;
+        use std::io::BufReader;
+
+        let mut cert_file =
+            BufReader::new(File::open(cert_path.as_ref()).expect("failed to open cert file"));
+        let mut key_file =
+            BufReader::new(File::open(key_path.as_ref()).expect("failed to open key file"));
+
+        let certs: Vec<Certificate> = match read_one(&mut cert_file).unwrap().unwrap() {
+            Item::X509Certificate(cert) => vec![Certificate(cert)],
+            _ => panic!("failed to parse cert file"),
+        };
+
+        let key: PrivateKey = match read_one(&mut key_file).unwrap().unwrap() {
+            Item::PKCS8Key(key) => PrivateKey(key),
+            _ => panic!("failed to parse key file"),
+        };
+
+        let config = Arc::new(
+            ServerConfig::builder()
+                .with_safe_defaults()
+                .with_no_client_auth()
+                .with_single_cert(certs, key)
+                .expect("failed to create server config"),
+        );
+
+        self.tls_config = Some(config);
+
         self
     }
 
