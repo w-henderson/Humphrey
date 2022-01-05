@@ -65,7 +65,9 @@ pub fn main(config: Config) {
 
     #[cfg(feature = "tls")]
     if let Some(tls_config) = &state.config.tls_config {
-        app = app.with_cert(&tls_config.cert_file, &tls_config.key_file);
+        app = app
+            .with_cert(&tls_config.cert_file, &tls_config.key_file)
+            .with_forced_https(tls_config.force);
     }
 
     let addr = format!("{}:{}", state.config.address, state.config.port);

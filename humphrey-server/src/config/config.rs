@@ -107,6 +107,7 @@ pub struct BlacklistConfig {
 pub struct TlsConfig {
     pub cert_file: String,
     pub key_file: String,
+    pub force: bool,
 }
 
 /// Represents configuration for a plugin.
@@ -196,12 +197,14 @@ impl Config {
         let tls_config = {
             let cert_file = hashmap.get_owned("server.tls.cert_file");
             let key_file = hashmap.get_owned("server.tls.key_file");
+            let force = hashmap.get_optional("server.tls.force", "false".into());
 
             if let Some(cert_file) = cert_file {
                 if let Some(key_file) = key_file {
                     Some(TlsConfig {
                         cert_file,
                         key_file,
+                        force: force == "true",
                     })
                 } else {
                     return Err("Missing key file for TLS");
