@@ -33,6 +33,8 @@ fn test_parse_config() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
+        #[cfg(feature = "tls")]
+        tls_config: None,
         default_websocket_proxy: Some("localhost:1234".into()),
         default_host: HostConfig {
             matches: "*".into(),
@@ -92,6 +94,8 @@ fn test_host_config() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
+        #[cfg(feature = "tls")]
+        tls_config: None,
         default_websocket_proxy: None,
         default_host: HostConfig {
             matches: "*".into(),
@@ -154,6 +158,8 @@ fn comma_separated_routes() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
+        #[cfg(feature = "tls")]
+        tls_config: None,
         default_websocket_proxy: None,
         default_host: HostConfig {
             matches: "*".into(),

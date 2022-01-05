@@ -23,6 +23,8 @@ fn include_route() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
+        #[cfg(feature = "tls")]
+        tls_config: None,
         default_websocket_proxy: None,
         default_host: HostConfig {
             matches: "*".into(),
@@ -68,6 +70,8 @@ fn nested_include() {
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
+        #[cfg(feature = "tls")]
+        tls_config: None,
         default_websocket_proxy: None,
         default_host: HostConfig {
             matches: "*".into(),
