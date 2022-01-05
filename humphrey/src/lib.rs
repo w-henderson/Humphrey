@@ -46,6 +46,7 @@ pub mod handlers;
 pub mod http;
 pub mod krauss;
 pub mod route;
+pub mod stream;
 pub mod thread;
 
 #[cfg(test)]

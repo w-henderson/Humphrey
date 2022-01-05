@@ -9,6 +9,8 @@ impl Default for Config {
             address: "0.0.0.0".into(),
             port: 80,
             threads: 32,
+            #[cfg(feature = "tls")]
+            tls_config: None,
             default_websocket_proxy: None,
             hosts: vec![Default::default()],
             default_host: Default::default(),

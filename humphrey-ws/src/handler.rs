@@ -6,14 +6,14 @@ use crate::MAGIC_STRING;
 
 use humphrey::http::headers::{RequestHeader, ResponseHeader};
 use humphrey::http::{Request, Response, StatusCode};
+use humphrey::stream::Stream;
 
 use std::io::Write;
-use std::net::TcpStream;
 use std::sync::Arc;
 
 /// Represents a function able to handle WebSocket streams.
-pub trait WebsocketHandler<S>: Fn(WebsocketStream<TcpStream>, Arc<S>) + Send + Sync {}
-impl<T, S> WebsocketHandler<S> for T where T: Fn(WebsocketStream<TcpStream>, Arc<S>) + Send + Sync {}
+pub trait WebsocketHandler<S>: Fn(WebsocketStream<Stream>, Arc<S>) + Send + Sync {}
+impl<T, S> WebsocketHandler<S> for T where T: Fn(WebsocketStream<Stream>, Arc<S>) + Send + Sync {}
 
 /// Provides WebSocket handshake functionality.
 /// Supply a `WebsocketHandler` to handle the subsequent messages.
@@ -21,11 +21,11 @@ impl<T, S> WebsocketHandler<S> for T where T: Fn(WebsocketStream<TcpStream>, Arc
 /// ## Example
 /// ```
 /// use humphrey::App;
+/// use humphrey::stream::Stream;
 /// use humphrey_ws::message::Message;
 /// use humphrey_ws::stream::WebsocketStream;
 /// use humphrey_ws::websocket_handler;
 ///
-/// use std::net::TcpStream;
 /// use std::sync::Arc;
 ///
 /// fn main() {
@@ -35,15 +35,15 @@ impl<T, S> WebsocketHandler<S> for T where T: Fn(WebsocketStream<TcpStream>, Arc
 ///     app.run("0.0.0.0:80").unwrap();
 /// }
 ///
-/// fn my_handler(mut stream: WebsocketStream<TcpStream>, _: Arc<()>) {
+/// fn my_handler(mut stream: WebsocketStream<Stream>, _: Arc<()>) {
 ///     stream.send(Message::new("Hello, World!")).unwrap();
 /// }
 /// ```
-pub fn websocket_handler<T, S>(handler: T) -> impl Fn(Request, TcpStream, Arc<S>)
+pub fn websocket_handler<T, S>(handler: T) -> impl Fn(Request, Stream, Arc<S>)
 where
     T: WebsocketHandler<S>,
 {
-    move |request: Request, mut stream: TcpStream, state: Arc<S>| {
+    move |request: Request, mut stream: Stream, state: Arc<S>| {
         if handshake(request, &mut stream).is_ok() {
             handler(WebsocketStream::new(stream), state);
         }
@@ -51,7 +51,7 @@ where
 }
 
 /// Performs the WebSocket handshake.
-fn handshake(request: Request, stream: &mut TcpStream) -> Result<(), WebsocketError> {
+fn handshake(request: Request, stream: &mut Stream) -> Result<(), WebsocketError> {
     // Get the handshake key header
     let handshake_key = request
         .headers

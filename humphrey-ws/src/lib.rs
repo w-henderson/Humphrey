@@ -11,6 +11,7 @@
 //! ## Features
 //! - Performs WebSocket handshake and implements WebSocket according to [RFC 6455](https://datatracker.ietf.org/doc/html/rfc6455).
 //! - Well-integrated with the core Humphrey crate
+//! - Supports WebSocket Secure connections using the TLS feature of the core Humphrey crate
 //! - Has no dependencies in accordance with Humphrey's goals of being dependency-free. This means SHA-1 ([RFC 3174](https://datatracker.ietf.org/doc/html/rfc3174)) and base64 ([RFC 4648](https://datatracker.ietf.org/doc/html/rfc4648)) are both implemented from scratch in this crate as they are required for the handshake.
 //!
 //! ## Installation
@@ -22,13 +23,13 @@
 //! ## Basic Example
 //! ```rs
 //! use humphrey::App;
+//! use humphrey::stream::Stream;
 //!
 //! use humphrey_ws::error::WebsocketError;
 //! use humphrey_ws::message::Message;
 //! use humphrey_ws::stream::WebsocketStream;
 //! use humphrey_ws::websocket_handler;
 //!
-//! use std::net::TcpStream;
 //! use std::sync::Arc;
 //!
 //! fn main() {
@@ -37,7 +38,7 @@
 //!     app.run("0.0.0.0:80").unwrap();
 //! }
 //!
-//! fn my_handler(mut stream: WebsocketStream<TcpStream>, _: Arc<()>) {
+//! fn my_handler(mut stream: WebsocketStream<Stream>, _: Arc<()>) {
 //!     let hello_world = Message::new("Hello, World!");
 //!     stream.send(hello_world).unwrap();
 //!

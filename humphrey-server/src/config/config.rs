@@ -20,6 +20,9 @@ pub struct Config {
     pub port: u16,
     /// The number of threads to host the server on
     pub threads: usize,
+    /// The TLS configuration to use
+    #[cfg(feature = "tls")]
+    pub tls_config: Option<TlsConfig>,
     /// Address to forward WebSocket connections to, unless otherwise specified by the route
     pub default_websocket_proxy: Option<String>,
     /// The configuration for different hosts
@@ -96,6 +99,15 @@ pub struct BlacklistConfig {
     pub list: Vec<IpAddr>,
     /// The way in which the blacklist is enforced
     pub mode: BlacklistMode,
+}
+
+/// Represents configuration for TLS.
+#[cfg(feature = "tls")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TlsConfig {
+    pub cert_file: String,
+    pub key_file: String,
+    pub force: bool,
 }
 
 /// Represents configuration for a plugin.
@@ -181,6 +193,27 @@ impl Config {
             }
         };
 
+        #[cfg(feature = "tls")]
+        let tls_config = {
+            let cert_file = hashmap.get_owned("server.tls.cert_file");
+            let key_file = hashmap.get_owned("server.tls.key_file");
+            let force = hashmap.get_optional("server.tls.force", "false".into());
+
+            if let Some(cert_file) = cert_file {
+                if let Some(key_file) = key_file {
+                    Some(TlsConfig {
+                        cert_file,
+                        key_file,
+                        force: force == "true",
+                    })
+                } else {
+                    return Err("Missing key file for TLS");
+                }
+            } else {
+                None
+            }
+        };
+
         // Get and validate the logging configuration
         let logging = {
             let log_level = hashmap.get_optional_parsed(
@@ -258,6 +291,8 @@ impl Config {
             address,
             port,
             threads,
+            #[cfg(feature = "tls")]
+            tls_config,
             default_websocket_proxy,
             default_host,
             hosts,

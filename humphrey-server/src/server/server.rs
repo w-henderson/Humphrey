@@ -1,10 +1,12 @@
 use humphrey::http::{Request, Response};
+use humphrey::stream::Stream;
 use humphrey::{App, SubApp};
 
 #[cfg(feature = "plugins")]
 use crate::plugins::manager::PluginManager;
 #[cfg(feature = "plugins")]
 use crate::plugins::plugin::PluginLoadResult;
+use std::error::Error;
 #[cfg(feature = "plugins")]
 use std::process::exit;
 
@@ -13,12 +15,10 @@ use crate::config::{BlacklistMode, Config, HostConfig, RouteType};
 use crate::logger::Logger;
 use crate::proxy::proxy_handler;
 use crate::r#static::{directory_handler, file_handler, redirect_handler};
-use crate::server::pipe::pipe;
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::{Arc, RwLock};
-use std::thread::spawn;
 
 /// Represents the application state.
 /// Includes the target directory, cache state, and the logger.
@@ -63,6 +63,13 @@ pub fn main(config: Config) {
         app = app.with_websocket_route("/*", websocket_handler(proxy.to_string()));
     }
 
+    #[cfg(feature = "tls")]
+    if let Some(tls_config) = &state.config.tls_config {
+        app = app
+            .with_cert(&tls_config.cert_file, &tls_config.key_file)
+            .with_forced_https(tls_config.force);
+    }
+
     let addr = format!("{}:{}", state.config.address, state.config.port);
     let logger = &state.logger;
     logger.info("Starting server");
@@ -77,6 +84,14 @@ pub fn main(config: Config) {
     logger.info(&format!("Running at {}", addr));
     logger.debug(&format!("Configuration: {:?}", state.config));
 
+    #[cfg(feature = "tls")]
+    if state.config.tls_config.is_some() {
+        app.run_tls(addr).unwrap();
+    } else {
+        app.run(addr).unwrap();
+    }
+
+    #[cfg(not(feature = "tls"))]
     app.run(addr).unwrap();
 }
 
@@ -171,55 +186,69 @@ fn inner_request_handler(
     }
 }
 
-fn websocket_handler(target: String) -> impl Fn(Request, TcpStream, Arc<AppState>) {
-    move |request: Request, source: TcpStream, state: Arc<AppState>| {
-        proxy_websocket(request, source, &target, state)
+fn websocket_handler(target: String) -> impl Fn(Request, Stream, Arc<AppState>) {
+    move |request: Request, source: Stream, state: Arc<AppState>| {
+        proxy_websocket(request, source, &target, state).ok();
     }
 }
 
-fn proxy_websocket(request: Request, mut source: TcpStream, target: &str, state: Arc<AppState>) {
+fn proxy_websocket(
+    request: Request,
+    mut source: Stream,
+    target: &str,
+    state: Arc<AppState>,
+) -> Result<(), Box<dyn Error>> {
     let source_addr = request.address.origin_addr.to_string();
     let bytes: Vec<u8> = request.into();
 
-    if let Ok(mut destination) = TcpStream::connect(target) {
+    if let Ok(destination) = TcpStream::connect(target) {
         // The target was successfully connected to
 
-        destination.write_all(&bytes).unwrap();
+        let mut destination = Stream::Tcp(destination);
 
-        let mut source_clone = source.try_clone().unwrap();
-        let mut destination_clone = destination.try_clone().unwrap();
+        destination.write_all(&bytes)?;
+
         state.logger.info(&format!(
             "{}: WebSocket connected, proxying data",
             source_addr
         ));
 
-        // Pipe data in both directions
-        let forward = spawn(move || pipe(&mut source, &mut destination));
-        let backward = spawn(move || pipe(&mut destination_clone, &mut source_clone));
+        source.set_nonblocking()?;
+        destination.set_nonblocking()?;
 
-        // Log any errors
-        if forward.join().unwrap().is_err() {
-            state.logger.error(&format!(
-                "{}: Error proxying WebSocket from client to target, connection closed",
-                source_addr
-            ));
-        }
-        if backward.join().unwrap().is_err() {
-            state.logger.error(&format!(
-                "{}: Error proxying WebSocket from target to client, connection closed",
-                source_addr
-            ));
-        }
+        let mut source_buffer: [u8; 1024] = [0; 1024];
+        let mut destination_buffer: [u8; 1024] = [0; 1024];
 
-        state.logger.info(&format!(
-            "{}: WebSocket session complete, connection closed",
-            source_addr
-        ));
+        loop {
+            let source_read = match source.read(&mut source_buffer) {
+                Ok(read) => read,
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => 0,
+                _ => break,
+            };
+
+            let destination_read = match destination.read(&mut destination_buffer) {
+                Ok(read) => read,
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => 0,
+                _ => break,
+            };
+
+            if source_read != 0 {
+                destination.write_all(&source_buffer[0..source_read])?;
+            }
+
+            if destination_read != 0 {
+                source.write_all(&destination_buffer[0..destination_read])?;
+            }
+
+            std::thread::park_timeout(std::time::Duration::from_millis(10));
+        }
     } else {
         state
             .logger
             .error(&format!("{}: Could not connect to WebSocket", source_addr));
     }
+
+    Ok(())
 }
 
 #[cfg(feature = "plugins")]

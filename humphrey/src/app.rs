@@ -1,18 +1,19 @@
 #![allow(clippy::new_without_default)]
 
-use crate::http::date::DateTime;
-use crate::http::headers::{RequestHeader, ResponseHeader};
-use crate::http::request::{Request, RequestError};
+use crate::http::headers::RequestHeader;
+use crate::http::request::Request;
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
 use crate::krauss::wildcard_match;
 use crate::route::{Route, SubApp};
+use crate::stream::Stream;
 use crate::thread::pool::ThreadPool;
 
-use std::collections::btree_map::Entry;
-use std::io::Write;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
+
+#[cfg(feature = "tls")]
+use rustls::ServerConfig;
 
 /// Represents the Humphrey app.
 ///
@@ -30,19 +31,23 @@ where
     state: Arc<State>,
     connection_handler: ConnectionHandler<State>,
     connection_condition: ConnectionCondition<State>,
+    #[cfg(feature = "tls")]
+    tls_config: Option<Arc<ServerConfig>>,
+    #[cfg(feature = "tls")]
+    force_https: bool,
 }
 
 /// Represents a function able to handle a connection.
 /// In most cases, the default connection handler should be used.
 pub type ConnectionHandler<State> =
-    fn(TcpStream, Arc<Vec<SubApp<State>>>, Arc<SubApp<State>>, Arc<ErrorHandler>, Arc<State>);
+    fn(Stream, Arc<Vec<SubApp<State>>>, Arc<SubApp<State>>, Arc<ErrorHandler>, Arc<State>);
 
 /// Represents a function able to calculate whether a connection will be accepted.
 pub type ConnectionCondition<State> = fn(&mut TcpStream, Arc<State>) -> bool;
 
 /// Represents a function able to handle a WebSocket handshake and consequent data frames.
-pub trait WebsocketHandler<State>: Fn(Request, TcpStream, Arc<State>) + Send + Sync {}
-impl<T, S> WebsocketHandler<S> for T where T: Fn(Request, TcpStream, Arc<S>) + Send + Sync {}
+pub trait WebsocketHandler<State>: Fn(Request, Stream, Arc<State>) + Send + Sync {}
+impl<T, S> WebsocketHandler<S> for T where T: Fn(Request, Stream, Arc<S>) + Send + Sync {}
 
 /// Represents a function able to handle a request.
 /// It is passed the request as well as the app's state, and must return a response.
@@ -134,6 +139,10 @@ where
             state: Arc::new(State::default()),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
+            #[cfg(feature = "tls")]
+            tls_config: None,
+            #[cfg(feature = "tls")]
+            force_https: false,
         }
     }
 
@@ -147,6 +156,10 @@ where
             state: Arc::new(state),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
+            #[cfg(feature = "tls")]
+            tls_config: None,
+            #[cfg(feature = "tls")]
+            force_https: false,
         }
     }
 
@@ -174,6 +187,57 @@ where
 
                 // Spawn a new thread to handle the connection
                 self.thread_pool.execute(move || {
+                    (cloned_handler)(
+                        Stream::Tcp(stream),
+                        cloned_subapps,
+                        cloned_default_subapp,
+                        cloned_error_handler,
+                        cloned_state,
+                    )
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Runs the Humphrey app on the given socket address.
+    /// This function will only return if a fatal error is thrown such as the port being in use.
+    #[cfg(feature = "tls")]
+    pub fn run_tls<A>(self, addr: A) -> Result<(), HumphreyError>
+    where
+        A: ToSocketAddrs,
+    {
+        use rustls::ServerConnection;
+
+        let socket = TcpListener::bind(addr)?;
+        let subapps = Arc::new(self.subapps);
+        let default_subapp = Arc::new(self.default_subapp);
+        let error_handler = Arc::new(self.error_handler);
+
+        if self.force_https {
+            self.thread_pool
+                .execute(|| force_https_thread().unwrap_or(()));
+        }
+
+        for mut sock in socket.incoming().flatten() {
+            let cloned_state = self.state.clone();
+
+            // Check that the client is allowed to connect
+            if (self.connection_condition)(&mut sock, cloned_state) {
+                let cloned_state = self.state.clone();
+                let cloned_subapps = subapps.clone();
+                let cloned_default_subapp = default_subapp.clone();
+                let cloned_error_handler = error_handler.clone();
+                let cloned_handler = self.connection_handler;
+                let cloned_config = self.tls_config.as_ref().unwrap().clone();
+
+                // Spawn a new thread to handle the connection
+                self.thread_pool.execute(move || {
+                    let mut server = ServerConnection::new(cloned_config).unwrap();
+                    let tls_stream = rustls::Stream::new(&mut server, &mut sock);
+                    let stream = Stream::Tls(tls_stream);
+
                     (cloned_handler)(
                         stream,
                         cloned_subapps,
@@ -271,6 +335,48 @@ where
         self
     }
 
+    #[cfg(feature = "tls")]
+    pub fn with_forced_https(mut self, forced: bool) -> Self {
+        self.force_https = forced;
+        self
+    }
+
+    #[cfg(feature = "tls")]
+    pub fn with_cert(mut self, cert_path: impl AsRef<str>, key_path: impl AsRef<str>) -> Self {
+        use rustls::{Certificate, PrivateKey};
+        use rustls_pemfile::{read_one, Item};
+
+        use std::fs::File;
+        use std::io::BufReader;
+
+        let mut cert_file =
+            BufReader::new(File::open(cert_path.as_ref()).expect("failed to open cert file"));
+        let mut key_file =
+            BufReader::new(File::open(key_path.as_ref()).expect("failed to open key file"));
+
+        let certs: Vec<Certificate> = match read_one(&mut cert_file).unwrap().unwrap() {
+            Item::X509Certificate(cert) => vec![Certificate(cert)],
+            _ => panic!("failed to parse cert file"),
+        };
+
+        let key: PrivateKey = match read_one(&mut key_file).unwrap().unwrap() {
+            Item::PKCS8Key(key) => PrivateKey(key),
+            _ => panic!("failed to parse key file"),
+        };
+
+        let config = Arc::new(
+            ServerConfig::builder()
+                .with_safe_defaults()
+                .with_no_client_auth()
+                .with_single_cert(certs, key)
+                .expect("failed to create server config"),
+        );
+
+        self.tls_config = Some(config);
+
+        self
+    }
+
     /// Adds a global WebSocket handler to the server.
     ///
     /// ## Deprecated
@@ -303,12 +409,19 @@ where
 /// The connection will be opened upon the first request and closed as soon as a request is
 ///   recieved without the `Connection: Keep-Alive` header.
 fn client_handler<State>(
-    mut stream: TcpStream,
+    mut stream: Stream,
     subapps: Arc<Vec<SubApp<State>>>,
     default_subapp: Arc<SubApp<State>>,
     error_handler: Arc<ErrorHandler>,
     state: Arc<State>,
 ) {
+    use std::collections::btree_map::Entry;
+    use std::io::Write;
+
+    use crate::http::date::DateTime;
+    use crate::http::headers::ResponseHeader;
+    use crate::http::request::RequestError;
+
     let addr = stream.peer_addr().unwrap();
 
     loop {
@@ -391,7 +504,7 @@ fn client_handler<State>(
 
         // Write the response to the stream
         let response_bytes: Vec<u8> = response.into();
-        if stream.write(&response_bytes).is_err() {
+        if stream.write_all(&response_bytes).is_err() {
             break;
         };
 
@@ -403,7 +516,7 @@ fn client_handler<State>(
 }
 
 /// Calls the correct handler for the given request.
-fn call_handler<State>(
+pub(crate) fn call_handler<State>(
     request: &Request,
     subapps: &[SubApp<State>],
     default_subapp: &SubApp<State>,
@@ -447,7 +560,7 @@ fn call_websocket_handler<State>(
     subapps: &[SubApp<State>],
     default_subapp: &SubApp<State>,
     state: Arc<State>,
-    stream: TcpStream,
+    stream: Stream,
 ) {
     let host = request.headers.get(&RequestHeader::Host).unwrap();
 
@@ -475,6 +588,34 @@ fn call_websocket_handler<State>(
     {
         (handler.handler)(request.clone(), stream, state)
     }
+}
+
+#[cfg(feature = "tls")]
+fn force_https_thread() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::http::headers::ResponseHeader;
+    use std::io::Write;
+
+    let socket = TcpListener::bind("0.0.0.0:80")?;
+
+    for mut stream in socket.incoming().flatten() {
+        let addr = stream.peer_addr()?;
+        let request = Request::from_stream(&mut stream, addr)?;
+        let response = Response::empty(StatusCode::MovedPermanently)
+            .with_header(
+                ResponseHeader::Location,
+                format!(
+                    "https://{}{}",
+                    request.headers.get(&RequestHeader::Host).unwrap(),
+                    request.uri
+                ),
+            )
+            .with_header(ResponseHeader::Connection, "Close".into());
+
+        let response_bytes: Vec<u8> = response.into();
+        stream.write_all(&response_bytes)?;
+    }
+
+    Ok(())
 }
 
 /// The default error handler for every Humphrey app.
