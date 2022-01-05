@@ -1,3 +1,5 @@
+//! Provides functionality for handling app routes.
+
 use crate::app::{
     PathAwareRequestHandler, RequestHandler, StatelessRequestHandler, WebsocketHandler,
 };
@@ -8,20 +10,27 @@ use std::path::PathBuf;
 
 /// Represents a sub-app to run for a specific host.
 pub struct SubApp<State> {
+    /// The host to process requests for.
     pub host: String,
+    /// The routes to process requests for and their handlers.
     pub routes: Vec<RouteHandler<State>>,
+    /// The routes to process WebSocket requests for and their handlers.
     pub websocket_routes: Vec<WebsocketRouteHandler<State>>,
 }
 
 /// Encapsulates a route and its handler.
 pub struct RouteHandler<State> {
+    /// The route that this handler will match.
     pub route: String,
+    /// The handler to run when the route is matched.
     pub handler: Box<dyn RequestHandler<State>>,
 }
 
 /// Encapsulates a route and its WebSocket handler.
 pub struct WebsocketRouteHandler<State> {
+    /// The route that this handler will match.
     pub route: String,
+    /// The handler to run when the route is matched.
     pub handler: Box<dyn WebsocketHandler<State>>,
 }
 
@@ -101,6 +110,7 @@ impl<State> SubApp<State> {
 
 /// An object that can represent a route, currently only `String`.
 pub trait Route {
+    /// Returns true if the given route matches the path.
     fn route_matches(&self, route: &str) -> bool;
 }
 
@@ -114,7 +124,9 @@ impl Route for String {
 
 /// A located file or directory path.
 pub enum LocatedPath {
+    /// A directory was located.
     Directory,
+    /// A file was located at the given path.
     File(PathBuf),
 }
 

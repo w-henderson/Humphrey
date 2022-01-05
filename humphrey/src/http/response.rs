@@ -1,3 +1,5 @@
+//! Provides functionality for handling HTTP responses.
+
 use crate::http::date::DateTime;
 use crate::http::headers::{RequestHeader, ResponseHeader, ResponseHeaderMap};
 use crate::http::request::Request;

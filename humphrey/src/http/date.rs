@@ -1,3 +1,5 @@
+//! Provides functionality for handling HTTP date timestamps.
+
 use std::time::SystemTime;
 
 const DAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -17,17 +19,26 @@ const MARCH_01_2000: i64 = 951868800;
 
 /// Represents a date and time.
 pub struct DateTime {
+    /// The UNIX timestamp of the date.
     pub timestamp: i64,
+    /// The year of the date.
     pub year: u16,
+    /// The month of the date.
     pub month: u8,
+    /// The day of the month of the date.
     pub day: u8,
+    /// The weekday of the date.
     pub weekday: u8,
+    /// The hour of the date.
     pub hour: u8,
+    /// The minute of the date.
     pub minute: u8,
+    /// The second of the date.
     pub second: u8,
 }
 
 impl DateTime {
+    /// Creates a new `DateTime` from the current time.
     pub fn now() -> Self {
         let timestamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -37,6 +48,7 @@ impl DateTime {
         Self::from(timestamp)
     }
 
+    /// Returns the UNIX timestamp of the date.
     pub fn get_timestamp(&self) -> i64 {
         self.timestamp
     }

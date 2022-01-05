@@ -1,3 +1,5 @@
+//! Provides functionality for handling HTTP requests.
+
 use crate::http::address::Address;
 use crate::http::headers::{RequestHeader, RequestHeaderMap};
 use crate::http::method::Method;

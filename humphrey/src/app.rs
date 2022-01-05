@@ -1,3 +1,5 @@
+//! Provides the core Humphrey app functionality.
+
 #![allow(clippy::new_without_default)]
 
 use crate::http::headers::RequestHeader;
