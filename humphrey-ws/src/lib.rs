@@ -59,6 +59,8 @@
 //! ## Further Examples
 //! - [Echo Server](https://github.com/w-henderson/Humphrey/tree/master/examples/websocket): echoes received messages back to the client with an incrementing number at the end
 
+#![warn(missing_docs)]
+
 const MAGIC_STRING: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 pub mod error;

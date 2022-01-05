@@ -24,6 +24,8 @@
 //! ## Example
 //! A basic example of username/password authentication can be found [here](https://github.com/w-henderson/Humphrey/tree/master/examples/auth).
 
+#![warn(missing_docs)]
+
 pub mod app;
 pub mod config;
 pub mod database;
