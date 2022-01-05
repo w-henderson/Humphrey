@@ -203,8 +203,8 @@ where
         Ok(())
     }
 
-    /// Runs the Humphrey app on the given socket address.
-    /// This function will only return if a fatal error is thrown such as the port being in use.
+    /// Securely runs the Humphrey app on the given socket address.
+    /// This function will only return if a fatal error is thrown such as the port being in use or the TLS certificate being invalid.
     #[cfg(feature = "tls")]
     pub fn run_tls<A>(self, addr: A) -> Result<(), HumphreyError>
     where
@@ -232,7 +232,11 @@ where
                 let cloned_default_subapp = default_subapp.clone();
                 let cloned_error_handler = error_handler.clone();
                 let cloned_handler = self.connection_handler;
-                let cloned_config = self.tls_config.as_ref().unwrap().clone();
+                let cloned_config = self
+                    .tls_config
+                    .as_ref()
+                    .expect("TLS certificate not supplied")
+                    .clone();
 
                 // Spawn a new thread to handle the connection
                 self.thread_pool.execute(move || {
@@ -337,12 +341,19 @@ where
         self
     }
 
+    /// Sets whether HTTPS should be forced on all connections. Defaults to false.
+    ///
+    /// If this is set to true, a background thread will be spawned when `run_tls` is called to send
+    ///   redirect responses to all insecure requests on port 80.
     #[cfg(feature = "tls")]
     pub fn with_forced_https(mut self, forced: bool) -> Self {
         self.force_https = forced;
         self
     }
 
+    /// Sets the TLS configuration for the server.
+    ///
+    /// This **must** be called before `run_tls` is called.
     #[cfg(feature = "tls")]
     pub fn with_cert(mut self, cert_path: impl AsRef<str>, key_path: impl AsRef<str>) -> Self {
         use rustls::{Certificate, PrivateKey};
