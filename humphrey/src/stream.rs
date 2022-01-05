@@ -52,4 +52,22 @@ impl<'a> Stream<'a> {
             Stream::Phantom(_) => panic!("Phantom data in stream enum"),
         }
     }
+
+    pub fn shutdown(&self) -> std::io::Result<()> {
+        match self {
+            Stream::Tcp(stream) => stream.shutdown(std::net::Shutdown::Both),
+            #[cfg(feature = "tls")]
+            Stream::Tls(stream) => stream.sock.shutdown(std::net::Shutdown::Both),
+            Stream::Phantom(_) => panic!("Phantom data in stream enum"),
+        }
+    }
+
+    pub fn set_nonblocking(&self) -> std::io::Result<()> {
+        match self {
+            Stream::Tcp(stream) => stream.set_nonblocking(true),
+            #[cfg(feature = "tls")]
+            Stream::Tls(stream) => stream.sock.set_nonblocking(true),
+            Stream::Phantom(_) => panic!("Phantom data in stream enum"),
+        }
+    }
 }

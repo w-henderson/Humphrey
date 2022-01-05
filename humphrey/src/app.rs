@@ -504,7 +504,7 @@ fn client_handler<State>(
 
         // Write the response to the stream
         let response_bytes: Vec<u8> = response.into();
-        if stream.write(&response_bytes).is_err() {
+        if stream.write_all(&response_bytes).is_err() {
             break;
         };
 
