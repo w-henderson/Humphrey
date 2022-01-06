@@ -2,6 +2,7 @@
 
 use crate::http::headers::{RequestHeader, RequestHeaderMap};
 
+use std::error::Error;
 use std::fmt::Display;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::str::FromStr;
@@ -20,36 +21,55 @@ pub struct Address {
 
 impl Address {
     /// Create a new `Address` object from the socket address.
-    pub fn new(addr: impl ToSocketAddrs) -> Self {
-        let addr = addr.to_socket_addrs().unwrap().next().unwrap();
+    pub fn new(addr: impl ToSocketAddrs) -> Result<Self, Box<dyn Error>> {
+        let addr = addr
+            .to_socket_addrs()?
+            .next()
+            .ok_or("No socket address found")?;
 
-        Self {
+        Ok(Self {
             origin_addr: addr.ip(),
             proxies: Vec::new(),
             port: addr.port(),
-        }
+        })
     }
 
     /// Create a new `Address` object from a request's headers and the socket address.
     /// This looks for the `X-Forwarded-For` header, used by proxies and CDNs, to find the origin address.
-    pub fn from_headers(headers: &RequestHeaderMap, addr: impl ToSocketAddrs) -> Self {
+    pub fn from_headers(
+        headers: &RequestHeaderMap,
+        addr: impl ToSocketAddrs,
+    ) -> Result<Self, Box<dyn Error>> {
         if let Some(forwarded) = headers.get(&RequestHeader::Custom {
             name: "x-forwarded-for".into(),
         }) {
             let mut proxies: Vec<IpAddr> = forwarded
                 .split(',')
-                .map(|s| IpAddr::from_str(s).unwrap())
+                .filter_map(|s| IpAddr::from_str(s).ok())
                 .collect();
 
-            let origin_addr = *proxies.last().unwrap();
-            proxies.remove(proxies.len() - 1);
-            proxies.push(addr.to_socket_addrs().unwrap().next().unwrap().ip());
+            if proxies.is_empty() {
+                return Self::new(addr);
+            }
 
-            Self {
+            let origin_addr = *proxies.last().ok_or("No socket address found")?;
+            proxies.remove(proxies.len() - 1);
+            proxies.push(
+                addr.to_socket_addrs()?
+                    .next()
+                    .ok_or("No socket address found")?
+                    .ip(),
+            );
+
+            Ok(Self {
                 origin_addr,
                 proxies,
-                port: addr.to_socket_addrs().unwrap().next().unwrap().port(),
-            }
+                port: addr
+                    .to_socket_addrs()?
+                    .next()
+                    .ok_or("No socket address found")?
+                    .port(),
+            })
         } else {
             Self::new(addr)
         }
