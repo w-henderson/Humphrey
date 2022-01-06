@@ -1,3 +1,5 @@
+//! Provides a user model for the authentication service.
+
 use crate::error::AuthError;
 use crate::session::Session;
 

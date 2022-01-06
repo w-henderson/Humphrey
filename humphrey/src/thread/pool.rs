@@ -1,3 +1,5 @@
+//! Provides thread pool functionality.
+
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::{spawn, JoinHandle};
@@ -17,7 +19,9 @@ pub struct Thread {
 
 /// Represents a message between threads.
 pub enum Message {
+    /// A task to be processed by a thread.
     Function(Task),
+    /// The thread should be shut down.
     Shutdown,
 }
 

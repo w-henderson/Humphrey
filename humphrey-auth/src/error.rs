@@ -1,3 +1,5 @@
+//! Provides error handling capabilities to the crate.
+
 use std::error::Error;
 use std::fmt::Display;
 

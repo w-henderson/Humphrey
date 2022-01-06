@@ -1,3 +1,5 @@
+//! Provides functionality for HTTP proxying.
+
 use crate::http::headers::RequestHeader;
 use crate::http::response::ResponseError;
 use crate::http::{Request, Response, StatusCode};

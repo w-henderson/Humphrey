@@ -1,3 +1,5 @@
+//! Provides an implementation of [Krauss' wildcard-matching algorithm](https://www.drdobbs.com/architecture-and-design/matching-wildcards-an-algorithm/210200888).
+
 use std::iter::Peekable;
 use std::str::Chars;
 

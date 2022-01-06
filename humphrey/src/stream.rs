@@ -1,3 +1,5 @@
+//! Provides a wrapper around the stream to allow for simpler APIs.
+
 #[cfg(feature = "tls")]
 use rustls::ServerConnection;
 
@@ -5,10 +7,17 @@ use std::io::{Error, Read, Write};
 use std::marker::PhantomData;
 use std::net::{SocketAddr, TcpStream};
 
+/// Represents a connection to a remote client or server.
+///
+/// This is typically a wrapper around `TcpStream`, but is required to allow for a single API
+///   to be used to process both regular and TLS connections.
 pub enum Stream<'a> {
+    /// A regular TCP stream.
     Tcp(TcpStream),
+    /// A TLS stream.
     #[cfg(feature = "tls")]
     Tls(rustls::Stream<'a, ServerConnection, TcpStream>),
+    /// Phantom data to contain the lifetime of the stream when the TLS feature is disabled.
     Phantom(PhantomData<&'a ()>),
 }
 
@@ -44,6 +53,7 @@ impl<'a> Write for Stream<'a> {
 }
 
 impl<'a> Stream<'a> {
+    /// Returns the socket address of the remote peer of this connection.
     pub fn peer_addr(&self) -> Result<SocketAddr, Error> {
         match self {
             Stream::Tcp(stream) => stream.peer_addr(),
@@ -53,6 +63,7 @@ impl<'a> Stream<'a> {
         }
     }
 
+    /// Shuts down both the read and write halves of this connection.
     pub fn shutdown(&self) -> std::io::Result<()> {
         match self {
             Stream::Tcp(stream) => stream.shutdown(std::net::Shutdown::Both),
@@ -62,6 +73,7 @@ impl<'a> Stream<'a> {
         }
     }
 
+    /// Sets this connection to nonblocking mode.
     pub fn set_nonblocking(&self) -> std::io::Result<()> {
         match self {
             Stream::Tcp(stream) => stream.set_nonblocking(true),

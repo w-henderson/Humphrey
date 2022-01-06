@@ -1,3 +1,5 @@
+//! Provides functionality for handling sessions and tokens.
+
 use std::time::UNIX_EPOCH;
 
 use rand_core::{OsRng, RngCore};
@@ -5,7 +7,9 @@ use rand_core::{OsRng, RngCore};
 /// Represents a session, containing a token and an expiration time.
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct Session {
+    /// The token string for this session.
     pub token: String,
+    /// The UNIX timestamp at which this session will expire.
     pub expiry: u64,
 }
 

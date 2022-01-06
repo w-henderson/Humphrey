@@ -1,27 +1,51 @@
+//! Provides functionality for handling MIME types.
+
 /// Represents a MIME type as used in the `Content-Type` header.
 #[derive(Clone, Copy)]
 pub enum MimeType {
+    /// The `text/css` MIME type.
     TextCss,
+    /// The `text/html` MIME type.
     TextHtml,
+    /// The `text/javascript` MIME type.
     TextJavaScript,
+    /// The `text/plain` MIME type.
     TextPlain,
+    /// The `image/bmp` MIME type.
     ImageBmp,
+    /// The `image/gif` MIME type.
     ImageGif,
+    /// The `image/jpeg` MIME type.
     ImageJpeg,
+    /// The `image/png` MIME type.
     ImagePng,
+    /// The `image/webp` MIME type.
     ImageWebp,
+    /// The `image/svg+xml` MIME type.
     ImageSvg,
+    /// The `image/vnd.microsoft.icon` MIME type.
     ImageIcon,
+    /// The `application/octet-stream` MIME type.
     ApplicationOctetStream,
+    /// The `application/json` MIME type.
     ApplicationJson,
+    /// The `application/pdf` MIME type.
     ApplicationPdf,
+    /// The `application/zip` MIME type.
     ApplicationZip,
+    /// The `video/mp4` MIME type.
     VideoMp4,
+    /// The `video/ogg` MIME type.
     VideoOgg,
+    /// The `video/webm` MIME type.
     VideoWebm,
+    /// The `font/ttf` MIME type.
     FontTtf,
+    /// The `font/otf` MIME type.
     FontOtf,
+    /// The `font/woff` MIME type.
     FontWoff,
+    /// The `font/woff2` MIME type.
     FontWoff2,
 }
 

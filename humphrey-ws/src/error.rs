@@ -1,3 +1,5 @@
+//! Provides error handling for the WebSocket crate.
+
 use std::error::Error;
 use std::fmt::Display;
 

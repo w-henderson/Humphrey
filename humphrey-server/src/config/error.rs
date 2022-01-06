@@ -1,3 +1,5 @@
+//! Provides error handling functionality for the configuration parser.
+
 use std::error::Error;
 use std::fmt::Display;
 

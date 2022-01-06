@@ -1,3 +1,5 @@
+//! Provides functionality for working with a WebSocket stream.
+
 use crate::error::WebsocketError;
 use crate::frame::{Frame, Opcode};
 use crate::message::Message;
@@ -54,6 +56,7 @@ where
 }
 
 impl WebsocketStream<TcpStream> {
+    /// Attemps to receive a message from the stream without blocking.
     pub fn recv_nonblocking(&mut self) -> Restion<Message, WebsocketError> {
         let message = Message::from_stream_nonblocking(&mut self.stream);
 

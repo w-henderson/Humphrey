@@ -1,3 +1,5 @@
+//! Provides a number of useful handlers for Humphrey apps.
+
 use crate::app::error_handler;
 use crate::http::headers::ResponseHeader;
 use crate::http::{Request, Response, StatusCode};

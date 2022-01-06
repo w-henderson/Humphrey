@@ -1,3 +1,5 @@
+//! Provides a Humphrey-compatible WebSocket handler for performing the handshake.
+
 use crate::error::WebsocketError;
 use crate::stream::WebsocketStream;
 use crate::util::base64::Base64Encode;

@@ -1,3 +1,5 @@
+//! Provides the core server functionality and manages the underlying Humphrey app.
+
 use humphrey::http::{Request, Response};
 use humphrey::stream::Stream;
 use humphrey::{App, SubApp};
@@ -23,9 +25,13 @@ use std::sync::{Arc, RwLock};
 /// Represents the application state.
 /// Includes the target directory, cache state, and the logger.
 pub struct AppState {
+    /// The app's configuration.
     pub config: Config,
+    /// The app's cache.
     pub cache: RwLock<Cache>,
+    /// The app's logger.
     pub logger: Logger,
+    /// The app's plugin manager.
     #[cfg(feature = "plugins")]
     pub plugin_manager: RwLock<PluginManager>,
 }

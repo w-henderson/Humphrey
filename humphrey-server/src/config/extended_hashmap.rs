@@ -1,8 +1,12 @@
+//! Provides an extension of the `HashMap` type called `ExtendedMap`.
+
 use crate::config::tree::ConfigNode;
 
 use std::collections::HashMap;
 use std::str::FromStr;
 
+/// An extension of the standard HashMap that provides some syntactic sugar for working with
+///   optional and compulsory items, as well as errors.
 pub trait ExtendedMap<K, V> {
     /// Gets an item from the map by value.
     fn get_owned(&self, key: K) -> Option<V>;

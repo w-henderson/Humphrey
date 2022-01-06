@@ -1,3 +1,5 @@
+//! Contains the Humphrey HTTP implementation.
+
 pub mod address;
 pub mod date;
 pub mod headers;

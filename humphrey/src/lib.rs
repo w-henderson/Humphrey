@@ -41,6 +41,8 @@
 //! - [Wildcard Example](https://github.com/w-henderson/Humphrey/tree/master/examples/wildcard): demonstrates a wildcard route
 //! - [Static Content Example](https://github.com/w-henderson/Humphrey/tree/master/examples/static-content): demonstrates the built-in static content handlers
 
+#![warn(missing_docs)]
+
 pub mod app;
 pub mod handlers;
 pub mod http;

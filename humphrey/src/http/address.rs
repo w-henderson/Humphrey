@@ -1,3 +1,5 @@
+//! Provides functionality for parsing and representing network addresses.
+
 use crate::http::headers::{RequestHeader, RequestHeaderMap};
 
 use std::fmt::Display;

@@ -1,3 +1,5 @@
+//! Contains configuration functionality for the authentication service.
+
 /// Represents the configuration of the authentication provider.
 #[derive(Clone)]
 pub struct AuthConfig {

@@ -1,6 +1,6 @@
 //! Types used when creating a plugin.
 //!
-//! https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html
+//! <https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html>
 
 #![allow(unused_variables)]
 #![allow(dead_code)]

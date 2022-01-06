@@ -1,3 +1,5 @@
+//! Provides the authentication-related extensions to the Humphrey app.
+
 use crate::database::AuthDatabase;
 use crate::AuthProvider;
 
@@ -29,6 +31,7 @@ pub trait AuthState<D>
 where
     D: AuthDatabase,
 {
+    /// Returns a `MutexGuard` to the `AuthProvider`.
     fn auth_provider(&self) -> MutexGuard<AuthProvider<D>>;
 }
 

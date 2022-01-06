@@ -1,3 +1,5 @@
+//! Provides an implementation of WebSocket frames as specified in [RFC 6455 Section 5](https://datatracker.ietf.org/doc/html/rfc6455#section-5).
+
 use crate::error::WebsocketError;
 use crate::util::restion::Restion;
 

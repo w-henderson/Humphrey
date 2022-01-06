@@ -1,3 +1,5 @@
+//! Provides functionality for tracebacks.
+
 /// Wrapper for an iterator, counting the current index.
 /// Basically allows for the same thing as `enumerate` but not just in one statement.
 pub struct TracebackIterator<T>

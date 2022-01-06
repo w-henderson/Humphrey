@@ -1,3 +1,5 @@
+//! Provides default values for the configuration.
+
 use crate::config::{
     BlacklistConfig, BlacklistMode, Config, LoggingConfig, RouteConfig, RouteType,
 };
