@@ -435,7 +435,11 @@ fn client_handler<State>(
     use crate::http::headers::ResponseHeader;
     use crate::http::request::RequestError;
 
-    let addr = stream.peer_addr().unwrap();
+    let addr = if let Ok(addr) = stream.peer_addr() {
+        addr
+    } else {
+        return;
+    };
 
     loop {
         // Parses the request from the stream
