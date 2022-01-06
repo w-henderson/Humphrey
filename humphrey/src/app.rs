@@ -539,21 +539,21 @@ pub(crate) fn call_handler<State>(
     default_subapp: &SubApp<State>,
     state: Arc<State>,
 ) -> Response {
-    let host = request.headers.get(&RequestHeader::Host).unwrap();
-
     // Iterate over the sub-apps and find the one which matches the host
-    if let Some(subapp) = subapps
-        .iter()
-        .find(|subapp| wildcard_match(&subapp.host, host))
-    {
-        // If the sub-app has a handler for this route, call it
-        if let Some(response) = subapp
-            .routes // Get the routes of the sub-app
-            .iter() // Iterate over the routes
-            .find(|route| route.route.route_matches(&request.uri)) // Find the route that matches
-            .map(|handler| (handler.handler)(request.clone(), state.clone()))
+    if let Some(host) = request.headers.get(&RequestHeader::Host) {
+        if let Some(subapp) = subapps
+            .iter()
+            .find(|subapp| wildcard_match(&subapp.host, host))
         {
-            return response;
+            // If the sub-app has a handler for this route, call it
+            if let Some(response) = subapp
+                .routes // Get the routes of the sub-app
+                .iter() // Iterate over the routes
+                .find(|route| route.route.route_matches(&request.uri)) // Find the route that matches
+                .map(|handler| (handler.handler)(request.clone(), state.clone()))
+            {
+                return response;
+            }
         }
     }
 
@@ -579,21 +579,21 @@ fn call_websocket_handler<State>(
     state: Arc<State>,
     stream: Stream,
 ) {
-    let host = request.headers.get(&RequestHeader::Host).unwrap();
-
     // Iterate over the sub-apps and find the one which matches the host
-    if let Some(subapp) = subapps
-        .iter()
-        .find(|subapp| wildcard_match(&subapp.host, host))
-    {
-        // If the sub-app has a handler for this route, call it
-        if let Some(handler) = subapp
-            .websocket_routes // Get the WebSocket routes of the sub-app
-            .iter() // Iterate over the routes
-            .find(|route| route.route.route_matches(&request.uri))
+    if let Some(host) = request.headers.get(&RequestHeader::Host) {
+        if let Some(subapp) = subapps
+            .iter()
+            .find(|subapp| wildcard_match(&subapp.host, host))
         {
-            (handler.handler)(request.clone(), stream, state);
-            return;
+            // If the sub-app has a handler for this route, call it
+            if let Some(handler) = subapp
+                .websocket_routes // Get the WebSocket routes of the sub-app
+                .iter() // Iterate over the routes
+                .find(|route| route.route.route_matches(&request.uri))
+            {
+                (handler.handler)(request.clone(), stream, state);
+                return;
+            }
         }
     }
 
@@ -617,16 +617,20 @@ fn force_https_thread() -> Result<(), Box<dyn std::error::Error>> {
     for mut stream in socket.incoming().flatten() {
         let addr = stream.peer_addr()?;
         let request = Request::from_stream(&mut stream, addr)?;
-        let response = Response::empty(StatusCode::MovedPermanently)
-            .with_header(
-                ResponseHeader::Location,
-                format!(
-                    "https://{}{}",
-                    request.headers.get(&RequestHeader::Host).unwrap(),
-                    request.uri
-                ),
-            )
-            .with_header(ResponseHeader::Connection, "Close".into());
+
+        let response = if let Some(host) = request.headers.get(&RequestHeader::Host) {
+            Response::empty(StatusCode::MovedPermanently)
+                .with_header(
+                    ResponseHeader::Location,
+                    format!("https://{}{}", host, request.uri),
+                )
+                .with_header(ResponseHeader::Connection, "Close".into())
+        } else {
+            Response::empty(StatusCode::OK)
+                .with_bytes(b"<h1>Please access over HTTPS</h1>")
+                .with_header(ResponseHeader::ContentLength, "33".into())
+                .with_header(ResponseHeader::Connection, "Close".into())
+        };
 
         let response_bytes: Vec<u8> = response.into();
         stream.write_all(&response_bytes)?;
