@@ -1,6 +1,6 @@
 //! Plugin management code.
 //!
-//! https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html
+//! <https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html>
 
 use crate::config::RouteConfig;
 use crate::plugins::plugin::{Plugin, PluginLoadResult};
