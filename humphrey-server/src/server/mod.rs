@@ -1,3 +1,5 @@
+//! Provides the server functionality.
+
 #![allow(clippy::module_inception)]
 
 pub mod cache;

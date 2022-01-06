@@ -1,3 +1,5 @@
+//! Provides a simple LCG implementation for generating random numbers.
+
 use std::time::SystemTime;
 
 /// Represents a linear congruential generator, used to generate random `u32` numbers.
@@ -11,6 +13,7 @@ pub struct Lcg {
 
 /// Allows random sampling on an object.
 pub trait Choose {
+    /// The type of the object.
     type Item;
 
     /// Selects a random item from the collection.

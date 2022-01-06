@@ -1,3 +1,5 @@
+//! Provides caching functionality.
+
 use crate::config::Config;
 
 use humphrey::http::mime::MimeType;
@@ -6,6 +8,7 @@ use std::{collections::VecDeque, time::SystemTime};
 /// Represents the server's cache.
 #[derive(Default)]
 pub struct Cache {
+    /// The cache's maximum size.
     pub cache_limit: usize,
     cache_time_limit: u64,
     cache_size: usize,
@@ -14,10 +17,15 @@ pub struct Cache {
 
 /// Represents a cached item.
 pub struct CachedItem {
+    /// The route that this item was served at.
     pub route: String,
+    /// The host that this item was served at.
     pub host: usize,
+    /// The MIME type of the item.
     pub mime_type: MimeType,
+    /// The time at which the item was cached.
     pub cache_time: u64,
+    /// The item's data.
     pub data: Vec<u8>,
 }
 

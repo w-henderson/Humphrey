@@ -1,3 +1,5 @@
+//! Provides functionality for working with the configuration syntax tree.
+
 use crate::config::error::ConfigError;
 use crate::config::traceback::TracebackIterator;
 use humphrey::krauss::wildcard_match;
@@ -10,15 +12,22 @@ use std::str::Lines;
 /// Represents a node in the configuration syntax tree.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum ConfigNode {
+    /// A node that contains a number.
     Number(String, String),
+    /// A node that contains a boolean.
     Boolean(String, String),
+    /// A node that contains a string.
     String(String, String),
+    /// A node that represents a section and contains a number of child nodes.
     Section(String, Vec<ConfigNode>),
+    /// A node that represents a host's configuration and contains a number of child nodes.
     Host(String, Vec<ConfigNode>),
+    /// A node that represents a route's configuration and contains a number of child nodes.
     Route(String, Vec<ConfigNode>),
 }
 
 impl ConfigNode {
+    /// Flatten this node and all child nodes into a hashmap.
     pub fn flatten(&self, hashmap: &mut HashMap<String, Self>, level: &[&str]) {
         match self {
             ConfigNode::Section(k, v) => {
@@ -39,6 +48,7 @@ impl ConfigNode {
         }
     }
 
+    /// Get the hosts configured under this node.
     pub fn get_hosts(&self) -> Vec<(String, Self)> {
         let mut hosts: Vec<(String, Self)> = Vec::new();
 
@@ -53,6 +63,7 @@ impl ConfigNode {
         hosts
     }
 
+    /// Get the routes configured under this node.
     pub fn get_routes(&self) -> Vec<(String, HashMap<String, Self>)> {
         let mut routes: Vec<(String, HashMap<String, Self>)> = Vec::new();
 
@@ -85,6 +96,7 @@ impl ConfigNode {
         routes
     }
 
+    /// Get the plugins configured under this node.
     pub fn get_plugins(&self) -> Vec<(String, HashMap<String, Self>)> {
         let mut plugins: Vec<(String, HashMap<String, Self>)> = Vec::new();
         if let ConfigNode::Section(_, children) = self {
@@ -111,6 +123,7 @@ impl ConfigNode {
         plugins
     }
 
+    /// Get this node's value as a string, or `None` if this is not possible.
     pub fn get_string(&self) -> Option<String> {
         match self {
             ConfigNode::String(_, s) => Some(s.clone()),

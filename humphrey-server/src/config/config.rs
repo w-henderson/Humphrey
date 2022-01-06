@@ -1,3 +1,5 @@
+//! Provides the core configuration functionality.
+
 use crate::config::extended_hashmap::ExtendedMap;
 use crate::config::tree::{parse_conf, ConfigNode};
 use crate::logger::LogLevel;
@@ -40,6 +42,7 @@ pub struct Config {
     pub blacklist: BlacklistConfig,
 }
 
+/// Represents the configuration for a specific host.
 #[derive(Debug, Default, PartialEq)]
 pub struct HostConfig {
     /// Wildcard string specifying what hosts to match, e.g. `*.example.com`
@@ -51,9 +54,13 @@ pub struct HostConfig {
 /// Represents the type of a route.
 #[derive(Debug, PartialEq)]
 pub enum RouteType {
+    /// Serve a single file.
     File,
+    /// Serve a directory of files.
     Directory,
+    /// Proxy requests to this route to another server.
     Proxy,
+    /// Redirect clients to another server.
     Redirect,
 }
 

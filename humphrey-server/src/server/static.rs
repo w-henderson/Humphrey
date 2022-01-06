@@ -1,3 +1,5 @@
+//! Provides functionality for serving static content.
+
 use crate::server::server::AppState;
 
 use humphrey::http::headers::ResponseHeader;
@@ -161,6 +163,7 @@ fn cache_check(request: &Request, state: Arc<AppState>, host: usize) -> Option<R
     None
 }
 
+/// Generates a 404 response.
 pub fn not_found() -> Response {
     Response::empty(StatusCode::NotFound)
         .with_header(ResponseHeader::ContentType, "text/html".into())
