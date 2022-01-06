@@ -114,7 +114,8 @@ impl Request {
             }
         }
 
-        let address = Address::from_headers(&headers, address);
+        let address =
+            Address::from_headers(&headers, address).map_err(|_| RequestError::Request)?;
 
         if let Some(content_length) = headers.get(&RequestHeader::ContentLength) {
             let content_length: usize =
