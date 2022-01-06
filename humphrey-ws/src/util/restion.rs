@@ -1,3 +1,5 @@
+//! Provides the `Restion` type, a combination of `Result` and `Option`.
+
 use std::fmt::Debug;
 
 /// A combination of `Result` and `Option`, used to represent the result of non-blocking operations.
