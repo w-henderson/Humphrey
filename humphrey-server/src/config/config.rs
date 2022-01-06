@@ -112,8 +112,11 @@ pub struct BlacklistConfig {
 #[cfg(feature = "tls")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TlsConfig {
+    /// The TLS certificate file path.
     pub cert_file: String,
+    /// The TLS key file path.
     pub key_file: String,
+    /// Whether to force clients to use HTTPS.
     pub force: bool,
 }
 
@@ -121,8 +124,11 @@ pub struct TlsConfig {
 #[cfg(feature = "plugins")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PluginConfig {
+    /// The name of the plugin.
     pub name: String,
+    /// The path to the shared library file.
     pub library: String,
+    /// The configuration for the plugin.
     pub config: HashMap<String, String>,
 }
 
