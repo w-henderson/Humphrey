@@ -1,3 +1,6 @@
+//! Contains database traits for connecting the authentication service with a database of
+//!   your choosing. These are automatically implemented for `Vec<User>` as an example.
+
 use crate::error::AuthError;
 use crate::session::Session;
 use crate::user::User;
