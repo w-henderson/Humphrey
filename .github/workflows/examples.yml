@@ -1,0 +1,92 @@
+on:
+  push:
+    paths:
+    - "humphrey/**"
+    - "humphrey-auth/**"
+    - "humphrey-server/**"
+    - "humphrey-ws/**"
+    - "examples/**"
+    - ".github/**"
+
+name: Examples
+
+jobs:
+  examples:
+    name: Check Examples
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Check auth example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/auth/Cargo.toml
+
+      - name: Check basic example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/basic/Cargo.toml
+
+      - name: Check broadcast example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/broadcast/Cargo.toml
+
+      - name: Check database example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/database/Cargo.toml
+
+      - name: Check host example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/host/Cargo.toml
+
+      - name: Check plugin example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/plugin/Cargo.toml
+
+      - name: Check stateful example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/stateful/Cargo.toml
+
+      - name: Check static content example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/static-content/Cargo.toml
+
+      - name: Check TLS example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/tls/Cargo.toml
+
+      - name: Check WebSocket example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/websocket/Cargo.toml
+
+      - name: Check wildcard example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/wildcard/Cargo.toml

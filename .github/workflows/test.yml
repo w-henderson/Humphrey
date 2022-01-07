@@ -5,13 +5,13 @@ on:
     - "humphrey-auth/**"
     - "humphrey-server/**"
     - "humphrey-ws/**"
-  pull_request:
+    - ".github/**"
 
 name: CI
 
 jobs:
   check:
-    name: Check
+    name: Check Crates
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -30,7 +30,7 @@ jobs:
           command: check
 
   test:
-    name: Test
+    name: Test Crates
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
