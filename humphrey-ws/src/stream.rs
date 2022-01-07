@@ -1,12 +1,13 @@
 //! Provides functionality for working with a WebSocket stream.
 
+use humphrey::stream::Stream;
+
 use crate::error::WebsocketError;
 use crate::frame::{Frame, Opcode};
 use crate::message::Message;
 use crate::restion::Restion;
 
 use std::io::{Read, Write};
-use std::net::TcpStream;
 
 /// Represents a WebSocket stream.
 pub struct WebsocketStream<T>
@@ -55,7 +56,7 @@ where
     }
 }
 
-impl WebsocketStream<TcpStream> {
+impl WebsocketStream<Stream<'_>> {
     /// Attemps to receive a message from the stream without blocking.
     pub fn recv_nonblocking(&mut self) -> Restion<Message, WebsocketError> {
         let message = Message::from_stream_nonblocking(&mut self.stream);

@@ -82,4 +82,14 @@ impl<'a> Stream<'a> {
             Stream::Phantom(_) => panic!("Phantom data in stream enum"),
         }
     }
+
+    /// Sets this connection to blocking mode.
+    pub fn set_blocking(&self) -> std::io::Result<()> {
+        match self {
+            Stream::Tcp(stream) => stream.set_nonblocking(false),
+            #[cfg(feature = "tls")]
+            Stream::Tls(stream) => stream.sock.set_nonblocking(false),
+            Stream::Phantom(_) => panic!("Phantom data in stream enum"),
+        }
+    }
 }

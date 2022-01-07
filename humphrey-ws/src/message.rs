@@ -1,11 +1,12 @@
 //! Provides an abstraction over WebSocket frames called `Message`.
 
+use humphrey::stream::Stream;
+
 use crate::error::WebsocketError;
 use crate::frame::{Frame, Opcode};
 use crate::restion::Restion;
 
 use std::io::{Read, Write};
-use std::net::TcpStream;
 
 /// Represents a WebSocket message.
 #[derive(Debug)]
@@ -92,7 +93,7 @@ impl Message {
     /// Attemps to read a message from the given stream without blocking.
     ///
     /// Silently responds to pings with pongs, as specified in [RFC 6455 Section 5.5.2](https://datatracker.ietf.org/doc/html/rfc6455#section-5.5.2).
-    pub fn from_stream_nonblocking(mut stream: &mut TcpStream) -> Restion<Self, WebsocketError> {
+    pub fn from_stream_nonblocking(mut stream: &mut Stream) -> Restion<Self, WebsocketError> {
         let mut frames: Vec<Frame> = Vec::new();
         let mut is_first_frame = true;
 
