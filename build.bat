@@ -1,9 +1,9 @@
 :: Batch file to build the following program variants:
 ::
 :: - Windows
-:: - Windows with plugin support
+:: - Windows with all features (TLS and plugins)
 :: - Linux
-:: - Linux with plugin support
+:: - Linux with all features (TLS and plugins)
 :: - PHP plugin for Windows
 :: - PHP plugin for Linux
 ::
@@ -27,18 +27,18 @@ cd dist
 rename humphrey humphrey_linux
 cd ..
 
-echo Building for Windows (with plugin support)...
-cargo build --release -q --features plugins
+echo Building for Windows (with all features)...
+cargo build --release -q --all-features
 robocopy target/release dist humphrey.exe > nul
 cd dist
-rename humphrey.exe humphrey_windows_with_plugins.exe
+rename humphrey.exe humphrey_windows_all_features.exe
 cd ..
 
-echo Building for Linux (with plugin support)...
-wsl $HOME/.cargo/bin/cargo build --release -q --features plugins
+echo Building for Linux (with all features)...
+wsl $HOME/.cargo/bin/cargo build --release -q --all-features
 robocopy target/release dist humphrey > nul
 cd dist
-rename humphrey humphrey_linux_with_plugins
+rename humphrey humphrey_linux_all_features
 cd ..
 
 echo Building PHP plugin for Windows...
