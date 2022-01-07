@@ -27,10 +27,11 @@
 
 <hr><br>
 
-Humphrey is a very fast, robust and flexible HTTP/1.1 web server, with support for static and dynamic content through its Rust crate and plugin system. It has no dependencies when only using default features, and is easily extensible with a configuration file, dynamically-loaded plugins, or its Rust crate. It also provides a WebSocket API for the easy integration of WebSockets into your application, and a simple authentication system for authenticating users and managing sessions.
+Humphrey is a very fast, robust and flexible HTTP/1.1 web server, with support for static and dynamic content through its Rust crate and plugin system. It has no dependencies when only using default features, and the binary is easily extensible with a flexible configuration file and dynamically-loaded plugins. It also provides a WebSocket API for the easy integration of WebSockets into your application, and a simple authentication system for authenticating users and managing sessions.
 
 ## Contents
 - [Use Humphrey as a crate](humphrey/README.md)
 - [Use Humphrey as a standalone application](humphrey-server/README.md)
 - [Use WebSockets with Humphrey](humphrey-ws/README.md)
 - [Use authentication with Humphrey](humphrey-auth/README.md)
+- [Use HTTPS/TLS with Humphrey](humphrey/TLS.md)

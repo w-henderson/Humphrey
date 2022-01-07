@@ -44,3 +44,4 @@ fn contact(_: Request) -> Response {
 - [Static Content Example](https://github.com/w-henderson/Humphrey/tree/master/examples/static-content): demonstrates the built-in static content handlers
 - [Different Hosts Example](https://github.com/w-henderson/Humphrey/tree/master/examples/host): demonstrates how Humphrey can use different handlers depending on the host
 - [Database Example](https://github.com/w-henderson/Humphrey/tree/master/examples/database): integrates with JasonDB to make a basic message board
+- [TLS Example](https://github.com/w-henderson/Humphrey/tree/master/examples/tls): runs a Humphrey application over HTTPS
