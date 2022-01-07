@@ -1,11 +1,12 @@
 //! Provides an implementation of WebSocket frames as specified in [RFC 6455 Section 5](https://datatracker.ietf.org/doc/html/rfc6455#section-5).
 
+use humphrey::stream::Stream;
+
 use crate::error::WebsocketError;
 use crate::util::restion::Restion;
 
 use std::convert::TryFrom;
 use std::io::Read;
-use std::net::TcpStream;
 
 /// Represents a frame of WebSocket data.
 /// Follows [Section 5.2 of RFC 6455](https://datatracker.ietf.org/doc/html/rfc6455#section-5.2)
@@ -77,9 +78,9 @@ impl Frame {
     }
 
     /// Attemps to read a frame from the given stream, immediately returning instead of blocking if there is no frame to read.
-    pub fn from_stream_nonblocking(stream: &mut TcpStream) -> Restion<Self, WebsocketError> {
+    pub fn from_stream_nonblocking(stream: &mut Stream) -> Restion<Self, WebsocketError> {
         // Set the stream to nonblocking to read the header
-        if stream.set_nonblocking(true).is_err() {
+        if stream.set_nonblocking().is_err() {
             return Restion::Err(WebsocketError::ReadError);
         }
 
@@ -88,7 +89,7 @@ impl Frame {
         let result = stream.read(&mut buf);
 
         // Set the stream to blocking for further reads
-        if stream.set_nonblocking(false).is_err() {
+        if stream.set_blocking().is_err() {
             return Restion::Err(WebsocketError::ReadError);
         }
 
