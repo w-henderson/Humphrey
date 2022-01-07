@@ -5,6 +5,7 @@ on:
     - "humphrey-auth/**"
     - "humphrey-server/**"
     - "humphrey-ws/**"
+    - "examples/**"
     - ".github/**"
 
 name: Examples
