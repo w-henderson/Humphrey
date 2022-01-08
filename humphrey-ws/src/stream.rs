@@ -10,6 +10,11 @@ use crate::restion::Restion;
 use std::io::{Read, Write};
 
 /// Represents a WebSocket stream.
+///
+/// Messages can be sent and received through the `send` and `recv` methods.
+///
+/// The stream also implements the `Read` and `Write` traits to help with compatibility with
+///   other crates. These simply wrap and unwrap the bytes in WebSocket frames.
 pub struct WebsocketStream<T>
 where
     T: Read + Write,
@@ -66,6 +71,54 @@ impl WebsocketStream<Stream<'_>> {
         }
 
         message
+    }
+}
+
+impl<T> Read for WebsocketStream<T>
+where
+    T: Read + Write,
+{
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if let Ok(message) = self.recv() {
+            let bytes = message.bytes();
+
+            if bytes.len() <= buf.len() {
+                buf[..bytes.len()].copy_from_slice(bytes);
+                Ok(bytes.len())
+            } else {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Buffer is too small",
+                ))
+            }
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Failed to receive message",
+            ))
+        }
+    }
+}
+
+impl<T> Write for WebsocketStream<T>
+where
+    T: Read + Write,
+{
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let message = Message::new(buf);
+
+        if self.send(message).is_ok() {
+            Ok(buf.len())
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Failed to send message",
+            ))
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 
