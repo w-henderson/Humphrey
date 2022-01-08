@@ -196,6 +196,8 @@ impl Response {
     }
 
     /// Attemps to read and parse one HTTP response from the given stream.
+    ///
+    /// Converts chunked transfer encoding into a regular body.
     pub fn from_stream<T>(stream: &mut T) -> Result<Self, ResponseError>
     where
         T: Read,
@@ -238,7 +240,27 @@ impl Response {
             }
         }
 
-        if let Some(content_length) = headers.get(&ResponseHeader::ContentLength) {
+        if headers
+            .get(&ResponseHeader::TransferEncoding)
+            .and_then(|te| if te == "chunked" { Some(()) } else { None })
+            .is_some()
+        {
+            let mut body: Vec<u8> = Vec::new();
+
+            while let Some(chunk) = parse_chunk(&mut reader) {
+                body.extend(chunk);
+            }
+
+            headers.remove(&ResponseHeader::TransferEncoding);
+            headers.insert(ResponseHeader::ContentLength, body.len().to_string());
+
+            Ok(Self {
+                version,
+                status_code: status,
+                headers,
+                body,
+            })
+        } else if let Some(content_length) = headers.get(&ResponseHeader::ContentLength) {
             let content_length: usize = content_length
                 .parse()
                 .map_err(|_| ResponseError::Response)?;
@@ -292,6 +314,27 @@ impl From<Response> for Vec<u8> {
         }
 
         bytes
+    }
+}
+
+/// Parses a chunk using the chunked transfer encoding.
+fn parse_chunk<T>(stream: &mut BufReader<T>) -> Option<Vec<u8>>
+where
+    T: Read,
+{
+    let mut length_line_buf: Vec<u8> = Vec::new();
+    stream.read_until(0xA, &mut length_line_buf).ok()?;
+    let length: usize =
+        usize::from_str_radix(std::str::from_utf8(&length_line_buf).ok()?.trim_end(), 16).ok()?;
+
+    if length == 0 {
+        stream.read_exact(&mut [0u8, 0]).ok()?;
+        None
+    } else {
+        let mut content_buf: Vec<u8> = vec![0u8; length];
+        stream.read_exact(&mut content_buf).ok()?;
+        stream.read_exact(&mut [0u8, 0]).ok()?;
+        Some(content_buf)
     }
 }
 

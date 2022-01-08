@@ -110,6 +110,8 @@ pub enum ResponseHeader {
     Server,
     /// Indicates that the client should set the specified cookies.
     SetCookie,
+    /// Indicates the encoding used in the transfer of the payload body.
+    TransferEncoding,
     /// Indicates that the connection is to be upgraded to a different protocol, e.g. WebSocket.
     Upgrade,
     /// Contains the addresses of proxies through which the response has been forwarded.
@@ -197,6 +199,7 @@ impl From<&str> for ResponseHeader {
             "Pragma" => Self::Pragma,
             "Server" => Self::Server,
             "Set-Cookie" => Self::SetCookie,
+            "Transfer-Encoding" => Self::TransferEncoding,
             "Upgrade" => Self::Upgrade,
             "Via" => Self::Via,
             "Warning" => Self::Warning,
@@ -271,6 +274,7 @@ impl ToString for ResponseHeader {
             ResponseHeader::Pragma => "Pragma",
             ResponseHeader::Server => "Server",
             ResponseHeader::SetCookie => "Set-Cookie",
+            ResponseHeader::TransferEncoding => "Transfer-Encoding",
             ResponseHeader::Upgrade => "Upgrade",
             ResponseHeader::Via => "Via",
             ResponseHeader::Warning => "Warning",
@@ -313,6 +317,7 @@ impl ResponseHeader {
             ResponseHeader::Pragma => HeaderCategory::General,
             ResponseHeader::Server => HeaderCategory::Response,
             ResponseHeader::SetCookie => HeaderCategory::Other,
+            ResponseHeader::TransferEncoding => HeaderCategory::Entity,
             ResponseHeader::Upgrade => HeaderCategory::General,
             ResponseHeader::Via => HeaderCategory::General,
             ResponseHeader::Warning => HeaderCategory::General,
