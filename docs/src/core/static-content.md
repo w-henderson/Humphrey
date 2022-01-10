@@ -51,4 +51,4 @@ fn main() {
 ```
 
 ## Conclusion
-In this section, we've learnt how to use Humphrey's built-in handlers to serve static content from a Humphrey web application. To learn more about Humphrey, consider reading the [WebSocket](../websocket/index.md) chapter.
+In this section, we've learnt how to use Humphrey's built-in handlers to serve static content from a Humphrey web application. In the next section, we'll explore how to use HTTPS (TLS) with Humphrey using the `rustls` crate.

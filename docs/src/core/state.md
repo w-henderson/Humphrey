@@ -47,10 +47,10 @@ Our `/api/getPresses` endpoint just needs to load the value of the `button_press
 ```rs
 // --snip--
 
-fn get_presses(request: Request, state: Arc<AppState>) -> Response {
+fn get_presses(_: Request, state: Arc<AppState>) -> Response {
     let presses = state.button_presses.load(Ordering::SeqCst);
 
-    Response::new(StatusCode::OK, presses.to_string(), &request)
+    Response::new(StatusCode::OK, presses.to_string())
 }
 ```
 
@@ -59,10 +59,10 @@ Creating the `/api/incrementPresses` endpoint is similar, but we need to increme
 ```rs
 /// --snip--
 
-fn increment_presses(request: Request, state: Arc<AppState>) -> Response {
+fn increment_presses(_: Request, state: Arc<AppState>) -> Response {
     state.button_presses.fetch_add(1, Ordering::SeqCst);
 
-    Response::new(StatusCode::OK, b"OK", &request)
+    Response::new(StatusCode::OK, b"OK")
 }
 ```
 

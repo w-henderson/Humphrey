@@ -31,8 +31,8 @@ use humphrey::http::{Response, StatusCode};
 use humphrey::App;
 
 fn main() {
-    let app: App = App::new().with_stateless_route("/", |request| {
-        Response::new(StatusCode::OK, "Hello, Humphrey!", &request)
+    let app: App = App::new().with_stateless_route("/", |_| {
+        Response::new(StatusCode::OK, "Hello, Humphrey!")
     });
 
     app.run("0.0.0.0:80").unwrap();
@@ -43,9 +43,9 @@ If we now run `cargo run`, our application will successfully compile and start t
 
 First, we create a new `App` instance, which is the core of every Humphrey application. We need to specify the type `App` as well, since the app is generic over a state type, which we'll cover in the [Using State](state.md) chapter. This shouldn't be necessary since the default state type is the Rust empty type `()`, but it must be done due to current technical limitations of Rust (see [rust-lang/rust issue #36887](https://github.com/rust-lang/rust/issues/36887)).
 
-We then call `with_stateless_route` on the `App` instance, passing in the path of the route and a closure that will be called when the route is matched. The closure takes one argument, the request. It returns a `Response` object with the success status code (200), the text "Hello, Humphrey!", and takes in the request to ensure that the response is constructed correctly, for example respecting the `Connection` header.
+We then call `with_stateless_route` on the `App` instance, passing in the path of the route and a closure that will be called when the route is matched. The closure takes one argument, the request, which we ignore with the `_`. It returns a `Response` object with the success status code (200), containing the text "Hello, Humphrey!".
 
-Finally, we call `run` on the `App` instance, passing in the address and port to listen on. This will start the server and block the thread until the server is shut down.
+Finally, we call `run` on the `App` instance, passing in the address and port to listen on. This will start the server and block the main thread until the server is shut down.
 
 ## Adding Multiple Routes
 At the moment, our app only shows a message for the root path, but we can add more routes by calling `with_stateless_route` again with different handlers. In most cases, these would not be passed in as closures, but rather as functions that return a `Response` object. Let's add another route called `/api/time` that shows the current time.
@@ -65,11 +65,11 @@ fn main() {
     app.run("0.0.0.0:80").unwrap();
 }
 
-fn root_handler(request: Request) -> Response {
-    Response::new(StatusCode::OK, "Hello, Humphrey!", &request)
+fn root_handler(_: Request) -> Response {
+    Response::new(StatusCode::OK, "Hello, Humphrey!")
 }
 
-fn time_handler(request: Request) -> Response {
+fn time_handler(_: Request) -> Response {
     // todo: get the current time
 }
 ```
@@ -81,11 +81,11 @@ use humphrey::http::date::DateTime;
 
 // --snip--
 
-fn time_handler(request: Request) -> Response {
+fn time_handler(_: Request) -> Response {
     let time = DateTime::now();
     let time_http = time.to_string();
 
-    Response::new(StatusCode::OK, time_http, &request)
+    Response::new(StatusCode::OK, time_http)
 }
 ```
 
@@ -113,7 +113,7 @@ fn greeting_handler(request: Request) -> Response {
 }
 ```
 
-In our newly-created greeting handler, we want to extract the name from the path and return a response depending on the name provided. We can do that with the Rust standard library's `strip_prefix` function for strings.
+In our newly-created greeting handler, we want to extract the name from the path and return a response depending on the name provided. We can do that with the Rust standard library's `strip_prefix` function for strings. You'll notice that we haven't ignored the request argument as we did previously, and this is so we can access the path of the request.
 
 ```rs
 // --snip--
@@ -122,7 +122,7 @@ fn greeting_handler(request: Request) -> Response {
     let name = request.uri.strip_prefix("/api/greeting/").unwrap();
     let greeting = format!("Hello, {}!", name);
 
-    Response::new(StatusCode::OK, greeting, &request)
+    Response::new(StatusCode::OK, greeting)
 }
 ```
 
