@@ -1,3 +1,5 @@
+//! Provides functionality for handling HTTP methods.
+
 use super::request::RequestError;
 
 use std::fmt::Display;
@@ -5,9 +7,13 @@ use std::fmt::Display;
 /// Represents an HTTP method.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Method {
+    /// The `GET` method.
     Get,
+    /// The `POST` method.
     Post,
+    /// The `PUT` method.
     Put,
+    /// The `DELETE` method.
     Delete,
 }
 

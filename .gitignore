@@ -4,6 +4,10 @@ humphrey.ini
 conf/
 humphrey.log
 Cargo.lock
+pkg/
+bench/
+database.jdb
+keys/
 docs/book/
 
 *.conf

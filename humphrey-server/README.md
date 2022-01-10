@@ -9,7 +9,7 @@
 Humphrey is a very fast, robust and flexible HTTP/1.1 web server, with support for static and dynamic content through its plugin system. It has no dependencies when only using default features, and is easily extensible with a configuration file and dynamically-loaded plugins.
 
 ## Installation
-To install the binary, run `cargo install humphrey_server` and it will be automatically downloaded, compiled and added to your path as `humphrey`. Alternatively, you can find precompiled binaries from the [latest GitHub release](https://github.com/w-henderson/Humphrey/releases).
+To install the binary, run `cargo install humphrey_server` and it will be automatically downloaded, compiled and added to your path as `humphrey`. Alternatively, you can find precompiled binaries from the [latest GitHub release](https://github.com/w-henderson/Humphrey/releases). If you want to use plugins or TLS, you will need to enable the corresponding features with either `--features plugins`, `--features tls` or `--all-features` when installing.
 
 ## Configuration
 The Humphrey executable is run with a maximum of one argument, which specifies the path to the configuration file (defaulting to `humphrey.conf` in the current directory). The configuration file is where all configuration for Humphrey and any plugins is stored. The syntax is similar to Nginx, with comments starting with a `#`. Other configuration files can be included with the `include` directive, like in Nginx. Below is an example of a configuration file with every supported field specified. Unless specified otherwise, all fields are optional.
@@ -17,12 +17,17 @@ The Humphrey executable is run with a maximum of one argument, which specifies t
 ```conf
 server {
   address   "0.0.0.0"        # Address to host the server on
-  port      80               # Port to host the server on
+  port      443              # Port to host the server on
   threads   32               # Number of threads to use for the server
-  websocket "localhost:1234" # Where to proxy WebSocket connections to
 
-  plugins {
+  plugins { # Plugin configuration (only supported with the `plugins` feature)
     include "php.conf"       # Include PHP configuration (see below)
+  }
+
+  tls { # TLS configuration (only supported with the `tls` feature)
+    cert_file "cert.pem"     # Path to the TLS certificate
+    key_file  "key.pem"      # Path to the TLS key
+    force     true           # Whether to force HTTPS on all requests
   }
 
   blacklist {
@@ -39,6 +44,16 @@ server {
   cache {
     size 128M # Size limit of the cache
     time 60   # Max time to cache files for, in seconds
+  }
+
+  host "127.0.0.1" { # Configuration for connecting through the host 127.0.0.1
+    route /* {
+      redirect "http://localhost/" # Redirect to localhost
+    }
+  }
+
+  route /ws {
+    websocket "localhost:1234" # Address to connect to for WebSocket connections
   }
 
   route /proxy/* {

@@ -1,3 +1,5 @@
+//! Provides functionality for handling HTTP responses.
+
 use crate::http::date::DateTime;
 use crate::http::headers::{RequestHeader, ResponseHeader, ResponseHeaderMap};
 use crate::http::request::Request;
@@ -12,7 +14,7 @@ use std::io::{BufRead, BufReader, Read};
 ///
 /// ## Simple Creation
 /// ```
-/// Response::new(StatusCode::OK, b"Success", &request)
+/// Response::new(StatusCode::OK, b"Success")
 /// ```
 ///
 /// ## Advanced Creation
@@ -20,8 +22,6 @@ use std::io::{BufRead, BufReader, Read};
 /// Response::empty(StatusCode::OK)
 ///     .with_bytes(b"Success")
 ///     .with_header(ResponseHeader::ContentType, "text/plain".into())
-///     .with_request_compatibility(&request)
-///     .with_generated_headers()
 /// ```
 #[derive(Debug)]
 pub struct Response {
@@ -57,16 +57,13 @@ impl Response {
     /// Functionally equivalent to the following (but with some allocation optimisations not shown):
     ///
     /// ```
-    /// Response::empty(status_code)
-    ///     .with_bytes(bytes)
-    ///     .with_request_compatibility(request)
-    ///     .with_generated_headers()
+    /// Response::empty(status_code).with_bytes(bytes)
     /// ```
     ///
     /// ## Note about Headers
     /// If you want to add headers to a response, ideally use `Response::empty` and the builder pattern
     ///   so as to not accidentally override important generated headers such as content length and connection.
-    pub fn new<T>(status_code: StatusCode, bytes: T, request: &Request) -> Self
+    pub fn new<T>(status_code: StatusCode, bytes: T) -> Self
     where
         T: AsRef<[u8]>,
     {
@@ -76,8 +73,6 @@ impl Response {
             headers: ResponseHeaderMap::new(),
             body: bytes.as_ref().to_vec(),
         }
-        .with_request_compatibility(request)
-        .with_generated_headers()
     }
 
     /// Creates a new response object with the given status code.
@@ -89,6 +84,15 @@ impl Response {
             headers: ResponseHeaderMap::new(),
             body: Vec::new(),
         }
+    }
+
+    /// Creates a redirect response to the given location.
+    pub fn redirect<T>(location: T) -> Self
+    where
+        T: AsRef<str>,
+    {
+        Self::empty(StatusCode::MovedPermanently)
+            .with_header(ResponseHeader::Location, location.as_ref().to_string())
     }
 
     /// Adds the given header to the response.
@@ -113,6 +117,14 @@ impl Response {
     ///   strongly recommended to fully comply with the browser's request.
     ///
     /// Returns itself for use in a builder pattern.
+    ///
+    /// ## Deprecated
+    /// This function is deprecated and will be removed in a future release. It is automatically performed
+    ///   on every response before being sent, so you can safely remove it.
+    #[deprecated(
+        since = "0.3.0",
+        note = "This is automatically performed on every response."
+    )]
     pub fn with_request_compatibility(mut self, request: &Request) -> Self {
         if let Some(connection) = request.headers.get(&RequestHeader::Connection) {
             self.headers
@@ -138,6 +150,14 @@ impl Response {
     /// - `Connection`: will be set to `Close` unless previously set, for example in `.with_request_compatibility(request)`
     ///
     /// Returns itself for use in a builder pattern.
+    ///
+    /// ## Deprecated
+    /// This function is deprecated and will be removed in a future release. It is automatically performed
+    ///   on every response before being sent, so you can safely remove it.
+    #[deprecated(
+        since = "0.3.0",
+        note = "This is automatically performed on every response."
+    )]
     pub fn with_generated_headers(mut self) -> Self {
         match self.headers.entry(ResponseHeader::Server) {
             Entry::Occupied(_) => (),
@@ -160,12 +180,10 @@ impl Response {
             }
         }
 
-        if !self.body.is_empty() {
-            match self.headers.entry(ResponseHeader::ContentLength) {
-                Entry::Occupied(_) => (),
-                Entry::Vacant(v) => {
-                    v.insert(self.body.len().to_string());
-                }
+        match self.headers.entry(ResponseHeader::ContentLength) {
+            Entry::Occupied(_) => (),
+            Entry::Vacant(v) => {
+                v.insert(self.body.len().to_string());
             }
         }
 
@@ -178,6 +196,8 @@ impl Response {
     }
 
     /// Attemps to read and parse one HTTP response from the given stream.
+    ///
+    /// Converts chunked transfer encoding into a regular body.
     pub fn from_stream<T>(stream: &mut T) -> Result<Self, ResponseError>
     where
         T: Read,
@@ -220,7 +240,27 @@ impl Response {
             }
         }
 
-        if let Some(content_length) = headers.get(&ResponseHeader::ContentLength) {
+        if headers
+            .get(&ResponseHeader::TransferEncoding)
+            .and_then(|te| if te == "chunked" { Some(()) } else { None })
+            .is_some()
+        {
+            let mut body: Vec<u8> = Vec::new();
+
+            while let Some(chunk) = parse_chunk(&mut reader) {
+                body.extend(chunk);
+            }
+
+            headers.remove(&ResponseHeader::TransferEncoding);
+            headers.insert(ResponseHeader::ContentLength, body.len().to_string());
+
+            Ok(Self {
+                version,
+                status_code: status,
+                headers,
+                body,
+            })
+        } else if let Some(content_length) = headers.get(&ResponseHeader::ContentLength) {
             let content_length: usize = content_length
                 .parse()
                 .map_err(|_| ResponseError::Response)?;
@@ -274,6 +314,27 @@ impl From<Response> for Vec<u8> {
         }
 
         bytes
+    }
+}
+
+/// Parses a chunk using the chunked transfer encoding.
+fn parse_chunk<T>(stream: &mut BufReader<T>) -> Option<Vec<u8>>
+where
+    T: Read,
+{
+    let mut length_line_buf: Vec<u8> = Vec::new();
+    stream.read_until(0xA, &mut length_line_buf).ok()?;
+    let length: usize =
+        usize::from_str_radix(std::str::from_utf8(&length_line_buf).ok()?.trim_end(), 16).ok()?;
+
+    if length == 0 {
+        stream.read_exact(&mut [0u8, 0]).ok()?;
+        None
+    } else {
+        let mut content_buf: Vec<u8> = vec![0u8; length];
+        stream.read_exact(&mut content_buf).ok()?;
+        stream.read_exact(&mut [0u8, 0]).ok()?;
+        Some(content_buf)
     }
 }
 

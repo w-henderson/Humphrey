@@ -1,15 +1,21 @@
+//! Provides the core Humphrey app functionality.
+
 #![allow(clippy::new_without_default)]
 
 use crate::http::headers::RequestHeader;
-use crate::http::request::{Request, RequestError};
+use crate::http::request::Request;
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
-use crate::route::{Route, RouteHandler};
+use crate::krauss::wildcard_match;
+use crate::route::{Route, SubApp};
+use crate::stream::Stream;
 use crate::thread::pool::ThreadPool;
 
-use std::io::Write;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
+
+#[cfg(feature = "tls")]
+use rustls::ServerConfig;
 
 /// Represents the Humphrey app.
 ///
@@ -21,42 +27,73 @@ where
     State: Send + Sync + 'static,
 {
     thread_pool: ThreadPool,
-    routes: Vec<RouteHandler<State>>,
+    subapps: Vec<SubApp<State>>,
+    default_subapp: SubApp<State>,
     error_handler: ErrorHandler,
     state: Arc<State>,
     connection_handler: ConnectionHandler<State>,
     connection_condition: ConnectionCondition<State>,
-    websocket_handler: WebsocketHandler<State>,
+    #[cfg(feature = "tls")]
+    tls_config: Option<Arc<ServerConfig>>,
+    #[cfg(feature = "tls")]
+    force_https: bool,
 }
 
 /// Represents a function able to handle a connection.
 /// In most cases, the default connection handler should be used.
-pub type ConnectionHandler<State> = fn(
-    TcpStream,
-    Arc<Vec<RouteHandler<State>>>,
-    Arc<ErrorHandler>,
-    Arc<WebsocketHandler<State>>,
-    Arc<State>,
-);
+pub type ConnectionHandler<State> =
+    fn(Stream, Arc<Vec<SubApp<State>>>, Arc<SubApp<State>>, Arc<ErrorHandler>, Arc<State>);
 
 /// Represents a function able to calculate whether a connection will be accepted.
 pub type ConnectionCondition<State> = fn(&mut TcpStream, Arc<State>) -> bool;
 
 /// Represents a function able to handle a WebSocket handshake and consequent data frames.
-pub type WebsocketHandler<State> = fn(Request, TcpStream, Arc<State>);
+pub trait WebsocketHandler<State>: Fn(Request, Stream, Arc<State>) + Send + Sync {}
+impl<T, S> WebsocketHandler<S> for T where T: Fn(Request, Stream, Arc<S>) + Send + Sync {}
 
 /// Represents a function able to handle a request.
-/// It is passed a the request as well as the app's state, and must return a response.
+/// It is passed the request as well as the app's state, and must return a response.
 ///
 /// ## Example
 /// The most basic request handler would be as follows:
 /// ```
-/// fn handler(request: Request, _: Arc<()>) -> Response {
-///     Response::new(StatusCode::OK, b"Success", &request)
+/// fn handler(_: Request, _: Arc<()>) -> Response {
+///     Response::new(StatusCode::OK, b"Success")
 /// }
 /// ```
 pub trait RequestHandler<State>: Fn(Request, Arc<State>) -> Response + Send + Sync {}
 impl<T, S> RequestHandler<S> for T where T: Fn(Request, Arc<S>) -> Response + Send + Sync {}
+
+/// Represents a function able to handle a request.
+/// It is passed only the request, and must return a response.
+/// If you want access to the app's state, consider using the `RequestHandler` trait instead.
+///
+/// ## Example
+/// The most basic stateless request handler would be as follows:
+/// ```
+/// fn handler(_: Request) -> Response {
+///     Response::new(StatusCode::OK, b"Success")
+/// }
+/// ```
+pub trait StatelessRequestHandler<State>: Fn(Request) -> Response + Send + Sync {}
+impl<T, S> StatelessRequestHandler<S> for T where T: Fn(Request) -> Response + Send + Sync {}
+
+/// Represents a function able to handle a request with respect to the route it was called from.
+/// It is passed the request, the app's state, and the route it was called from, and must return a response.
+///
+/// ## Example
+/// The most basic path-aware request handler would be as follows:
+/// ```
+/// fn handler(_: Request, _: Arc<()>, route: &str) -> Response {
+///     Response::new(StatusCode::OK, format!("Success matching route {}", route))
+/// }
+/// ```
+#[rustfmt::skip]
+pub trait PathAwareRequestHandler<State>:
+    Fn(Request, Arc<State>, &str) -> Response + Send + Sync {}
+#[rustfmt::skip]
+impl<T, S> PathAwareRequestHandler<S> for T where
+    T: Fn(Request, Arc<S>, &str) -> Response + Send + Sync {}
 
 /// Represents a function able to handle an error.
 /// The first parameter of type `Option<Request>` will be `Some` if the request could be parsed.
@@ -67,23 +104,17 @@ impl<T, S> RequestHandler<S> for T where T: Fn(Request, Arc<S>) -> Response + Se
 ///
 /// ## Example
 /// ```
-/// fn error_handler(request: Option<Request>, status_code: StatusCode) -> Response {
+/// fn error_handler(status_code: StatusCode) -> Response {
 ///     let body = format!(
 ///         "<html><body><h1>{} {}</h1></body></html>",
 ///         Into::<u16>::into(status_code.clone()),
 ///         Into::<&str>::into(status_code.clone())
 ///     );
 ///     
-///     if let Some(request) = request {
-///         Response::new(status_code, body.as_bytes(), &request)
-///     } else {
-///         Response::empty(status_code)
-///             .with_bytes(body.as_bytes())
-///             .with_generated_headers()
-///     }
+///     Response::new(status_code, body.as_bytes())
 /// }
 /// ```
-pub type ErrorHandler = fn(Option<Request>, StatusCode) -> Response;
+pub type ErrorHandler = fn(StatusCode) -> Response;
 
 /// Represents a generic error with the program.
 pub type HumphreyError = Box<dyn std::error::Error>;
@@ -104,12 +135,16 @@ where
     {
         Self {
             thread_pool: ThreadPool::new(32),
-            routes: Vec::new(),
+            subapps: Vec::new(),
+            default_subapp: SubApp::default(),
             error_handler,
             state: Arc::new(State::default()),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
-            websocket_handler: |_, _, _| (),
+            #[cfg(feature = "tls")]
+            tls_config: None,
+            #[cfg(feature = "tls")]
+            force_https: false,
         }
     }
 
@@ -117,12 +152,16 @@ where
     pub fn new_with_config(threads: usize, state: State) -> Self {
         Self {
             thread_pool: ThreadPool::new(threads),
-            routes: Vec::new(),
+            subapps: Vec::new(),
+            default_subapp: SubApp::default(),
             error_handler,
             state: Arc::new(state),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
-            websocket_handler: |_, _, _| (),
+            #[cfg(feature = "tls")]
+            tls_config: None,
+            #[cfg(feature = "tls")]
+            force_https: false,
         }
     }
 
@@ -133,9 +172,9 @@ where
         A: ToSocketAddrs,
     {
         let socket = TcpListener::bind(addr)?;
-        let routes = Arc::new(self.routes);
+        let subapps = Arc::new(self.subapps);
+        let default_subapp = Arc::new(self.default_subapp);
         let error_handler = Arc::new(self.error_handler);
-        let websocket_handler = Arc::new(self.websocket_handler);
 
         for mut stream in socket.incoming().flatten() {
             let cloned_state = self.state.clone();
@@ -143,18 +182,73 @@ where
             // Check that the client is allowed to connect
             if (self.connection_condition)(&mut stream, cloned_state) {
                 let cloned_state = self.state.clone();
-                let cloned_routes = routes.clone();
-                let cloned_websocket_handler = websocket_handler.clone();
+                let cloned_subapps = subapps.clone();
+                let cloned_default_subapp = default_subapp.clone();
                 let cloned_error_handler = error_handler.clone();
                 let cloned_handler = self.connection_handler;
 
                 // Spawn a new thread to handle the connection
                 self.thread_pool.execute(move || {
                     (cloned_handler)(
-                        stream,
-                        cloned_routes,
+                        Stream::Tcp(stream),
+                        cloned_subapps,
+                        cloned_default_subapp,
                         cloned_error_handler,
-                        cloned_websocket_handler,
+                        cloned_state,
+                    )
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Securely runs the Humphrey app on the given socket address.
+    /// This function will only return if a fatal error is thrown such as the port being in use or the TLS certificate being invalid.
+    #[cfg(feature = "tls")]
+    pub fn run_tls<A>(self, addr: A) -> Result<(), HumphreyError>
+    where
+        A: ToSocketAddrs,
+    {
+        use rustls::ServerConnection;
+
+        let socket = TcpListener::bind(addr)?;
+        let subapps = Arc::new(self.subapps);
+        let default_subapp = Arc::new(self.default_subapp);
+        let error_handler = Arc::new(self.error_handler);
+
+        if self.force_https {
+            self.thread_pool
+                .execute(|| force_https_thread().unwrap_or(()));
+        }
+
+        for mut sock in socket.incoming().flatten() {
+            let cloned_state = self.state.clone();
+
+            // Check that the client is allowed to connect
+            if (self.connection_condition)(&mut sock, cloned_state) {
+                let cloned_state = self.state.clone();
+                let cloned_subapps = subapps.clone();
+                let cloned_default_subapp = default_subapp.clone();
+                let cloned_error_handler = error_handler.clone();
+                let cloned_handler = self.connection_handler;
+                let cloned_config = self
+                    .tls_config
+                    .as_ref()
+                    .expect("TLS certificate not supplied")
+                    .clone();
+
+                // Spawn a new thread to handle the connection
+                self.thread_pool.execute(move || {
+                    let mut server = ServerConnection::new(cloned_config).unwrap();
+                    let tls_stream = rustls::Stream::new(&mut server, &mut sock);
+                    let stream = Stream::Tls(tls_stream);
+
+                    (cloned_handler)(
+                        stream,
+                        cloned_subapps,
+                        cloned_default_subapp,
+                        cloned_error_handler,
                         cloned_state,
                     )
                 });
@@ -172,19 +266,65 @@ where
         self
     }
 
-    /// Adds a route and associated handler to the server.
-    /// Routes can include wildcards, for example `/blog/*`.
+    /// Adds a new host sub-app to the server.
+    /// The host can contain wildcards, for example `*.example.com`.
     ///
     /// ## Panics
-    /// This function will panic if the route string cannot be converted to a `Uri` object.
+    /// This function will panic if the host is equal to `*`, since this is the default host.
+    /// If you want to add a route to every host, simply add it directly to the main app.
+    pub fn with_host(mut self, host: &str, mut handler: SubApp<State>) -> Self {
+        if host == "*" {
+            panic!("Cannot add a sub-app with wildcard `*`");
+        }
+
+        handler.host = host.to_string();
+        self.subapps.push(handler);
+
+        self
+    }
+
+    /// Adds a route and associated handler to the server.
+    /// Routes can include wildcards, for example `/blog/*`.
     pub fn with_route<T>(mut self, route: &str, handler: T) -> Self
     where
         T: RequestHandler<State> + 'static,
     {
-        self.routes.push(RouteHandler {
-            route: route.parse().unwrap(),
-            handler: Box::new(handler),
-        });
+        self.default_subapp = self.default_subapp.with_route(route, handler);
+        self
+    }
+
+    /// Adds a route and associated handler to the server.
+    /// Does not pass the state to the handler.
+    /// Routes can include wildcards, for example `/blog/*`.
+    ///
+    /// If you want to access the app's state in the handler, consider using `with_route`.
+    pub fn with_stateless_route<T>(mut self, route: &str, handler: T) -> Self
+    where
+        T: StatelessRequestHandler<State> + 'static,
+    {
+        self.default_subapp = self.default_subapp.with_stateless_route(route, handler);
+        self
+    }
+
+    /// Adds a path-aware route and associated handler to the server.
+    /// Routes can include wildcards, for example `/blog/*`.
+    /// Will also pass the route to the handler at runtime.
+    pub fn with_path_aware_route<T>(mut self, route: &'static str, handler: T) -> Self
+    where
+        T: PathAwareRequestHandler<State> + 'static,
+    {
+        self.default_subapp = self.default_subapp.with_path_aware_route(route, handler);
+        self
+    }
+
+    /// Adds a WebSocket route and associated handler to the server.
+    /// Routes can include wildcards, for example `/ws/*`.
+    /// The handler is passed the stream, state, and the request which triggered its calling.
+    pub fn with_websocket_route<T>(mut self, route: &str, handler: T) -> Self
+    where
+        T: WebsocketHandler<State> + 'static,
+    {
+        self.default_subapp = self.default_subapp.with_websocket_route(route, handler);
         self
     }
 
@@ -201,10 +341,66 @@ where
         self
     }
 
-    /// Sets the websocket handler, a function which processes WebSocket handshakes.
-    /// This is passed the stream, state, and the request which triggered its calling.
-    pub fn with_websocket_handler(mut self, handler: WebsocketHandler<State>) -> Self {
-        self.websocket_handler = handler;
+    /// Sets whether HTTPS should be forced on all connections. Defaults to false.
+    ///
+    /// If this is set to true, a background thread will be spawned when `run_tls` is called to send
+    ///   redirect responses to all insecure requests on port 80.
+    #[cfg(feature = "tls")]
+    pub fn with_forced_https(mut self, forced: bool) -> Self {
+        self.force_https = forced;
+        self
+    }
+
+    /// Sets the TLS configuration for the server.
+    ///
+    /// This **must** be called before `run_tls` is called.
+    #[cfg(feature = "tls")]
+    pub fn with_cert(mut self, cert_path: impl AsRef<str>, key_path: impl AsRef<str>) -> Self {
+        use rustls::{Certificate, PrivateKey};
+        use rustls_pemfile::{read_one, Item};
+
+        use std::fs::File;
+        use std::io::BufReader;
+
+        let mut cert_file =
+            BufReader::new(File::open(cert_path.as_ref()).expect("failed to open cert file"));
+        let mut key_file =
+            BufReader::new(File::open(key_path.as_ref()).expect("failed to open key file"));
+
+        let certs: Vec<Certificate> = match read_one(&mut cert_file).unwrap().unwrap() {
+            Item::X509Certificate(cert) => vec![Certificate(cert)],
+            _ => panic!("failed to parse cert file"),
+        };
+
+        let key: PrivateKey = match read_one(&mut key_file).unwrap().unwrap() {
+            Item::PKCS8Key(key) => PrivateKey(key),
+            _ => panic!("failed to parse key file"),
+        };
+
+        let config = Arc::new(
+            ServerConfig::builder()
+                .with_safe_defaults()
+                .with_no_client_auth()
+                .with_single_cert(certs, key)
+                .expect("failed to create server config"),
+        );
+
+        self.tls_config = Some(config);
+
+        self
+    }
+
+    /// Adds a global WebSocket handler to the server.
+    ///
+    /// ## Deprecated
+    /// This function is deprecated and will be removed in a future version.
+    /// Please use `with_websocket_route` intead.
+    #[deprecated(since = "0.3.0", note = "Please use `with_websocket_route` instead")]
+    pub fn with_websocket_handler<T>(mut self, handler: T) -> Self
+    where
+        T: WebsocketHandler<State> + 'static,
+    {
+        self.default_subapp = self.default_subapp.with_websocket_route("*", handler);
         self
     }
 
@@ -217,8 +413,8 @@ where
 
     /// Gets a reference to the app's state.
     /// This should only be used in the main thread, as the state is passed to request handlers otherwise.
-    pub fn get_state(&self) -> &Arc<State> {
-        &self.state
+    pub fn get_state(&self) -> Arc<State> {
+        self.state.clone()
     }
 }
 
@@ -226,23 +422,34 @@ where
 /// The connection will be opened upon the first request and closed as soon as a request is
 ///   recieved without the `Connection: Keep-Alive` header.
 fn client_handler<State>(
-    mut stream: TcpStream,
-    routes: Arc<Vec<RouteHandler<State>>>,
+    mut stream: Stream,
+    subapps: Arc<Vec<SubApp<State>>>,
+    default_subapp: Arc<SubApp<State>>,
     error_handler: Arc<ErrorHandler>,
-    websocket_handler: Arc<WebsocketHandler<State>>,
     state: Arc<State>,
 ) {
-    let addr = stream.peer_addr().unwrap();
+    use std::collections::btree_map::Entry;
+    use std::io::Write;
+
+    use crate::http::date::DateTime;
+    use crate::http::headers::ResponseHeader;
+    use crate::http::request::RequestError;
+
+    let addr = if let Ok(addr) = stream.peer_addr() {
+        addr
+    } else {
+        return;
+    };
 
     loop {
         // Parses the request from the stream
         let request = Request::from_stream(&mut stream, addr);
         let cloned_state = state.clone();
 
-        // If the request is valid an is a websocket request, call the corresponding handler
+        // If the request is valid an is a WebSocket request, call the corresponding handler
         if let Ok(req) = &request {
             if req.headers.get(&RequestHeader::Upgrade) == Some(&"websocket".to_string()) {
-                (websocket_handler)(req.clone(), stream, cloned_state);
+                call_websocket_handler(req, &subapps, &default_subapp, cloned_state, stream);
                 break;
             }
         }
@@ -268,16 +475,53 @@ fn client_handler<State>(
 
         // Generate the response based on the handlers
         let response = match request {
-            Ok(request) => match routes.iter().find(|r| r.route.route_matches(&request.uri)) {
-                Some(handler) => (handler.handler)(request, cloned_state),
-                None => error_handler(Some(request), StatusCode::NotFound),
-            },
-            Err(_) => error_handler(None, StatusCode::BadRequest),
+            Ok(request) => {
+                let mut response = call_handler(&request, &subapps, &default_subapp, state.clone());
+
+                // Automatically generate required headers
+                match response.headers.entry(ResponseHeader::Connection) {
+                    Entry::Occupied(_) => (),
+                    Entry::Vacant(v) => {
+                        if let Some(connection) = &request.headers.get(&RequestHeader::Connection) {
+                            v.insert(connection.to_string());
+                        } else {
+                            v.insert("Close".to_string());
+                        }
+                    }
+                }
+
+                match response.headers.entry(ResponseHeader::Server) {
+                    Entry::Occupied(_) => (),
+                    Entry::Vacant(v) => {
+                        v.insert("Humphrey".to_string());
+                    }
+                }
+
+                match response.headers.entry(ResponseHeader::Date) {
+                    Entry::Occupied(_) => (),
+                    Entry::Vacant(v) => {
+                        v.insert(DateTime::now().to_string());
+                    }
+                }
+
+                match response.headers.entry(ResponseHeader::ContentLength) {
+                    Entry::Occupied(_) => (),
+                    Entry::Vacant(v) => {
+                        v.insert(response.body.len().to_string());
+                    }
+                }
+
+                // Set HTTP version
+                response.version = request.version.clone();
+
+                response
+            }
+            Err(_) => error_handler(StatusCode::BadRequest),
         };
 
         // Write the response to the stream
         let response_bytes: Vec<u8> = response.into();
-        if stream.write(&response_bytes).is_err() {
+        if stream.write_all(&response_bytes).is_err() {
             break;
         };
 
@@ -288,20 +532,121 @@ fn client_handler<State>(
     }
 }
 
+/// Calls the correct handler for the given request.
+pub(crate) fn call_handler<State>(
+    request: &Request,
+    subapps: &[SubApp<State>],
+    default_subapp: &SubApp<State>,
+    state: Arc<State>,
+) -> Response {
+    // Iterate over the sub-apps and find the one which matches the host
+    if let Some(host) = request.headers.get(&RequestHeader::Host) {
+        if let Some(subapp) = subapps
+            .iter()
+            .find(|subapp| wildcard_match(&subapp.host, host))
+        {
+            // If the sub-app has a handler for this route, call it
+            if let Some(response) = subapp
+                .routes // Get the routes of the sub-app
+                .iter() // Iterate over the routes
+                .find(|route| route.route.route_matches(&request.uri)) // Find the route that matches
+                .map(|handler| (handler.handler)(request.clone(), state.clone()))
+            {
+                return response;
+            }
+        }
+    }
+
+    // If no sub-app was found, try to use the handler on the default sub-app
+    if let Some(response) = default_subapp
+        .routes
+        .iter()
+        .find(|route| route.route.route_matches(&request.uri))
+        .map(|handler| (handler.handler)(request.clone(), state))
+    {
+        return response;
+    }
+
+    // Otherwise return an error
+    error_handler(StatusCode::NotFound)
+}
+
+/// Calls the correct WebSocket handler for the given request.
+fn call_websocket_handler<State>(
+    request: &Request,
+    subapps: &[SubApp<State>],
+    default_subapp: &SubApp<State>,
+    state: Arc<State>,
+    stream: Stream,
+) {
+    // Iterate over the sub-apps and find the one which matches the host
+    if let Some(host) = request.headers.get(&RequestHeader::Host) {
+        if let Some(subapp) = subapps
+            .iter()
+            .find(|subapp| wildcard_match(&subapp.host, host))
+        {
+            // If the sub-app has a handler for this route, call it
+            if let Some(handler) = subapp
+                .websocket_routes // Get the WebSocket routes of the sub-app
+                .iter() // Iterate over the routes
+                .find(|route| route.route.route_matches(&request.uri))
+            {
+                (handler.handler)(request.clone(), stream, state);
+                return;
+            }
+        }
+    }
+
+    // If no sub-app was found, try to use the handler on the default sub-app
+    if let Some(handler) = default_subapp
+        .websocket_routes
+        .iter()
+        .find(|route| route.route.route_matches(&request.uri))
+    {
+        (handler.handler)(request.clone(), stream, state)
+    }
+}
+
+#[cfg(feature = "tls")]
+fn force_https_thread() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::http::headers::ResponseHeader;
+    use std::io::Write;
+
+    let socket = TcpListener::bind("0.0.0.0:80")?;
+
+    for mut stream in socket.incoming().flatten() {
+        let addr = stream.peer_addr()?;
+        let request = Request::from_stream(&mut stream, addr)?;
+
+        let response = if let Some(host) = request.headers.get(&RequestHeader::Host) {
+            Response::empty(StatusCode::MovedPermanently)
+                .with_header(
+                    ResponseHeader::Location,
+                    format!("https://{}{}", host, request.uri),
+                )
+                .with_header(ResponseHeader::Connection, "Close".into())
+        } else {
+            Response::empty(StatusCode::OK)
+                .with_bytes(b"<h1>Please access over HTTPS</h1>")
+                .with_header(ResponseHeader::ContentLength, "33".into())
+                .with_header(ResponseHeader::Connection, "Close".into())
+        };
+
+        let response_bytes: Vec<u8> = response.into();
+        stream.write_all(&response_bytes)?;
+    }
+
+    Ok(())
+}
+
 /// The default error handler for every Humphrey app.
 /// This can be overridden by using the `with_error_handler` method when building the app.
-pub(crate) fn error_handler(request: Option<Request>, status_code: StatusCode) -> Response {
+pub(crate) fn error_handler(status_code: StatusCode) -> Response {
     let body = format!(
         "<html><body><h1>{} {}</h1></body></html>",
         Into::<u16>::into(status_code.clone()),
         Into::<&str>::into(status_code.clone())
     );
 
-    if let Some(request) = request {
-        Response::new(status_code, body.as_bytes(), &request)
-    } else {
-        Response::empty(status_code)
-            .with_bytes(body.as_bytes().to_vec())
-            .with_generated_headers()
-    }
+    Response::new(status_code, body.as_bytes())
 }

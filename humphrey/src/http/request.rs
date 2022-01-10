@@ -1,3 +1,5 @@
+//! Provides functionality for handling HTTP requests.
+
 use crate::http::address::Address;
 use crate::http::headers::{RequestHeader, RequestHeaderMap};
 use crate::http::method::Method;
@@ -112,7 +114,8 @@ impl Request {
             }
         }
 
-        let address = Address::from_headers(&headers, address);
+        let address =
+            Address::from_headers(&headers, address).map_err(|_| RequestError::Request)?;
 
         if let Some(content_length) = headers.get(&RequestHeader::ContentLength) {
             let content_length: usize =

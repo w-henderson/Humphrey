@@ -1,3 +1,5 @@
+//! Provides logging functionality.
+
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::str::FromStr;

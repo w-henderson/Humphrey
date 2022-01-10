@@ -1,10 +1,11 @@
 //! Types used when creating a plugin.
 //!
-//! https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html
+//! <https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html>
 
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
+use crate::config::RouteConfig;
 use crate::server::server::AppState;
 use humphrey::http::{Request, Response};
 
@@ -36,7 +37,12 @@ pub trait Plugin: Any + Send + Sync + Debug {
     /// Called when a request is received but before it is processed. May modify the request in-place.
     /// Should return `None` to indicate that Humphrey should process the request,
     ///   or the plugin should process the request itself and return `Some(response)`.
-    fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
+    fn on_request(
+        &self,
+        request: &mut Request,
+        state: Arc<AppState>,
+        route: &RouteConfig,
+    ) -> Option<Response> {
         None
     }
 

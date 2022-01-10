@@ -1,7 +1,8 @@
 //! Plugin management code.
 //!
-//! https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html
+//! <https://michael-f-bryan.github.io/rust-ffi-guide/dynamic_loading.html>
 
+use crate::config::RouteConfig;
 use crate::plugins::plugin::{Plugin, PluginLoadResult};
 use crate::server::server::AppState;
 use humphrey::http::{Request, Response};
@@ -68,9 +69,14 @@ impl PluginManager {
 
     /// Calls the `on_request` function on every plugin.
     /// If a plugin overrides the response, this is immediately returned.
-    pub fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
+    pub fn on_request(
+        &self,
+        request: &mut Request,
+        state: Arc<AppState>,
+        route: &RouteConfig,
+    ) -> Option<Response> {
         for plugin in &self.plugins {
-            if let Some(response) = plugin.on_request(request, state.clone()) {
+            if let Some(response) = plugin.on_request(request, state.clone(), route) {
                 return Some(response);
             }
         }

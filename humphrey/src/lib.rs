@@ -15,23 +15,23 @@
 //! ```
 //! use humphrey::http::{Request, Response, StatusCode};
 //! use humphrey::App;
-//! use std::{error::Error, sync::Arc};
+//! use std::error::Error;
 //!
 //! fn main() -> Result<(), Box<dyn Error>> {
-//!     let app = App::new()
-//!         .with_route("/", home)
-//!         .with_route("/contact", contact);
+//!     let app: App<()> = App::new()
+//!         .with_stateless_route("/", home)
+//!         .with_stateless_route("/contact", contact);
 //!     app.run("0.0.0.0:80")?;
 //!
 //!     Ok(())
 //! }
 //!
-//! fn home(request: Request, _: Arc<()>) -> Response {
-//!     Response::new(StatusCode::OK, b"<html><body><h1>Home</h1></body></html>", &request)
+//! fn home(_: Request) -> Response {
+//!     Response::new(StatusCode::OK, b"<html><body><h1>Home</h1></body></html>")
 //! }
 //!
-//! fn contact(request: Request, _: Arc<()>) -> Response {
-//!     Response::new(StatusCode::OK, b"<html><body><h1>Contact</h1></body></html>", &request)
+//! fn contact(_: Request) -> Response {
+//!     Response::new(StatusCode::OK, b"<html><body><h1>Contact</h1></body></html>")
 //! }
 //! ```
 //!
@@ -41,14 +41,18 @@
 //! - [Wildcard Example](https://github.com/w-henderson/Humphrey/tree/master/examples/wildcard): demonstrates a wildcard route
 //! - [Static Content Example](https://github.com/w-henderson/Humphrey/tree/master/examples/static-content): demonstrates the built-in static content handlers
 
+#![warn(missing_docs)]
+
 pub mod app;
 pub mod handlers;
 pub mod http;
 pub mod krauss;
 pub mod route;
+pub mod stream;
 pub mod thread;
 
 #[cfg(test)]
 mod tests;
 
 pub use app::App;
+pub use route::SubApp;

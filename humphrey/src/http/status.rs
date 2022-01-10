@@ -1,3 +1,5 @@
+//! Provides functionality for handling HTTP status codes.
+
 use std::convert::TryFrom;
 
 /// Represents an HTTP status code.
@@ -16,47 +18,87 @@ use std::convert::TryFrom;
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StatusCode {
+    /// `100 Continue`: Continue with request.
     Continue,
+    /// `101 Switching Protocols`: Protocol upgrade.
     SwitchingProtocols,
+    /// `200 OK`: Request succeeded.
     OK,
+    /// `201 Created`: Resource created.
     Created,
+    /// `202 Accepted`: Request received, but not yet acted upon.
     Accepted,
+    /// `203 Non-Authoritative Information`: Request processed, but response is from another source.
     NonAuthoritative,
+    /// `204 No Content`: There is no content to send for this request.
     NoContent,
+    /// `205 Reset Content`: Indicates that the document which sent this request should be reset.
     ResetContent,
+    /// `206 Partial Content`: This response only contains part of a resource.
     PartialContent,
+    /// `300 Multiple Choice`: The request has multiple possible responses.
     MultipleChoices,
+    /// `301 Moved Permanently`: The resource has moved permanently to a new location.
     MovedPermanently,
+    /// `302 Found`: The resource has moved temporarily to a new location.
     Found,
+    /// `303 See Other`: The resource can be found under a different URI.
     SeeOther,
+    /// `304 Not Modified`: The resource has not been modified since the last request.
     NotModified,
+    /// `305 Use Proxy`: The requested resource must be accessed through a proxy.
     UseProxy,
+    /// `307 Temporary Redirect`: The resource has moved temporarily to a new location.
     TemporaryRedirect,
+    /// `400 Bad Request`: The request could not be understood by the server.
     BadRequest,
+    /// `401 Unauthorized`: The request requires user authentication.
     Unauthorized,
+    /// `403 Forbidden`: The client is not allowed to access this content.
     Forbidden,
+    /// `404 Not Found`: The server can not find the requested resource.
     NotFound,
+    /// `405 Method Not Allowed`: The method specified in the request is not allowed for the resource.
     MethodNotAllowed,
+    /// `406 Not Acceptable`: No content that meets the criteria is available.
     NotAcceptable,
+    /// `407 Proxy Authentication Required`: The client must first authenticate itself with a proxy.
     ProxyAuthenticationRequired,
+    /// `408 Request Timeout`: The server timed out waiting for the request.
     RequestTimeout,
+    /// `409 Conflict`: The request could not be completed because of a conflict with the server's current state.
     Conflict,
+    /// `410 Gone`: The requested resource is no longer available.
     Gone,
+    /// `411 Length Required`: The request did not specify the length of its content.
     LengthRequired,
+    /// `412 Precondition Failed`: The server does not meet one of the client's preconditions.
     PreconditionFailed,
+    /// `413 Payload Too Large`: The request is larger than the server is willing or able to process.
     RequestEntityTooLarge,
+    /// `414 URI Too Long`: The URI provided was too long for the server to process.
     RequestURITooLong,
+    /// `415 Unsupported Media Type`: The request entity has a media type which the server or resource does not support.
     UnsupportedMediaType,
+    /// `416 Requested Range Not Satisfiable`: The range specified in the `Range` header cannot be fulfilled.
     RequestedRangeNotSatisfiable,
+    /// `417 Expectation Failed`: The expectation given in the `Expect` header could not be met by the server.
     ExpectationFailed,
+    /// `500 Internal Server Error`: The server encountered an unexpected error which prevented it from fulfilling the request.
     InternalError,
+    /// `501 Not Implemented`: The server does not support the functionality required to fulfill the request.
     NotImplemented,
+    /// `502 Bad Gateway`: The server, while acting as a gateway or proxy, received an invalid response from the upstream server.
     BadGateway,
+    /// `503 Service Unavailable`: The server is temporarily unable to handle the request.
     ServiceUnavailable,
+    /// `504 Gateway Timeout`: The server, while acting as a gateway or proxy, did not receive a timely response from the upstream server.
     GatewayTimeout,
+    /// `505 HTTP Version Not Supported`: The server does not support the HTTP protocol version used in the request.
     VersionNotSupported,
 }
 
+/// Represents an error with the status code.
 #[derive(PartialEq, Eq)]
 pub struct StatusCodeError;
 

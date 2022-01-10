@@ -1,3 +1,5 @@
+//! Provides HTTP proxy functionality.
+
 use crate::config::LoadBalancerMode;
 use crate::rand::{Choose, Lcg};
 use crate::server::server::AppState;
@@ -13,9 +15,13 @@ use std::time::Duration;
 /// Represents a load balancer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LoadBalancer {
+    /// The targets of the load balancer.
     pub targets: Vec<String>,
+    /// The algorithm used to choose a target.
     pub mode: LoadBalancerMode,
+    /// The current target.
     pub index: usize,
+    /// The random number generator used by the load balancer.
     pub lcg: Lcg,
 }
 
@@ -37,6 +43,7 @@ impl LoadBalancer {
     }
 }
 
+/// Handles proxy requests.
 pub fn proxy_handler(
     request: Request,
     state: Arc<AppState>,
@@ -71,8 +78,6 @@ pub fn proxy_handler(
         Response::empty(StatusCode::Forbidden)
             .with_header(ResponseHeader::ContentType, "text/html".into())
             .with_bytes(b"<h1>403 Forbidden</h1>")
-            .with_request_compatibility(&request)
-            .with_generated_headers()
     } else {
         // Gets a load balancer target using the thread-safe `Mutex`
         let mut load_balancer_lock = load_balancer.lock().unwrap();
@@ -103,10 +108,12 @@ pub struct EqMutex<T> {
 }
 
 impl<T> EqMutex<T> {
+    /// Locks the mutex.
     pub fn lock(&self) -> Result<MutexGuard<T>, PoisonError<MutexGuard<T>>> {
         self.mutex.lock()
     }
 
+    /// Creates a new mutex.
     pub fn new(data: T) -> Self {
         Self {
             mutex: Mutex::new(data),

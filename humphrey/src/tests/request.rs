@@ -26,7 +26,7 @@ fn test_request_from_stream() {
     assert_eq!(request.query, expected_query);
     assert_eq!(request.version, "HTTP/1.1");
     assert_eq!(request.content, None);
-    assert_eq!(request.address, Address::new("1.2.3.4:5678"));
+    assert_eq!(request.address, Address::new("1.2.3.4:5678").unwrap());
 
     let mut expected_headers: BTreeMap<RequestHeader, String> = BTreeMap::new();
     expected_headers.insert(RequestHeader::Host, "localhost".to_string());
@@ -42,7 +42,7 @@ fn test_bytes_from_request() {
         version: "HTTP/1.1".into(),
         headers: BTreeMap::new(),
         content: Some(b"this is a test".to_vec()),
-        address: Address::new("1.2.3.4:5678"),
+        address: Address::new("1.2.3.4:5678").unwrap(),
     };
 
     test_data

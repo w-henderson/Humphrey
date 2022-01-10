@@ -1,6 +1,7 @@
 use humphrey::http::headers::ResponseHeader;
 use humphrey::http::{Request, Response, StatusCode};
 
+use humphrey_server::config::RouteConfig;
 use humphrey_server::declare_plugin;
 use humphrey_server::plugins::plugin::Plugin;
 use humphrey_server::server::server::AppState;
@@ -15,7 +16,12 @@ impl Plugin for ExamplePlugin {
         "Example Plugin"
     }
 
-    fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
+    fn on_request(
+        &self,
+        request: &mut Request,
+        state: Arc<AppState>,
+        _: &RouteConfig,
+    ) -> Option<Response> {
         state.logger.info(&format!(
             "Example plugin read a request from {}",
             request.address
@@ -28,9 +34,7 @@ impl Plugin for ExamplePlugin {
             return Some(
                 Response::empty(StatusCode::OK)
                     .with_bytes(b"Response overridden by example plugin :)".to_vec())
-                    .with_header(ResponseHeader::ContentType, "text/plain".into())
-                    .with_request_compatibility(request)
-                    .with_generated_headers(),
+                    .with_header(ResponseHeader::ContentType, "text/plain".into()),
             );
         }
 

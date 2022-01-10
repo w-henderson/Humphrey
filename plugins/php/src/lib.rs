@@ -1,10 +1,9 @@
 use humphrey::http::headers::{RequestHeader, ResponseHeaderMap};
 use humphrey::http::{Request, Response, StatusCode};
-use humphrey::krauss::wildcard_match;
 use humphrey::route::{try_find_path, LocatedPath};
 
 use humphrey_server::config::extended_hashmap::ExtendedMap;
-use humphrey_server::config::RouteConfig;
+use humphrey_server::config::{RouteConfig, RouteType};
 use humphrey_server::declare_plugin;
 use humphrey_server::plugins::plugin::{Plugin, PluginLoadResult};
 use humphrey_server::server::server::AppState;
@@ -75,56 +74,47 @@ impl Plugin for PhpPlugin {
         }
     }
 
-    fn on_request(&self, request: &mut Request, state: Arc<AppState>) -> Option<Response> {
+    fn on_request(
+        &self,
+        request: &mut Request,
+        state: Arc<AppState>,
+        route: &RouteConfig,
+    ) -> Option<Response> {
         if !request.uri.ends_with(".php") && !request.uri.ends_with('/') && !request.uri.is_empty()
         {
             return None;
         }
 
-        for route in &state.config.routes {
-            match route {
-                RouteConfig::File { matches, file } => {
-                    if wildcard_match(matches, &request.uri) {
-                        let path = PathBuf::from(file);
-                        let directory = path.parent().unwrap().to_str().unwrap();
+        match route.route_type {
+            RouteType::File => {
+                let path = PathBuf::from(route.path.as_ref().unwrap());
+                let directory = path.parent().unwrap().to_str().unwrap();
 
-                        return self.inner_request_handler(
-                            request,
-                            state.clone(),
-                            path.clone(),
-                            directory,
-                        );
-                    }
-                }
-                RouteConfig::Directory { matches, directory } => {
-                    if wildcard_match(matches, &request.uri) {
-                        let mut simplified_uri = request.uri.clone();
-
-                        for ch in matches.chars() {
-                            if ch != '*' {
-                                simplified_uri.remove(0);
-                            } else {
-                                break;
-                            }
-                        }
-
-                        if let Some(located) =
-                            try_find_path(directory, &simplified_uri, &["index.php"])
-                        {
-                            return match located {
-                                LocatedPath::File(path) => self.inner_request_handler(
-                                    request,
-                                    state.clone(),
-                                    path,
-                                    directory,
-                                ),
-                                _ => None,
-                            };
-                        }
-                    }
-                }
-                _ => (),
+                return self.inner_request_handler(request, state, path.clone(), directory);
             }
+            RouteType::Directory => {
+                let mut simplified_uri = request.uri.clone();
+
+                for ch in route.matches.chars() {
+                    if ch != '*' {
+                        simplified_uri.remove(0);
+                    } else {
+                        break;
+                    }
+                }
+
+                let directory = route.path.as_ref().unwrap();
+
+                if let Some(located) = try_find_path(directory, &simplified_uri, &["index.php"]) {
+                    return match located {
+                        LocatedPath::File(path) => {
+                            self.inner_request_handler(request, state, path, directory)
+                        }
+                        _ => None,
+                    };
+                }
+            }
+            _ => (),
         }
 
         None
@@ -279,12 +269,8 @@ impl PhpPlugin {
                 request.address, status_code_number, status_code_string, request.uri
             ));
 
-            // Add final headers and return the response
-            Some(
-                response
-                    .with_request_compatibility(request)
-                    .with_generated_headers(),
-            )
+            // Return the response
+            Some(response)
         } else {
             // If the file requested was not found, allow Humphrey to handle the error
 

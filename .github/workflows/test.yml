@@ -1,10 +1,17 @@
-on: [push, pull_request]
+on:
+  push:
+    paths:
+    - "humphrey/**"
+    - "humphrey-auth/**"
+    - "humphrey-server/**"
+    - "humphrey-ws/**"
+    - ".github/**"
 
 name: CI
 
 jobs:
   check:
-    name: Check
+    name: Check Crates
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -23,7 +30,7 @@ jobs:
           command: check
 
   test:
-    name: Test
+    name: Test Crates
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources

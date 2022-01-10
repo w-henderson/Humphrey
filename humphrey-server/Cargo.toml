@@ -1,6 +1,6 @@
 [package]
 name = "humphrey_server"
-version = "0.2.5"
+version = "0.4.0"
 edition = "2018"
 license = "MIT"
 homepage = "https://github.com/w-henderson/Humphrey"
@@ -11,11 +11,12 @@ keywords = ["http", "server", "http-server"]
 categories = ["web-programming::http-server", "network-programming", "command-line-utilities"]
 
 [dependencies]
-humphrey = { version = "^0.2", path = "../humphrey" }
+humphrey = { version = "^0.4", path = "../humphrey" }
 libloading = { version = "0.7", optional = true }
 
 [features]
 plugins = ["libloading"]
+tls = ["humphrey/tls"]
 
 [lib]
 test = false

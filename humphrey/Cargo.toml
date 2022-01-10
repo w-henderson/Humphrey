@@ -1,6 +1,6 @@
 [package]
 name = "humphrey"
-version = "0.2.0"
+version = "0.4.1"
 edition = "2018"
 license = "MIT"
 homepage = "https://github.com/w-henderson/Humphrey"
@@ -9,6 +9,18 @@ readme = "README.md"
 description = "A Performance-Focused, Dependency-Free Web Server."
 keywords = ["http", "server", "http-server"]
 categories = ["web-programming::http-server", "network-programming"]
+
+[dependencies.rustls]
+version = "^0.20.0"
+default-features = false
+optional = true
+
+[dependencies.rustls-pemfile]
+version = "^0.2.1"
+optional = true
+
+[features]
+tls = ["rustls", "rustls-pemfile"]
 
 [lib]
 doctest = false
