@@ -43,7 +43,7 @@ pub struct Config {
 }
 
 /// Represents the configuration for a specific host.
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct HostConfig {
     /// Wildcard string specifying what hosts to match, e.g. `*.example.com`
     pub matches: String,
