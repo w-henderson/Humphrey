@@ -1,7 +1,7 @@
 //! Provides default values for the configuration.
 
 use crate::config::{
-    BlacklistConfig, BlacklistMode, Config, LoggingConfig, RouteConfig, RouteType,
+    BlacklistConfig, BlacklistMode, Config, HostConfig, LoggingConfig, RouteConfig, RouteType,
 };
 use crate::server::logger::LogLevel;
 
@@ -14,13 +14,22 @@ impl Default for Config {
             #[cfg(feature = "tls")]
             tls_config: None,
             default_websocket_proxy: None,
-            hosts: vec![Default::default()],
+            hosts: Vec::new(),
             default_host: Default::default(),
             #[cfg(feature = "plugins")]
             plugins: Vec::new(),
             logging: Default::default(),
             cache: Default::default(),
             blacklist: Default::default(),
+        }
+    }
+}
+
+impl Default for HostConfig {
+    fn default() -> Self {
+        Self {
+            matches: "*".into(),
+            routes: vec![Default::default()],
         }
     }
 }
