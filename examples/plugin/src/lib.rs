@@ -28,7 +28,7 @@ impl Plugin for ExamplePlugin {
         ));
 
         // If the requested resource is "/override" then override the response (which would ordinarily be 404).
-        if &request.uri == "override" {
+        if &request.uri == "/override" {
             state.logger.info("Example plugin overrode a response");
 
             return Some(
