@@ -6,6 +6,7 @@ This section of the guide will cover the following topics:
 1. [Installing and running Humphrey Server](getting-started.md)
 2. [Exploring the configuration file](configuration.md)
 3. [Using PHP with Humphrey Server](using-php.md)
-4. [Creating your own plugin](plugin/creating-a-plugin.md)
+4. [Serving content over HTTPS](https.md)
+5. [Creating your own plugin](plugin/creating-a-plugin.md)
 
 This section requires no prior knowledge, with the exception of the plugin creation section, which requires knowledge of the Rust programming language.
