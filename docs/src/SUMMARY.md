@@ -16,5 +16,3 @@
   - [Getting Started](websocket/getting-started.md)
   - [Broadcasting Messages](websocket/broadcasting-messages.md)
 - [Humphrey Auth](auth/index.md)
-  - [Getting Started](auth/getting-started.md)
-  - [Integrating with a Database](auth/database.md)
