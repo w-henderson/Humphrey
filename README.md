@@ -5,11 +5,11 @@
 
   <p align="center">
     A Performance-Focused, Dependency-Free Web Server.<br>
-    <a href="#"><strong>Getting Started »</strong></a><br><br>
-    <a href="https://github.com/w-henderson/Humphrey/blob/master/humphrey/README.md">Core Quickstart</a> ·
-    <a href="https://github.com/w-henderson/Humphrey/blob/master/humphrey-server/README.md">Server Quickstart</a> ·
-    <a href="https://github.com/w-henderson/Humphrey/blob/master/humphrey-ws/README.md">WebSocket Quickstart</a> ·
-    <a href="https://github.com/w-henderson/Humphrey/blob/master/humphrey-auth/README.md">Auth Quickstart</a><br>
+    <a href=https://humphrey.whenderson.dev"><strong>Getting Started »</strong></a><br><br>
+    <a href="https://humphrey.whenderson.dev/core/index.html">Core Guide</a> ·
+    <a href="https://humphrey.whenderson.dev/server/index.html">Server Guide</a> ·
+    <a href="https://humphrey.whenderson.dev/websocket/index.html">WebSocket Guide</a> ·
+    <a href="https://humphrey.whenderson.dev/auth/index.html">Auth Guide</a><br>
     <a href="https://docs.rs/humphrey">Core API Reference</a> ·
     <a href="https://docs.rs/humphrey-server">Server API Reference</a> ·
     <a href="https://docs.rs/humphrey-ws">WebSocket API Reference</a> ·
@@ -29,9 +29,9 @@
 
 Humphrey is a very fast, robust and flexible HTTP/1.1 web server, with support for static and dynamic content through its Rust crate and plugin system. It has no dependencies when only using default features, and the binary is easily extensible with a flexible configuration file and dynamically-loaded plugins. It also provides a WebSocket API for the easy integration of WebSockets into your application, and a simple authentication system for authenticating users and managing sessions.
 
-## Contents
-- [Use Humphrey as a crate](humphrey/README.md)
-- [Use Humphrey as a standalone application](humphrey-server/README.md)
-- [Use WebSockets with Humphrey](humphrey-ws/README.md)
-- [Use authentication with Humphrey](humphrey-auth/README.md)
-- [Use HTTPS/TLS with Humphrey](humphrey/TLS.md)
+## Quick Links
+- [Use Humphrey as a crate](https://humphrey.whenderson.dev/core/index.html)
+- [Use Humphrey as a standalone application](https://humphrey.whenderson.dev/server/index.html)
+- [Use WebSockets with Humphrey](https://humphrey.whenderson.dev/websocket/index.html)
+- [Use authentication with Humphrey](https://humphrey.whenderson.dev/auth/index.html)
+- Use HTTPS/TLS with Humphrey [Core](https://humphrey.whenderson.dev/core/https.html)/[Server](https://humphrey.whenderson.dev/server/https.html)
