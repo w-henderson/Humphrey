@@ -8,6 +8,7 @@ pkg/
 bench/
 database.jdb
 keys/
+docs/book/
 
 *.conf
 !/humphrey-server/src/tests/testcases/*.conf
