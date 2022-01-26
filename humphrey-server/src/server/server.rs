@@ -8,7 +8,6 @@ use humphrey::{App, SubApp};
 use crate::plugins::manager::PluginManager;
 #[cfg(feature = "plugins")]
 use crate::plugins::plugin::PluginLoadResult;
-use std::error::Error;
 #[cfg(feature = "plugins")]
 use std::process::exit;
 
@@ -18,6 +17,7 @@ use crate::logger::Logger;
 use crate::proxy::proxy_handler;
 use crate::r#static::{directory_handler, file_handler, redirect_handler};
 
+use std::error::Error;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::{Arc, RwLock};
@@ -52,8 +52,11 @@ impl From<Config> for AppState {
 
 /// Main function for the static server.
 pub fn main(config: Config) {
+    let connection_timeout = config.connection_timeout;
+
     let mut app: App<AppState> = App::new_with_config(config.threads, AppState::from(config))
-        .with_connection_condition(verify_connection);
+        .with_connection_condition(verify_connection)
+        .with_connection_timeout(connection_timeout);
 
     let state = app.get_state();
 

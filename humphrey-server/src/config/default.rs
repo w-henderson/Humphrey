@@ -21,6 +21,7 @@ impl Default for Config {
             logging: Default::default(),
             cache: Default::default(),
             blacklist: Default::default(),
+            connection_timeout: Default::default(),
         }
     }
 }
