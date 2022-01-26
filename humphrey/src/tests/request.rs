@@ -4,16 +4,16 @@ use crate::http::headers::RequestHeader;
 use crate::http::method::Method;
 use crate::http::Request;
 use crate::tests::mock_stream::MockStream;
-use std::{
-    collections::BTreeMap,
-    io::Read,
-    net::{SocketAddr, ToSocketAddrs},
-};
+
+use std::collections::{BTreeMap, VecDeque};
+use std::io::Read;
+use std::iter::FromIterator;
+use std::net::{SocketAddr, ToSocketAddrs};
 
 #[test]
 fn test_request_from_stream() {
     let test_data = b"GET /testpath?foo=bar HTTP/1.1\r\nHost: localhost\r\n\r\n";
-    let mut stream = MockStream::with_data(test_data.to_vec());
+    let mut stream = MockStream::with_data(VecDeque::from_iter(test_data.iter().cloned()));
     let request = Request::from_stream(&mut stream, "1.2.3.4:5678".parse().unwrap());
 
     assert!(request.is_ok());
@@ -63,7 +63,7 @@ fn test_bytes_from_request() {
 fn test_proxied_request_from_stream() {
     let test_data =
         b"GET /testpath HTTP/1.1\r\nHost: localhost\r\nX-Forwarded-For: 9.10.11.12,13.14.15.16\r\n\r\n";
-    let mut stream = MockStream::with_data(test_data.to_vec());
+    let mut stream = MockStream::with_data(VecDeque::from_iter(test_data.iter().cloned()));
     let request = Request::from_stream(&mut stream, "1.2.3.4:5678".parse().unwrap());
 
     assert!(request.is_ok());

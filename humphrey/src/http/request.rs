@@ -3,10 +3,12 @@
 use crate::http::address::Address;
 use crate::http::headers::{RequestHeader, RequestHeaderMap};
 use crate::http::method::Method;
+use crate::stream::Stream;
 
 use std::error::Error;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, ErrorKind, Read};
 use std::net::SocketAddr;
+use std::time::Duration;
 
 /// Represents a request to the server.
 /// Contains parsed information about the request's data.
@@ -35,6 +37,8 @@ pub enum RequestError {
     Request,
     /// The request could not be parsed due to an issue with the stream.
     Stream,
+    /// The request timed out.
+    Timeout,
 }
 
 trait OptionToRequestResult<T> {
@@ -56,8 +60,49 @@ impl std::fmt::Display for RequestError {
 impl Error for RequestError {}
 
 impl Request {
-    /// Attempts to read and parse one HTTP request from the given stream.
+    /// Attempts to read and parse one HTTP request from the given reader.
     pub fn from_stream<T>(stream: &mut T, address: SocketAddr) -> Result<Self, RequestError>
+    where
+        T: Read,
+    {
+        let mut first_buf: [u8; 1] = [0; 1];
+        stream
+            .read_exact(&mut first_buf)
+            .map_err(|_| RequestError::Stream)?;
+
+        Self::from_stream_inner(stream, address, first_buf[0])
+    }
+
+    /// Attempts to read and parse one HTTP request from the given stream, timing out after the timeout.
+    pub fn from_stream_with_timeout(
+        stream: &mut Stream,
+        address: SocketAddr,
+        timeout: Duration,
+    ) -> Result<Self, RequestError> {
+        stream
+            .set_timeout(Some(timeout))
+            .map_err(|_| RequestError::Stream)?;
+
+        let mut first_buf: [u8; 1] = [0; 1];
+        stream
+            .read_exact(&mut first_buf)
+            .map_err(|e| match e.kind() {
+                ErrorKind::TimedOut => RequestError::Timeout,
+                ErrorKind::WouldBlock => RequestError::Timeout,
+                _ => RequestError::Stream,
+            })?;
+
+        stream.set_timeout(None).map_err(|_| RequestError::Stream)?;
+
+        Self::from_stream_inner(stream, address, first_buf[0])
+    }
+
+    /// Attempts to read and parse one HTTP request from the given reader.
+    fn from_stream_inner<T>(
+        stream: &mut T,
+        address: SocketAddr,
+        first_byte: u8,
+    ) -> Result<Self, RequestError>
     where
         T: Read,
     {
@@ -66,6 +111,8 @@ impl Request {
         reader
             .read_until(0xA, &mut start_line_buf)
             .map_err(|_| RequestError::Stream)?;
+
+        start_line_buf.insert(0, first_byte);
 
         let start_line_string =
             std::str::from_utf8(&start_line_buf).map_err(|_| RequestError::Request)?;

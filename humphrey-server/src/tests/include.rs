@@ -52,6 +52,7 @@ fn include_route() {
             list: Vec::new(),
             mode: BlacklistMode::Block,
         },
+        connection_timeout: None,
     });
 
     assert_eq!(config, expected_conf);
@@ -104,6 +105,7 @@ fn nested_include() {
             list: Vec::new(),
             mode: BlacklistMode::Block,
         },
+        connection_timeout: None,
     });
 
     assert_eq!(config, expected_conf);

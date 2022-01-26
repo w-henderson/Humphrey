@@ -14,6 +14,7 @@ use humphrey_server::proxy::{EqMutex, LoadBalancer};
 use humphrey_server::rand::Lcg;
 
 use std::collections::HashMap;
+use std::time::Duration;
 
 #[test]
 fn test_parse_config() {
@@ -80,6 +81,7 @@ fn test_parse_config() {
             list: Vec::new(),
             mode: BlacklistMode::Block,
         },
+        connection_timeout: Some(Duration::from_secs(5)),
     };
 
     assert_eq!(conf, expected_conf);
@@ -144,6 +146,7 @@ fn test_host_config() {
             list: Vec::new(),
             mode: BlacklistMode::Block,
         },
+        connection_timeout: None,
     };
 
     assert_eq!(conf, expected_conf);
@@ -196,6 +199,7 @@ fn comma_separated_routes() {
             list: Vec::new(),
             mode: BlacklistMode::Block,
         },
+        connection_timeout: None,
     };
 
     assert_eq!(conf, expected_conf);

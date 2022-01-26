@@ -14,6 +14,7 @@ fn test_build_tree() {
         ConfigNode::Number("port".into(), "80".into()),
         ConfigNode::Number("threads".into(), "32".into()),
         ConfigNode::String("websocket".into(), "localhost:1234".into()),
+        ConfigNode::Number("timeout".into(), "5".into()),
         ConfigNode::Section("plugins".into(), vec![
             ConfigNode::Section("php".into(), vec![
                 ConfigNode::String("library".into(), "plugins/php/target/release/php.dll".into()),
@@ -58,6 +59,7 @@ fn test_flatten_config() {
     expected_hashmap.insert("server.port".into(), ConfigNode::Number("port".into(), "80".into()));
     expected_hashmap.insert("server.threads".into(), ConfigNode::Number("threads".into(), "32".into()));
     expected_hashmap.insert("server.websocket".into(), ConfigNode::String("websocket".into(), "localhost:1234".into()));
+    expected_hashmap.insert("server.timeout".into(), ConfigNode::Number("timeout".into(), "5".into()));
     expected_hashmap.insert("server.blacklist.mode".into(), ConfigNode::String("mode".into(), "block".into()));
     expected_hashmap.insert("server.log.level".into(), ConfigNode::String("level".into(), "info".into()));
     expected_hashmap.insert("server.log.console".into(), ConfigNode::Boolean("console".into(), "true".into()));

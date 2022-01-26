@@ -12,6 +12,7 @@ use std::env::args;
 use std::fs::File;
 use std::io::Read;
 use std::net::IpAddr;
+use std::time::Duration;
 
 /// Represents the parsed and validated configuration.
 #[derive(Debug, PartialEq)]
@@ -40,6 +41,8 @@ pub struct Config {
     pub cache: CacheConfig,
     /// Blacklist configuration
     pub blacklist: BlacklistConfig,
+    /// The amount of time to wait between requests
+    pub connection_timeout: Option<Duration>,
 }
 
 /// Represents the configuration for a specific host.
@@ -179,6 +182,13 @@ impl Config {
         let threads: usize =
             hashmap.get_optional_parsed("server.threads", 32, "Invalid number of threads")?;
         let default_websocket_proxy = hashmap.get_owned("server.websocket");
+        let connection_timeout_seconds: u64 =
+            hashmap.get_optional_parsed("server.timeout", 0, "Invalid connection timeout")?;
+        let connection_timeout = if connection_timeout_seconds > 0 {
+            Some(Duration::from_secs(connection_timeout_seconds))
+        } else {
+            None
+        };
 
         // Get and validate the blacklist file and mode
         let blacklist = {
@@ -314,6 +324,7 @@ impl Config {
             logging,
             cache,
             blacklist,
+            connection_timeout,
         })
     }
 
