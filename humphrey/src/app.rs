@@ -244,6 +244,7 @@ where
                 let cloned_default_subapp = default_subapp.clone();
                 let cloned_error_handler = error_handler.clone();
                 let cloned_handler = self.connection_handler;
+                let cloned_timeout = self.connection_timeout;
                 let cloned_config = self
                     .tls_config
                     .as_ref()
@@ -262,6 +263,7 @@ where
                         cloned_default_subapp,
                         cloned_error_handler,
                         cloned_state,
+                        cloned_timeout,
                     )
                 });
             }
