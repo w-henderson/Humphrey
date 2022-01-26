@@ -6,6 +6,7 @@ use rustls::ServerConnection;
 use std::io::{Error, Read, Write};
 use std::marker::PhantomData;
 use std::net::{SocketAddr, TcpStream};
+use std::time::Duration;
 
 /// Represents a connection to a remote client or server.
 ///
@@ -69,6 +70,22 @@ impl<'a> Stream<'a> {
             Stream::Tcp(stream) => stream.shutdown(std::net::Shutdown::Both),
             #[cfg(feature = "tls")]
             Stream::Tls(stream) => stream.sock.shutdown(std::net::Shutdown::Both),
+            Stream::Phantom(_) => panic!("Phantom data in stream enum"),
+        }
+    }
+
+    /// Sets the read and write timeouts of the stream.
+    pub fn set_timeout(&self, timeout: Option<Duration>) -> std::io::Result<()> {
+        match self {
+            Stream::Tcp(stream) => {
+                stream.set_read_timeout(timeout)?;
+                stream.set_write_timeout(timeout)
+            }
+            #[cfg(feature = "tls")]
+            Stream::Tls(stream) => {
+                stream.sock.set_read_timeout(timeout)?;
+                stream.sock.set_write_timeout(timeout)
+            }
             Stream::Phantom(_) => panic!("Phantom data in stream enum"),
         }
     }

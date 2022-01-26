@@ -13,6 +13,7 @@ use crate::thread::pool::ThreadPool;
 
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
+use std::time::Duration;
 
 #[cfg(feature = "tls")]
 use rustls::ServerConfig;
@@ -33,6 +34,7 @@ where
     state: Arc<State>,
     connection_handler: ConnectionHandler<State>,
     connection_condition: ConnectionCondition<State>,
+    connection_timeout: Option<Duration>,
     #[cfg(feature = "tls")]
     tls_config: Option<Arc<ServerConfig>>,
     #[cfg(feature = "tls")]
@@ -41,8 +43,14 @@ where
 
 /// Represents a function able to handle a connection.
 /// In most cases, the default connection handler should be used.
-pub type ConnectionHandler<State> =
-    fn(Stream, Arc<Vec<SubApp<State>>>, Arc<SubApp<State>>, Arc<ErrorHandler>, Arc<State>);
+pub type ConnectionHandler<State> = fn(
+    Stream,
+    Arc<Vec<SubApp<State>>>,
+    Arc<SubApp<State>>,
+    Arc<ErrorHandler>,
+    Arc<State>,
+    Option<Duration>,
+);
 
 /// Represents a function able to calculate whether a connection will be accepted.
 pub type ConnectionCondition<State> = fn(&mut TcpStream, Arc<State>) -> bool;
@@ -141,6 +149,7 @@ where
             state: Arc::new(State::default()),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
+            connection_timeout: None,
             #[cfg(feature = "tls")]
             tls_config: None,
             #[cfg(feature = "tls")]
@@ -158,6 +167,7 @@ where
             state: Arc::new(state),
             connection_handler: client_handler,
             connection_condition: |_, _| true,
+            connection_timeout: None,
             #[cfg(feature = "tls")]
             tls_config: None,
             #[cfg(feature = "tls")]
@@ -186,6 +196,7 @@ where
                 let cloned_default_subapp = default_subapp.clone();
                 let cloned_error_handler = error_handler.clone();
                 let cloned_handler = self.connection_handler;
+                let cloned_timeout = self.connection_timeout;
 
                 // Spawn a new thread to handle the connection
                 self.thread_pool.execute(move || {
@@ -195,6 +206,7 @@ where
                         cloned_default_subapp,
                         cloned_error_handler,
                         cloned_state,
+                        cloned_timeout,
                     )
                 });
             }
@@ -341,6 +353,12 @@ where
         self
     }
 
+    /// Sets the connection timeout, the amount of time to wait between keep-alive requests.
+    pub fn with_connection_timeout(mut self, timeout: Option<Duration>) -> Self {
+        self.connection_timeout = timeout;
+        self
+    }
+
     /// Sets whether HTTPS should be forced on all connections. Defaults to false.
     ///
     /// If this is set to true, a background thread will be spawned when `run_tls` is called to send
@@ -427,6 +445,7 @@ fn client_handler<State>(
     default_subapp: Arc<SubApp<State>>,
     error_handler: Arc<ErrorHandler>,
     state: Arc<State>,
+    timeout: Option<Duration>,
 ) {
     use std::collections::btree_map::Entry;
     use std::io::Write;
@@ -443,7 +462,11 @@ fn client_handler<State>(
 
     loop {
         // Parses the request from the stream
-        let request = Request::from_stream(&mut stream, addr);
+        let request = match timeout {
+            Some(timeout) => Request::from_stream_with_timeout(&mut stream, addr, timeout),
+            None => Request::from_stream(&mut stream, addr),
+        };
+
         let cloned_state = state.clone();
 
         // If the request is valid an is a WebSocket request, call the corresponding handler
@@ -452,14 +475,6 @@ fn client_handler<State>(
                 call_websocket_handler(req, &subapps, &default_subapp, cloned_state, stream);
                 break;
             }
-        }
-
-        // If the request could not be parsed due to a stream error, close the thread
-        if match &request {
-            Ok(_) => false,
-            Err(e) => e == &RequestError::Stream,
-        } {
-            break;
         }
 
         // Get the keep alive information from the request before it is consumed by the handler
@@ -516,7 +531,11 @@ fn client_handler<State>(
 
                 response
             }
-            Err(_) => error_handler(StatusCode::BadRequest),
+            Err(e) => match e {
+                RequestError::Request => error_handler(StatusCode::BadRequest),
+                RequestError::Timeout => error_handler(StatusCode::RequestTimeout),
+                RequestError::Stream => return,
+            },
         };
 
         // Write the response to the stream
