@@ -9,6 +9,7 @@ server {
   address   "0.0.0.0"        # Address to host the server on
   port      443              # Port to host the server on
   threads   32               # Number of threads to use for the server
+  timeout   5                # Timeout for requests, highly recommended to avoid deadlocking the thread pool
 
   plugins { # Plugin configuration (only supported with the `plugins` feature)
     include "php.conf"       # Include PHP configuration (see next page)
