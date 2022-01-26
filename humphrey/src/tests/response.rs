@@ -3,7 +3,9 @@ use crate::http::headers::{ResponseHeader, ResponseHeaderMap};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
 use crate::tests::mock_stream::MockStream;
-use std::collections::BTreeMap;
+
+use std::collections::{BTreeMap, VecDeque};
+use std::iter::FromIterator;
 
 #[test]
 fn test_response() {
@@ -38,7 +40,7 @@ fn test_response() {
 #[test]
 fn test_response_from_stream() {
     let test_data = b"HTTP/1.1 404 Not Found\r\nContent-Length: 51\r\n\r\nThe requested resource was not found on the server.\r\n";
-    let mut stream = MockStream::with_data(test_data.to_vec());
+    let mut stream = MockStream::with_data(VecDeque::from_iter(test_data.iter().cloned()));
     let response = Response::from_stream(&mut stream);
 
     assert!(response.is_ok());

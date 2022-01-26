@@ -1,28 +1,31 @@
 #![allow(dead_code)]
 
+use std::collections::VecDeque;
 use std::io::Read;
 
 pub struct MockStream {
-    data: Vec<u8>,
+    data: VecDeque<u8>,
 }
 
 impl MockStream {
-    pub fn with_data(data: Vec<u8>) -> Self {
+    pub fn with_data(data: VecDeque<u8>) -> Self {
         Self { data }
     }
 }
 
 impl Read for MockStream {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let mut index = 0;
+        let mut bytes_written: usize = 0;
+
         for byte in buf {
-            *byte = self.data[index];
-            index += 1;
-            if index == self.data.len() {
-                break;
+            if let Some(new_byte) = self.data.pop_front() {
+                *byte = new_byte;
+                bytes_written += 1;
+            } else {
+                return std::io::Result::Ok(bytes_written);
             }
         }
 
-        std::io::Result::Ok(self.data.len())
+        std::io::Result::Ok(bytes_written)
     }
 }
