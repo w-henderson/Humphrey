@@ -1,4 +1,7 @@
+use crate::http::date::DateTime;
+
 use std::borrow::Cow;
+use std::fmt::Display;
 use std::net::{SocketAddr, ToSocketAddrs};
 
 pub struct Event {
@@ -34,7 +37,7 @@ pub enum EventType {
 pub enum EventLevel {
     Error = 0b0_0001_0010_0100_1000,
     Warning = 0b0_0001_0010_0100_1100,
-    Info = 0b1_1101_1011_0101_1110,
+    Info = 0b1_1101_0010_0100_1100,
     Debug = u32::MAX,
 }
 
@@ -56,9 +59,33 @@ impl Event {
         self
     }
 
-    pub fn with_info(mut self, info: impl Into<Cow<'static, str>>) -> Self {
+    pub fn with_peer_result<T, E>(mut self, peer_result: Result<T, E>) -> Self
+    where
+        T: ToSocketAddrs,
+        E: std::fmt::Display,
+    {
+        if let Ok(peer) = peer_result {
+            if let Ok(mut peer) = peer.to_socket_addrs() {
+                self.peer = peer.next();
+            }
+        }
+
+        self
+    }
+
+    pub fn with_info<T>(mut self, info: T) -> Self
+    where
+        T: Into<Cow<'static, str>>,
+    {
         self.info = Some(info.into());
         self
+    }
+}
+
+impl ToString for EventType {
+    fn to_string(&self) -> String {
+        let string: &'static str = (*self).into();
+        string.to_string()
     }
 }
 
@@ -85,6 +112,50 @@ impl From<EventType> for &'static str {
             EventType::WebsocketConnectionClosed => "WebSocket connection closed",
             EventType::HTTPSRedirect => "Redirected to HTTPS",
         }
+    }
+}
+
+impl Display for Event {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let time = DateTime::now();
+
+        write!(
+            f,
+            "{}-{:02}-{:02} {:02}:{:02}:{:02} ",
+            time.year,
+            time.month + 1,
+            time.day,
+            time.hour,
+            time.minute,
+            time.second
+        )?;
+
+        if let Some(info) = self.info.as_ref() {
+            write!(
+                f,
+                "{}{}: {}",
+                self.peer
+                    .map(|p| p.to_string() + " ")
+                    .unwrap_or_else(|| "".into()),
+                self.kind.to_string(),
+                info
+            )
+        } else {
+            write!(
+                f,
+                "{}{}",
+                self.peer
+                    .map(|p| p.to_string() + " ")
+                    .unwrap_or_else(|| "".into()),
+                self.kind.to_string()
+            )
+        }
+    }
+}
+
+impl From<EventType> for Event {
+    fn from(kind: EventType) -> Self {
+        Self::new(kind)
     }
 }
 

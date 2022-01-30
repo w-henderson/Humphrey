@@ -4,14 +4,18 @@ use event::{Event, ToEventMask};
 
 use std::sync::mpsc::Sender;
 
+#[derive(Default)]
 pub struct MonitorConfig {
     mask: u32,
-    sender: Sender<Event>,
+    sender: Option<Sender<Event>>,
 }
 
 impl MonitorConfig {
     pub fn new(sender: Sender<Event>) -> Self {
-        Self { mask: 0, sender }
+        Self {
+            mask: 0,
+            sender: Some(sender),
+        }
     }
 
     pub fn with_subscription_to<T>(mut self, event: T) -> Self
@@ -22,9 +26,13 @@ impl MonitorConfig {
         self
     }
 
-    pub fn send(&self, event: Event) {
-        if self.mask & event.kind.to_event_mask() != 0 {
-            self.sender.send(event).unwrap();
+    pub fn send(&self, event: impl Into<Event>) {
+        if let Some(sender) = &self.sender {
+            let event = event.into();
+
+            if self.mask & event.kind.to_event_mask() != 0 {
+                sender.send(event).unwrap();
+            }
         }
     }
 }
