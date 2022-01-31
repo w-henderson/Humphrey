@@ -193,8 +193,6 @@ where
         let error_handler = Arc::new(self.error_handler);
 
         for stream in socket.incoming() {
-            self.monitor.send(EventType::ConnectionAttempt);
-
             match stream {
                 Ok(mut stream) => {
                     let cloned_state = self.state.clone();
@@ -240,7 +238,7 @@ where
                 }
                 Err(e) => self
                     .monitor
-                    .send(Event::new(EventType::ConnectionFailed).with_info(e.to_string())),
+                    .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
             }
         }
 
@@ -509,8 +507,6 @@ fn client_handler<State>(
             None => Request::from_stream(&mut stream, addr),
         };
 
-        monitor.send(Event::new(EventType::RequestAttempt).with_peer(addr));
-
         let cloned_state = state.clone();
 
         // If the request is valid an is a WebSocket request, call the corresponding handler
@@ -537,15 +533,9 @@ fn client_handler<State>(
         };
 
         // Generate the response based on the handlers
-        let response = match request {
+        let response = match &request {
             Ok(request) => {
-                monitor.send(
-                    Event::new(EventType::RequestSuccess)
-                        .with_peer(addr)
-                        .with_info(request.uri.clone()),
-                );
-
-                let mut response = call_handler(&request, &subapps, &default_subapp, state.clone());
+                let mut response = call_handler(request, &subapps, &default_subapp, state.clone());
 
                 // Automatically generate required headers
                 match response.headers.entry(ResponseHeader::Connection) {
@@ -585,34 +575,22 @@ fn client_handler<State>(
 
                 response
             }
-            Err(e) => {
-                monitor.send(
-                    Event::new(EventType::RequestFailed)
-                        .with_peer(addr)
-                        .with_info(match e {
-                            RequestError::Request => "Bad request",
-                            RequestError::Timeout => "Request timed out",
-                            RequestError::Stream => "Stream error",
-                        }),
-                );
-
-                match e {
-                    RequestError::Request => error_handler(StatusCode::BadRequest),
-                    RequestError::Timeout => error_handler(StatusCode::RequestTimeout),
-                    RequestError::Stream => return,
+            Err(e) => match e {
+                RequestError::Request => error_handler(StatusCode::BadRequest),
+                RequestError::Timeout => error_handler(StatusCode::RequestTimeout),
+                RequestError::Stream => {
+                    return monitor.send(Event::new(EventType::RequestServedError))
                 }
-            }
+            },
         };
 
         // Write the response to the stream
         let status = response.status_code;
         let response_bytes: Vec<u8> = response.into();
 
-        monitor.send(Event::new(EventType::ResponseAttempt).with_peer(addr));
-
         if let Err(e) = stream.write_all(&response_bytes) {
             monitor.send(
-                Event::new(EventType::ResponseFailed)
+                Event::new(EventType::RequestServedError)
                     .with_peer(addr)
                     .with_info(e.to_string()),
             );
@@ -620,11 +598,30 @@ fn client_handler<State>(
             break;
         };
 
-        monitor.send(
-            Event::new(EventType::ResponseSuccess)
-                .with_peer(addr)
-                .with_info::<&str>(status.into()),
-        );
+        let status_str: &str = status.into();
+
+        match status {
+            StatusCode::OK => monitor.send(
+                Event::new(EventType::RequestServedSuccess)
+                    .with_peer(addr)
+                    .with_info(format!("200 OK {}", request.unwrap().uri)),
+            ),
+            StatusCode::RequestTimeout => monitor.send(
+                Event::new(EventType::RequestTimeout)
+                    .with_peer(addr)
+                    .with_info(format!("408 Request Timeout {}", request.unwrap().uri)),
+            ),
+            e => monitor.send(
+                Event::new(EventType::RequestServedError)
+                    .with_peer(addr)
+                    .with_info(format!(
+                        "{} {} {}",
+                        u16::from(e),
+                        status_str,
+                        request.unwrap().uri
+                    )),
+            ),
+        }
 
         // If the request specified to keep the connection open, respect this
         if !keep_alive {

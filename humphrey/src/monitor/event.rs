@@ -13,31 +13,27 @@ pub struct Event {
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EventType {
-    ConnectionAttempt = 0x01,
-    ConnectionSuccess = 0x02,
-    ConnectionDenied = 0x04,
-    ConnectionFailed = 0x08,
-    ConnectionClosed = 0x10,
-    ThreadPoolProcessStarted = 0x20,
-    StreamDisconnectedWhileWaiting = 0x40,
-    RequestAttempt = 0x80,
-    RequestSuccess = 0x0100,
-    RequestFailed = 0x0200,
-    ResponseAttempt = 0x0400,
-    ResponseSuccess = 0x0800,
-    ResponseFailed = 0x1000,
-    KeepAliveRespected = 0x2000,
-    WebsocketConnectionRequested = 0x4000,
-    WebsocketConnectionClosed = 0x8000,
-    HTTPSRedirect = 0x010000,
+    ConnectionSuccess = 0x01,
+    ConnectionDenied = 0x02,
+    ConnectionError = 0x04,
+    ConnectionClosed = 0x08,
+    ThreadPoolProcessStarted = 0x10,
+    StreamDisconnectedWhileWaiting = 0x20,
+    RequestServedSuccess = 0x40,
+    RequestServedError = 0x80,
+    RequestTimeout = 0x0100,
+    KeepAliveRespected = 0x0200,
+    WebsocketConnectionRequested = 0x0400,
+    WebsocketConnectionClosed = 0x0800,
+    HTTPSRedirect = 0x1000,
 }
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EventLevel {
-    Error = 0b0_0001_0010_0100_1000,
-    Warning = 0b0_0001_0010_0100_1100,
-    Info = 0b1_1101_0010_0100_1100,
+    Error = 0b0_0000_1000_0100,
+    Warning = 0b0_0001_1010_0110,
+    Info = 0b1_1101_1110_1110,
     Debug = u32::MAX,
 }
 
@@ -92,21 +88,17 @@ impl ToString for EventType {
 impl From<EventType> for &'static str {
     fn from(kind: EventType) -> Self {
         match kind {
-            EventType::ConnectionAttempt => "Connection attempted",
             EventType::ConnectionSuccess => "Connection successful",
             EventType::ConnectionDenied => "Connection denied",
-            EventType::ConnectionFailed => "Connection failed",
+            EventType::ConnectionError => "Connection error",
             EventType::ConnectionClosed => "Connection closed",
             EventType::ThreadPoolProcessStarted => "Handler sent in thread pool",
             EventType::StreamDisconnectedWhileWaiting => {
                 "Stream disconnected while waiting to be processed"
             }
-            EventType::RequestAttempt => "Request attempted",
-            EventType::RequestSuccess => "Request successful",
-            EventType::RequestFailed => "Request failed",
-            EventType::ResponseAttempt => "Response attempted",
-            EventType::ResponseSuccess => "Response successful",
-            EventType::ResponseFailed => "Response failed",
+            EventType::RequestServedSuccess => "Request served",
+            EventType::RequestServedError => "Request error",
+            EventType::RequestTimeout => "Request timeout",
             EventType::KeepAliveRespected => "Connection kept alive after response",
             EventType::WebsocketConnectionRequested => "WebSocket connection requested",
             EventType::WebsocketConnectionClosed => "WebSocket connection closed",
