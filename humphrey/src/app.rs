@@ -401,6 +401,7 @@ where
         self
     }
 
+    /// Registers a monitor for the server.
     pub fn with_monitor(mut self, monitor: MonitorConfig) -> Self {
         self.monitor = monitor;
         self
@@ -783,8 +784,8 @@ fn force_https_thread(monitor: MonitorConfig) -> Result<(), Box<dyn std::error::
 pub(crate) fn error_handler(status_code: StatusCode) -> Response {
     let body = format!(
         "<html><body><h1>{} {}</h1></body></html>",
-        Into::<u16>::into(status_code.clone()),
-        Into::<&str>::into(status_code.clone())
+        Into::<u16>::into(status_code),
+        Into::<&str>::into(status_code)
     );
 
     Response::new(status_code, body.as_bytes())

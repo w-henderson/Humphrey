@@ -291,8 +291,8 @@ impl From<Response> for Vec<u8> {
         let status_line = format!(
             "{} {} {}",
             val.version,
-            Into::<u16>::into(val.status_code.clone()),
-            Into::<&str>::into(val.status_code.clone())
+            Into::<u16>::into(val.status_code),
+            Into::<&str>::into(val.status_code)
         );
 
         let mut bytes: Vec<u8> =

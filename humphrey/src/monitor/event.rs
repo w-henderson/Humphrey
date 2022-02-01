@@ -1,48 +1,77 @@
+//! Event types for monitoring.
+
 use crate::http::date::DateTime;
 
 use std::borrow::Cow;
 use std::fmt::Display;
 use std::net::{SocketAddr, ToSocketAddrs};
 
+/// Represents a monitoring event.
 pub struct Event {
+    /// The type of the event.
     pub kind: EventType,
+    /// The address of the peer that triggered the event, if applicable.
     pub peer: Option<SocketAddr>,
+    /// Additional information about the event, if applicable.
     pub info: Option<Cow<'static, str>>,
 }
 
+/// Represents the type of event.
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EventType {
+    /// A successful connection.
     ConnectionSuccess = 0x01,
+    /// The connection was denied.
     ConnectionDenied = 0x02,
+    /// An error occurred while connecting.
     ConnectionError = 0x04,
+    /// The connection was closed.
     ConnectionClosed = 0x08,
+    /// The process started running in the thread pool.
     ThreadPoolProcessStarted = 0x10,
+    /// The stream disconnected while waiting to be processed.
     StreamDisconnectedWhileWaiting = 0x20,
+    /// A request was served successfully.
     RequestServedSuccess = 0x40,
+    /// A request was served, but an error was encountered.
     RequestServedError = 0x80,
+    /// A request timed out.
     RequestTimeout = 0x0100,
+    /// A connection was held open due to the `Keep-Alive` header.
     KeepAliveRespected = 0x0200,
+    /// A WebSocket connection was requested.
     WebsocketConnectionRequested = 0x0400,
+    /// A WebSocket connection was closed.
     WebsocketConnectionClosed = 0x0800,
+    /// A client was redirected to use HTTPS.
     HTTPSRedirect = 0x1000,
+    /// The thread pool is overloaded.
     ThreadPoolOverload = 0x2000,
 }
 
+/// Represents a category of events.
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EventLevel {
+    /// Only critical errors are logged.
     Error = 0b00_0000_1000_0100,
+    /// Only errors and warnings are logged.
     Warning = 0b10_0001_1010_0110,
+    /// Informative messages are logged.
     Info = 0b11_1101_1110_1110,
+    /// Everything is logged.
     Debug = u32::MAX,
 }
 
+/// Represents a type which can be converted to an event mask.
 pub trait ToEventMask {
+    /// Convert to an event mask.
     fn to_event_mask(&self) -> u32;
 }
 
 impl Event {
+    /// Create a new event with the given event type.
     pub fn new(kind: EventType) -> Self {
         Self {
             kind,
@@ -51,11 +80,13 @@ impl Event {
         }
     }
 
+    /// Add a peer to the event.
     pub fn with_peer(mut self, peer: impl ToSocketAddrs) -> Self {
         self.peer = Some(peer.to_socket_addrs().unwrap().next().unwrap());
         self
     }
 
+    /// Add a peer to the event, if the result is `Ok`.
     pub fn with_peer_result<T, E>(mut self, peer_result: Result<T, E>) -> Self
     where
         T: ToSocketAddrs,
@@ -70,6 +101,7 @@ impl Event {
         self
     }
 
+    /// Adds information to the event.
     pub fn with_info<T>(mut self, info: T) -> Self
     where
         T: Into<Cow<'static, str>>,

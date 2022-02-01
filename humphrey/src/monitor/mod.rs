@@ -1,9 +1,15 @@
+//! Monitoring functionality.
+
 pub mod event;
 
 use event::{Event, ToEventMask};
 
 use std::sync::mpsc::Sender;
 
+/// Represents configuration for monitoring.
+///
+/// Cloning this type will create another instance which sends events to the same receiver,
+///   like cloning a channel.
 #[derive(Default)]
 pub struct MonitorConfig {
     mask: u32,
@@ -11,6 +17,7 @@ pub struct MonitorConfig {
 }
 
 impl MonitorConfig {
+    /// Creates a new monitor configuration with the given sender.
     pub fn new(sender: Sender<Event>) -> Self {
         Self {
             mask: 0,
@@ -18,6 +25,8 @@ impl MonitorConfig {
         }
     }
 
+    /// Subscribes the monitor to the given event mask.
+    /// This can be an event type or an event level.
     pub fn with_subscription_to<T>(mut self, event: T) -> Self
     where
         T: ToEventMask,
@@ -26,6 +35,7 @@ impl MonitorConfig {
         self
     }
 
+    /// Send a monitoring event.
     pub fn send(&self, event: impl Into<Event>) {
         if let Some(sender) = &self.sender {
             let event = event.into();
