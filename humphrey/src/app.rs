@@ -264,38 +264,62 @@ where
                 .execute(|| force_https_thread().unwrap_or(()));
         }
 
-        for mut sock in socket.incoming().flatten() {
-            let cloned_state = self.state.clone();
+        for sock in socket.incoming() {
+            match sock {
+                Ok(mut sock) => {
+                    let cloned_state = self.state.clone();
 
-            // Check that the client is allowed to connect
-            if (self.connection_condition)(&mut sock, cloned_state) {
-                let cloned_state = self.state.clone();
-                let cloned_subapps = subapps.clone();
-                let cloned_default_subapp = default_subapp.clone();
-                let cloned_error_handler = error_handler.clone();
-                let cloned_handler = self.connection_handler;
-                let cloned_timeout = self.connection_timeout;
-                let cloned_config = self
-                    .tls_config
-                    .as_ref()
-                    .expect("TLS certificate not supplied")
-                    .clone();
+                    // Check that the client is allowed to connect
+                    if (self.connection_condition)(&mut sock, cloned_state) {
+                        let cloned_state = self.state.clone();
+                        let cloned_subapps = subapps.clone();
+                        let cloned_default_subapp = default_subapp.clone();
+                        let cloned_error_handler = error_handler.clone();
+                        let cloned_handler = self.connection_handler;
+                        let cloned_timeout = self.connection_timeout;
+                        let cloned_monitor = self.monitor.clone();
+                        let cloned_config = self
+                            .tls_config
+                            .as_ref()
+                            .expect("TLS certificate not supplied")
+                            .clone();
 
-                // Spawn a new thread to handle the connection
-                self.thread_pool.execute(move || {
-                    let mut server = ServerConnection::new(cloned_config).unwrap();
-                    let tls_stream = rustls::Stream::new(&mut server, &mut sock);
-                    let stream = Stream::Tls(tls_stream);
+                        cloned_monitor.send(
+                            Event::new(EventType::ConnectionSuccess)
+                                .with_peer_result(sock.peer_addr()),
+                        );
 
-                    (cloned_handler)(
-                        stream,
-                        cloned_subapps,
-                        cloned_default_subapp,
-                        cloned_error_handler,
-                        cloned_state,
-                        cloned_timeout,
-                    )
-                });
+                        // Spawn a new thread to handle the connection
+                        self.thread_pool.execute(move || {
+                            cloned_monitor.send(
+                                Event::new(EventType::ThreadPoolProcessStarted)
+                                    .with_peer_result(sock.peer_addr()),
+                            );
+
+                            let mut server = ServerConnection::new(cloned_config).unwrap();
+                            let tls_stream = rustls::Stream::new(&mut server, &mut sock);
+                            let stream = Stream::Tls(tls_stream);
+
+                            (cloned_handler)(
+                                stream,
+                                cloned_subapps,
+                                cloned_default_subapp,
+                                cloned_error_handler,
+                                cloned_state,
+                                cloned_monitor,
+                                cloned_timeout,
+                            )
+                        });
+                    } else {
+                        self.monitor.send(
+                            Event::new(EventType::ConnectionDenied)
+                                .with_peer_result(sock.peer_addr()),
+                        );
+                    }
+                }
+                Err(e) => self
+                    .monitor
+                    .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
             }
         }
 
