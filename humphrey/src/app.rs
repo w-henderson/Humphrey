@@ -578,6 +578,7 @@ fn client_handler<State>(
             Err(e) => match e {
                 RequestError::Request => error_handler(StatusCode::BadRequest),
                 RequestError::Timeout => error_handler(StatusCode::RequestTimeout),
+                RequestError::Disconnected => return,
                 RequestError::Stream => {
                     return monitor.send(Event::new(EventType::RequestServedError))
                 }

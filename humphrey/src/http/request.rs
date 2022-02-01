@@ -37,6 +37,8 @@ pub enum RequestError {
     Request,
     /// The request could not be parsed due to an issue with the stream.
     Stream,
+    /// The request could not be parsed since the client disconnected.
+    Disconnected,
     /// The request timed out.
     Timeout,
 }
@@ -68,7 +70,7 @@ impl Request {
         let mut first_buf: [u8; 1] = [0; 1];
         stream
             .read_exact(&mut first_buf)
-            .map_err(|_| RequestError::Stream)?;
+            .map_err(|_| RequestError::Disconnected)?;
 
         Self::from_stream_inner(stream, address, first_buf[0])
     }
@@ -89,7 +91,7 @@ impl Request {
             .map_err(|e| match e.kind() {
                 ErrorKind::TimedOut => RequestError::Timeout,
                 ErrorKind::WouldBlock => RequestError::Timeout,
-                _ => RequestError::Stream,
+                _ => RequestError::Disconnected,
             })?;
 
         stream.set_timeout(None).map_err(|_| RequestError::Stream)?;
