@@ -16,7 +16,7 @@ pub struct ThreadPool {
     thread_count: usize,
     threads: Vec<Thread>,
     tx: Sender<Message>,
-    monitor: MonitorConfig,
+    monitor: Option<MonitorConfig>,
 }
 
 /// Represents a single worker thread in the thread pool
@@ -59,7 +59,7 @@ impl ThreadPool {
             thread_count,
             threads: Vec::new(),
             tx: channel().0,
-            monitor: MonitorConfig::new(channel().0),
+            monitor: None,
         }
     }
 
@@ -77,8 +77,9 @@ impl ThreadPool {
         self.tx = tx;
     }
 
+    /// Register a monitor for the thread pool.
     pub fn register_monitor(&mut self, monitor: MonitorConfig) {
-        self.monitor = monitor;
+        self.monitor = Some(monitor);
     }
 
     /// Executes a task in the thread pool.
@@ -101,16 +102,22 @@ impl ThreadPool {
 
 impl Thread {
     /// Creates a new thread.
-    pub fn new(id: usize, rx: Arc<Mutex<Receiver<Message>>>, monitor: MonitorConfig) -> Self {
+    pub fn new(
+        id: usize,
+        rx: Arc<Mutex<Receiver<Message>>>,
+        monitor: Option<MonitorConfig>,
+    ) -> Self {
         let thread = spawn(move || loop {
             let task = { rx.lock().unwrap().recv().unwrap() };
 
             match task {
                 Message::Function(f, t) => {
-                    let time_in_pool = t.elapsed().as_millis();
+                    if let Some(monitor) = &monitor {
+                        let time_in_pool = t.elapsed().as_millis();
 
-                    if time_in_pool > OVERLOAD_THRESHOLD {
-                        monitor.send(EventType::ThreadPoolOverload);
+                        if time_in_pool > OVERLOAD_THRESHOLD {
+                            monitor.send(EventType::ThreadPoolOverload);
+                        }
                     }
 
                     (f)()
