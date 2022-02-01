@@ -183,7 +183,7 @@ where
 
     /// Runs the Humphrey app on the given socket address.
     /// This function will only return if a fatal error is thrown such as the port being in use.
-    pub fn run<A>(self, addr: A) -> Result<(), HumphreyError>
+    pub fn run<A>(mut self, addr: A) -> Result<(), HumphreyError>
     where
         A: ToSocketAddrs,
     {
@@ -191,6 +191,9 @@ where
         let subapps = Arc::new(self.subapps);
         let default_subapp = Arc::new(self.default_subapp);
         let error_handler = Arc::new(self.error_handler);
+
+        self.thread_pool.register_monitor(self.monitor.clone());
+        self.thread_pool.start();
 
         for stream in socket.incoming() {
             match stream {
@@ -634,18 +637,23 @@ fn client_handler<State>(
             StatusCode::RequestTimeout => monitor.send(
                 Event::new(EventType::RequestTimeout)
                     .with_peer(addr)
-                    .with_info(format!("408 Request Timeout {}", request.unwrap().uri)),
+                    .with_info("408 Request Timeout"),
             ),
-            e => monitor.send(
-                Event::new(EventType::RequestServedError)
-                    .with_peer(addr)
-                    .with_info(format!(
-                        "{} {} {}",
-                        u16::from(e),
-                        status_str,
-                        request.unwrap().uri
-                    )),
-            ),
+            e => {
+                if let Ok(request) = request {
+                    monitor.send(
+                        Event::new(EventType::RequestServedError)
+                            .with_peer(addr)
+                            .with_info(format!("{} {} {}", u16::from(e), status_str, request.uri)),
+                    )
+                } else {
+                    monitor.send(
+                        Event::new(EventType::RequestServedError)
+                            .with_peer(addr)
+                            .with_info(format!("{} {}", u16::from(e), status_str)),
+                    )
+                }
+            }
         }
 
         // If the request specified to keep the connection open, respect this

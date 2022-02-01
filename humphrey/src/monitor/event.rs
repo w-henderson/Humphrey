@@ -26,14 +26,15 @@ pub enum EventType {
     WebsocketConnectionRequested = 0x0400,
     WebsocketConnectionClosed = 0x0800,
     HTTPSRedirect = 0x1000,
+    ThreadPoolOverload = 0x2000,
 }
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EventLevel {
-    Error = 0b0_0000_1000_0100,
-    Warning = 0b0_0001_1010_0110,
-    Info = 0b1_1101_1110_1110,
+    Error = 0b00_0000_1000_0100,
+    Warning = 0b10_0001_1010_0110,
+    Info = 0b11_1101_1110_1110,
     Debug = u32::MAX,
 }
 
@@ -103,6 +104,7 @@ impl From<EventType> for &'static str {
             EventType::WebsocketConnectionRequested => "WebSocket connection requested",
             EventType::WebsocketConnectionClosed => "WebSocket connection closed",
             EventType::HTTPSRedirect => "Redirected to HTTPS",
+            EventType::ThreadPoolOverload => "Thread pool overloaded",
         }
     }
 }
