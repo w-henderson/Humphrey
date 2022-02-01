@@ -263,8 +263,10 @@ where
         let error_handler = Arc::new(self.error_handler);
 
         if self.force_https {
+            let cloned_monitor = self.monitor.clone();
+
             self.thread_pool
-                .execute(|| force_https_thread().unwrap_or(()));
+                .execute(|| force_https_thread(cloned_monitor).unwrap_or(()));
         }
 
         for sock in socket.incoming() {
@@ -743,7 +745,7 @@ fn call_websocket_handler<State>(
 }
 
 #[cfg(feature = "tls")]
-fn force_https_thread() -> Result<(), Box<dyn std::error::Error>> {
+fn force_https_thread(monitor: MonitorConfig) -> Result<(), Box<dyn std::error::Error>> {
     use crate::http::headers::ResponseHeader;
     use std::io::Write;
 
@@ -769,6 +771,8 @@ fn force_https_thread() -> Result<(), Box<dyn std::error::Error>> {
 
         let response_bytes: Vec<u8> = response.into();
         stream.write_all(&response_bytes)?;
+
+        monitor.send(Event::new(EventType::HTTPSRedirect).with_peer(addr));
     }
 
     Ok(())
