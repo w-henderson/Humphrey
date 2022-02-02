@@ -139,7 +139,7 @@ impl From<EventType> for &'static str {
             EventType::WebsocketConnectionClosed => "WebSocket connection closed",
             EventType::HTTPSRedirect => "Redirected to HTTPS",
             EventType::ThreadPoolOverload => "Thread pool overloaded",
-            EventType::ThreadPoolPanic => "Thread pool panic"
+            EventType::ThreadPoolPanic => "Thread pool panic",
         }
     }
 }
@@ -197,5 +197,11 @@ impl ToEventMask for EventType {
 impl ToEventMask for EventLevel {
     fn to_event_mask(&self) -> u32 {
         *self as u32
+    }
+}
+
+impl ToEventMask for u32 {
+    fn to_event_mask(&self) -> u32 {
+        *self
     }
 }
