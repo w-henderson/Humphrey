@@ -48,6 +48,8 @@ pub enum EventType {
     HTTPSRedirect = 0x1000,
     /// The thread pool is overloaded.
     ThreadPoolOverload = 0x2000,
+    /// The thread pool recovered from a thread error.
+    ThreadPoolPanic = 0x4000,
 }
 
 /// Represents a category of events.
@@ -55,11 +57,11 @@ pub enum EventType {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EventLevel {
     /// Only critical errors are logged.
-    Error = 0b00_0000_1000_0100,
+    Error = 0b100_0000_1000_0100,
     /// Only errors and warnings are logged.
-    Warning = 0b10_0001_1010_0110,
+    Warning = 0b110_0001_1010_0110,
     /// Informative messages are logged.
-    Info = 0b11_1101_1110_1110,
+    Info = 0b111_1101_1110_1110,
     /// Everything is logged.
     Debug = u32::MAX,
 }
@@ -137,6 +139,7 @@ impl From<EventType> for &'static str {
             EventType::WebsocketConnectionClosed => "WebSocket connection closed",
             EventType::HTTPSRedirect => "Redirected to HTTPS",
             EventType::ThreadPoolOverload => "Thread pool overloaded",
+            EventType::ThreadPoolPanic => "Thread pool panic"
         }
     }
 }

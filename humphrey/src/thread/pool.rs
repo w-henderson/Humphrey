@@ -2,6 +2,7 @@
 
 use crate::monitor::event::EventType;
 use crate::monitor::MonitorConfig;
+use crate::thread::recovery::{PanicMarker, RecoveryThread};
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -14,16 +15,20 @@ const OVERLOAD_THRESHOLD: u128 = 100;
 /// Represents a pool of threads.
 pub struct ThreadPool {
     thread_count: usize,
-    threads: Vec<Thread>,
+    started: bool,
+    threads: Arc<Mutex<Vec<Thread>>>,
+    recovery_thread: Option<RecoveryThread>,
     tx: Sender<Message>,
     monitor: Option<MonitorConfig>,
 }
 
 /// Represents a single worker thread in the thread pool
 pub struct Thread {
+    /// The ID of the thread.
     #[allow(dead_code)]
-    id: usize,
-    os_thread: Option<JoinHandle<()>>,
+    pub id: usize,
+    /// THe underlying OS thread.
+    pub os_thread: Option<JoinHandle<()>>,
 }
 
 /// Represents a message between threads.
@@ -57,7 +62,9 @@ impl ThreadPool {
 
         Self {
             thread_count,
-            threads: Vec::new(),
+            started: false,
+            threads: Arc::new(Mutex::new(Vec::new())),
+            recovery_thread: None,
             tx: channel().0,
             monitor: None,
         }
@@ -67,14 +74,32 @@ impl ThreadPool {
     pub fn start(&mut self) {
         let (tx, rx): (Sender<Message>, Receiver<Message>) = channel();
         let rx = Arc::new(Mutex::new(rx));
-        self.threads = Vec::with_capacity(self.thread_count);
+        let mut threads = Vec::with_capacity(self.thread_count);
+
+        let (recovery_tx, recovery_rx): (Sender<usize>, Receiver<usize>) = channel();
 
         for id in 0..self.thread_count {
-            self.threads
-                .push(Thread::new(id, rx.clone(), self.monitor.clone()))
+            threads.push(Thread::new(
+                id,
+                rx.clone(),
+                recovery_tx.clone(),
+                self.monitor.clone(),
+            ))
         }
 
+        self.threads = Arc::new(Mutex::new(threads));
         self.tx = tx;
+
+        let recovery_thread = RecoveryThread::new(
+            recovery_rx,
+            recovery_tx,
+            rx,
+            self.threads.clone(),
+            self.monitor.clone(),
+        );
+
+        self.recovery_thread = Some(recovery_thread);
+        self.started = true;
     }
 
     /// Register a monitor for the thread pool.
@@ -90,7 +115,7 @@ impl ThreadPool {
     where
         F: FnOnce() + Send + 'static,
     {
-        assert!(!self.threads.is_empty());
+        assert!(self.started);
 
         let boxed_task = Box::new(task);
         let time_into_pool = Instant::now();
@@ -105,25 +130,32 @@ impl Thread {
     pub fn new(
         id: usize,
         rx: Arc<Mutex<Receiver<Message>>>,
+        panic_tx: Sender<usize>,
         monitor: Option<MonitorConfig>,
     ) -> Self {
-        let thread = spawn(move || loop {
-            let task = { rx.lock().unwrap().recv().unwrap() };
+        let thread = spawn(move || {
+            let panic_marker = PanicMarker(id, panic_tx);
 
-            match task {
-                Message::Function(f, t) => {
-                    if let Some(monitor) = &monitor {
-                        let time_in_pool = t.elapsed().as_millis();
+            loop {
+                let task = { rx.lock().unwrap().recv().unwrap() };
 
-                        if time_in_pool > OVERLOAD_THRESHOLD {
-                            monitor.send(EventType::ThreadPoolOverload);
+                match task {
+                    Message::Function(f, t) => {
+                        if let Some(monitor) = &monitor {
+                            let time_in_pool = t.elapsed().as_millis();
+
+                            if time_in_pool > OVERLOAD_THRESHOLD {
+                                monitor.send(EventType::ThreadPoolOverload);
+                            }
                         }
-                    }
 
-                    (f)()
+                        (f)()
+                    }
+                    Message::Shutdown => break,
                 }
-                Message::Shutdown => break,
             }
+
+            drop(panic_marker);
         });
 
         Self {
@@ -135,7 +167,13 @@ impl Thread {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        for thread in &mut self.threads {
+        if let Some(mut recovery_thread) = self.recovery_thread.take() {
+            if let Some(thread) = recovery_thread.0.take() {
+                thread.join().unwrap();
+            }
+        }
+
+        for thread in &mut *self.threads.lock().unwrap() {
             if let Some(thread) = thread.os_thread.take() {
                 thread.join().unwrap();
             }

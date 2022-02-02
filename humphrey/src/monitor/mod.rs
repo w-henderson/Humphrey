@@ -41,9 +41,14 @@ impl MonitorConfig {
             let event = event.into();
 
             if self.mask & event.kind.to_event_mask() != 0 {
-                sender.send(event).unwrap();
+                sender.send(event).ok();
             }
         }
+    }
+
+    /// Get the mask of the monitor.
+    pub const fn mask(&self) -> u32 {
+        self.mask
     }
 }
 
