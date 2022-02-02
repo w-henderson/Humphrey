@@ -39,7 +39,20 @@ impl RecoveryThread {
                     if let Ok(monitor) = sync_monitor.lock() {
                         if let Some(info) = info.location() {
                             monitor.send(Event::new(EventType::ThreadPoolPanic).with_info(
-                                format!("{}:{}:{}", info.file(), info.line(), info.column()),
+                                format!(
+                                    "Thread {} panicked at {}:{}:{}",
+                                    std::thread::current().name().unwrap_or("<unknown>"),
+                                    info.file(),
+                                    info.line(),
+                                    info.column()
+                                ),
+                            ));
+                        } else {
+                            monitor.send(Event::new(EventType::ThreadPoolPanic).with_info(
+                                format!(
+                                    "Thread {} panicked, no location available",
+                                    std::thread::current().name().unwrap_or("<unknown>"),
+                                ),
                             ));
                         }
                     }
@@ -69,10 +82,10 @@ impl RecoveryThread {
 
                 // Log that a thread panicked.
                 if let Some(monitor) = &monitor {
-                    monitor.send(Event::new(EventType::ThreadPoolPanic).with_info(format!(
-                        "Thread {} panicked and was restarted",
-                        panicking_thread
-                    )));
+                    monitor.send(
+                        Event::new(EventType::ThreadPoolPanic)
+                            .with_info(format!("Thread {} was restarted", panicking_thread)),
+                    );
                 }
             }
         });

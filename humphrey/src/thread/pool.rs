@@ -6,7 +6,7 @@ use crate::thread::recovery::{PanicMarker, RecoveryThread};
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
-use std::thread::{spawn, JoinHandle};
+use std::thread::{Builder, JoinHandle};
 use std::time::Instant;
 
 /// The number of milliseconds a task can be waiting in the pool before the pool is considered overloaded.
@@ -133,30 +133,33 @@ impl Thread {
         panic_tx: Sender<usize>,
         monitor: Option<MonitorConfig>,
     ) -> Self {
-        let thread = spawn(move || {
-            let panic_marker = PanicMarker(id, panic_tx);
+        let thread = Builder::new()
+            .name(format!("{}", id))
+            .spawn(move || {
+                let panic_marker = PanicMarker(id, panic_tx);
 
-            loop {
-                let task = { rx.lock().unwrap().recv().unwrap() };
+                loop {
+                    let task = { rx.lock().unwrap().recv().unwrap() };
 
-                match task {
-                    Message::Function(f, t) => {
-                        if let Some(monitor) = &monitor {
-                            let time_in_pool = t.elapsed().as_millis();
+                    match task {
+                        Message::Function(f, t) => {
+                            if let Some(monitor) = &monitor {
+                                let time_in_pool = t.elapsed().as_millis();
 
-                            if time_in_pool > OVERLOAD_THRESHOLD {
-                                monitor.send(EventType::ThreadPoolOverload);
+                                if time_in_pool > OVERLOAD_THRESHOLD {
+                                    monitor.send(EventType::ThreadPoolOverload);
+                                }
                             }
+
+                            (f)()
                         }
-
-                        (f)()
+                        Message::Shutdown => break,
                     }
-                    Message::Shutdown => break,
                 }
-            }
 
-            drop(panic_marker);
-        });
+                drop(panic_marker);
+            })
+            .expect("Thread could not be spawned");
 
         Self {
             id,
