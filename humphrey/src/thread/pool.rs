@@ -123,6 +123,11 @@ impl ThreadPool {
             .send(Message::Function(boxed_task, time_into_pool))
             .unwrap();
     }
+
+    /// Returns the configured number of threads.
+    pub fn thread_count(&self) -> usize {
+        self.thread_count
+    }
 }
 
 impl Thread {

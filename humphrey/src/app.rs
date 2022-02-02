@@ -251,7 +251,7 @@ where
     /// Securely runs the Humphrey app on the given socket address.
     /// This function will only return if a fatal error is thrown such as the port being in use or the TLS certificate being invalid.
     #[cfg(feature = "tls")]
-    pub fn run_tls<A>(self, addr: A) -> Result<(), HumphreyError>
+    pub fn run_tls<A>(mut self, addr: A) -> Result<(), HumphreyError>
     where
         A: ToSocketAddrs,
     {
@@ -262,8 +262,16 @@ where
         let default_subapp = Arc::new(self.default_subapp);
         let error_handler = Arc::new(self.error_handler);
 
+        self.thread_pool.register_monitor(self.monitor.clone());
+        self.thread_pool.start();
+
         if self.force_https {
             let cloned_monitor = self.monitor.clone();
+
+            if self.thread_pool.thread_count() < 2 {
+                println!("Error: A minimum of two threads are required to force HTTPS since one is required for redirects.");
+                std::process::exit(1);
+            }
 
             self.thread_pool
                 .execute(|| force_https_thread(cloned_monitor).unwrap_or(()));
