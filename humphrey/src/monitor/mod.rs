@@ -10,6 +10,10 @@ use std::sync::mpsc::Sender;
 ///
 /// Cloning this type will create another instance which sends events to the same receiver,
 ///   like cloning a channel.
+///
+/// It is important to note that if the monitor is subscribed to the `EventType::ThreadPoolPanic`
+///   event, panic messages will be relayed through the monitor instead of through the standard
+///   error stream.
 #[derive(Default)]
 pub struct MonitorConfig {
     mask: u32,

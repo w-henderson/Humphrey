@@ -80,10 +80,10 @@ impl RecoveryThread {
                 // Put the new thread in the old thread's place.
                 threads[panicking_thread] = restarted_thread;
 
-                // Log that a thread panicked.
+                // Log that the thread restarted.
                 if let Some(monitor) = &monitor {
                     monitor.send(
-                        Event::new(EventType::ThreadPoolPanic)
+                        Event::new(EventType::ThreadRestarted)
                             .with_info(format!("Thread {} was restarted", panicking_thread)),
                     );
                 }
