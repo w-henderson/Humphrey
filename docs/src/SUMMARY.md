@@ -6,6 +6,7 @@
   - [Using State](core/state.md)
   - [Static Content](core/static-content.md)
   - [Using HTTPS](core/https.md)
+  - [Monitoring Events](core/monitoring.md)
 - [Humphrey Server](server/index.md)
   - [Getting Started](server/getting-started.md)
   - [Configuration](server/configuration.md)

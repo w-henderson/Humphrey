@@ -90,4 +90,4 @@ let app: App<()> = App::new()
 This starts a background thread which simply redirects HTTP requests to the corresponding HTTPS URL.
 
 ## Conclusion
-In this section, we've covered how to use the TLS feature of Humphrey, and how to use it to serve HTTPS applications. If you want to learn more about Humphrey, consider exploring the [API reference](https://docs.rs/humphrey) or reading the [WebSocket guide](../websocket/index.md)
+In this section, we've covered how to use the TLS feature of Humphrey, and how to use it to serve HTTPS applications. Next, we'll learn how to monitor internal events in the application.
