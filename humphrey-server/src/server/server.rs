@@ -16,10 +16,7 @@ use std::thread::spawn;
 
 use crate::cache::Cache;
 use crate::config::{BlacklistMode, Config, HostConfig, RouteType};
-use crate::logger::{
-    monitor_thread, LogLevel, Logger, INTERNAL_MASK_DEBUG, INTERNAL_MASK_ERROR, INTERNAL_MASK_INFO,
-    INTERNAL_MASK_WARN,
-};
+use crate::logger::{monitor_thread, Logger};
 use crate::proxy::proxy_handler;
 use crate::r#static::{directory_handler, file_handler, redirect_handler};
 

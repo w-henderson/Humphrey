@@ -175,6 +175,7 @@ impl ToEventMask for LogLevel {
     }
 }
 
+/// Monitors internal events and logs them.
 pub fn monitor_thread(rx: Receiver<Event>, state: Arc<AppState>) {
     for e in rx {
         if e.kind == EventType::RequestServedError
