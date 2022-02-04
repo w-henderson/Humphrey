@@ -16,7 +16,7 @@ use std::convert::TryFrom;
 /// assert_eq!(status_code, 404);
 /// assert_eq!(status_name, "Not Found");
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StatusCode {
     /// `100 Continue`: Continue with request.
     Continue,

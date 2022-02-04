@@ -54,6 +54,12 @@ jobs:
         with:
           command: check
           args: --manifest-path examples/host/Cargo.toml
+          
+      - name: Check monitor example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/monitor/Cargo.toml
 
       - name: Check plugin example
         uses: actions-rs/cargo@v1
