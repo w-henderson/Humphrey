@@ -87,10 +87,18 @@ pub fn main(config: Config) {
         app = app
             .with_cert(&tls_config.cert_file, &tls_config.key_file)
             .with_forced_https(tls_config.force);
+
+        if state.config.port != 443 {
+            state.logger.warn(&format!(
+                "HTTPS is typically served on port 443, so your setting of {} may cause issues.",
+                state.config.port,
+            ));
+        }
     }
 
     let addr = format!("{}:{}", state.config.address, state.config.port);
     let logger = &state.logger;
+
     logger.info("Starting server");
 
     #[cfg(feature = "plugins")]
