@@ -1,6 +1,15 @@
 # Configuration
 Humphrey's configuration format is similar to that of Nginx. Comments begin with a `#` and are ignored by the parser. Separate configuration files can be included with the `include` directive, like in Nginx.
 
+## Locating the Configuration
+Humphrey looks in three places for the configuration, before falling back to the default. If no configuration file can be found, the server will log a warning and start using the default configuration.
+
+1. The path specified as a command-line argument, for example when running `humphrey /path/to/config.conf`.
+2. The `humphrey.conf` file in the current directory.
+3. The path specified in the `HUMPHREY_CONF` environment variable.
+
+It is important to note that if a file is found at any of these locations but is invalid, the server will log an error and exit instead of continuing to the next location.
+
 ## Example
 An example configuration file with all the supported directives specified is shown below.
 
