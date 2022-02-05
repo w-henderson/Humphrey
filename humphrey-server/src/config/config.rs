@@ -5,18 +5,20 @@ use crate::config::tree::{parse_conf, ConfigNode};
 use crate::logger::LogLevel;
 use crate::proxy::{EqMutex, LoadBalancer};
 use crate::rand::Lcg;
-use crate::server::logger::Logger;
 
 use std::collections::HashMap;
-use std::env::args;
+use std::env::{args, var};
 use std::fs::File;
 use std::io::Read;
 use std::net::IpAddr;
+use std::path::Path;
 use std::time::Duration;
 
 /// Represents the parsed and validated configuration.
 #[derive(Debug, PartialEq)]
 pub struct Config {
+    /// Where the configuration was located.
+    pub source: ConfigSource,
     /// The address to host the server on
     pub address: String,
     /// The port to host the server on
@@ -55,7 +57,7 @@ pub struct HostConfig {
 }
 
 /// Represents the type of a route.
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum RouteType {
     /// Serve a single file.
     File,
@@ -94,7 +96,7 @@ pub struct LoggingConfig {
 }
 
 /// Represents configuration for the cache.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub struct CacheConfig {
     /// The maximum size of the cache, in bytes
     pub size_limit: usize,
@@ -136,7 +138,7 @@ pub struct PluginConfig {
 }
 
 /// Represents an algorithm for load balancing.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LoadBalancerMode {
     /// Evenly distributes load in a repeating pattern
     RoundRobin,
@@ -145,7 +147,7 @@ pub enum LoadBalancerMode {
 }
 
 /// Represents a method of applying the blacklist.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum BlacklistMode {
     /// Does not allow any access from blacklisted addresses
     Block,
@@ -153,20 +155,34 @@ pub enum BlacklistMode {
     Forbidden,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ConfigSource {
+    Argument,
+    EnvironmentVariable,
+    CurrentDirectory,
+    Default,
+}
+
 impl Config {
     /// Attempts to load the configuration.
     pub fn load() -> Result<Self, String> {
-        if let Ok((filename, config_string)) = load_config_file() {
+        let (path, source) = if let Some(arg_path) = args().nth(1) {
+            (arg_path, ConfigSource::Argument)
+        } else if Path::new("humphrey.conf").exists() {
+            ("humphrey.conf".into(), ConfigSource::CurrentDirectory)
+        } else if let Ok(env_path) = var("HUMPHREY_CONF") {
+            (env_path, ConfigSource::EnvironmentVariable)
+        } else {
+            ("".into(), ConfigSource::Default)
+        };
+
+        if let Ok((filename, config_string)) = load_config_file(path) {
             let tree = parse_conf(&config_string, &filename).map_err(|e| e.to_string())?;
-            let config = Self::from_tree(tree)?;
+            let mut config = Self::from_tree(tree)?;
+            config.source = source;
 
             Ok(config)
         } else {
-            let logger = Logger::default();
-            logger.warn(
-                "Configuration file not specified or inaccessible, falling back to default configuration",
-            );
-
             Ok(Config::default())
         }
     }
@@ -323,6 +339,7 @@ impl Config {
         };
 
         Ok(Config {
+            source: ConfigSource::Default,
             address,
             port,
             threads,
@@ -351,17 +368,15 @@ impl Config {
 }
 
 /// Loads the configuration file.
-fn load_config_file() -> Result<(String, String), ()> {
-    let path = args().nth(1).unwrap_or_else(|| "humphrey.conf".into());
-
-    if let Ok(mut file) = File::open(&path) {
+fn load_config_file(path: impl AsRef<str>) -> Result<(String, String), ()> {
+    if let Ok(mut file) = File::open(path.as_ref()) {
         // The file can be opened
 
         let mut string = String::new();
         if file.read_to_string(&mut string).is_ok() {
             // The file can be read
 
-            Ok((path, string))
+            Ok((path.as_ref().to_string(), string))
         } else {
             Err(())
         }

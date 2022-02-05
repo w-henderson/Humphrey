@@ -1,13 +1,15 @@
 //! Provides default values for the configuration.
 
 use crate::config::{
-    BlacklistConfig, BlacklistMode, Config, HostConfig, LoggingConfig, RouteConfig, RouteType,
+    BlacklistConfig, BlacklistMode, Config, ConfigSource, HostConfig, LoggingConfig, RouteConfig,
+    RouteType,
 };
 use crate::server::logger::LogLevel;
 
 impl Default for Config {
     fn default() -> Self {
         Self {
+            source: ConfigSource::Default,
             address: "0.0.0.0".into(),
             port: 80,
             threads: 32,

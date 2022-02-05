@@ -15,7 +15,7 @@ use std::process::exit;
 use std::thread::spawn;
 
 use crate::cache::Cache;
-use crate::config::{BlacklistMode, Config, HostConfig, RouteType};
+use crate::config::{BlacklistMode, Config, ConfigSource, HostConfig, RouteType};
 use crate::logger::{monitor_thread, Logger};
 use crate::proxy::proxy_handler;
 use crate::r#static::{directory_handler, file_handler, redirect_handler};
@@ -57,6 +57,7 @@ impl From<Config> for AppState {
 /// Main function for the static server.
 pub fn main(config: Config) {
     let connection_timeout = config.connection_timeout;
+    let source = config.source;
 
     let (monitor_tx, monitor_rx) = channel();
     let mask = config.logging.level.to_event_mask();
@@ -99,6 +100,21 @@ pub fn main(config: Config) {
     let addr = format!("{}:{}", state.config.address, state.config.port);
     let logger = &state.logger;
 
+    match source {
+        ConfigSource::Argument => logger.info("Configuration loaded from argument path"),
+        ConfigSource::EnvironmentVariable => {
+            logger.info("Configuration loaded from HUMPHREY_CONF environment variable path")
+        }
+        ConfigSource::CurrentDirectory => {
+            logger.info("Configuration loaded from humphrey.conf in the current directory")
+        }
+        ConfigSource::Default => {
+            logger.warn("Configuration file not found or invalid, using defaults")
+        }
+    }
+
+    logger.debug(&format!("Configuration: {:?}", state.config));
+
     logger.info("Starting server");
 
     #[cfg(feature = "plugins")]
@@ -109,7 +125,6 @@ pub fn main(config: Config) {
     };
 
     logger.info(&format!("Running at {}", addr));
-    logger.debug(&format!("Configuration: {:?}", state.config));
 
     #[cfg(feature = "tls")]
     if state.config.tls_config.is_some() {
