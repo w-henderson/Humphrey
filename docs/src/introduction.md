@@ -16,3 +16,13 @@ The simple authentication system is also provided by a separate crate, often ref
 - [Using WebSocket with Humphrey Core](websocket/getting-started.md)
 - [Using PHP with Humphrey Server](server/using-php.md)
 - [Creating a Humphrey Server plugin](server/creating-a-plugin.md)
+
+## Latest Versions
+This book is up-to-date with the following crate versions.
+
+| Crate | Version |
+| ----- | ------- |
+| Humphrey Core | 0.5.0 |
+| Humphrey Server | 0.5.0 |
+| Humphrey WebSocket | 0.2.1 |
+| Humphrey Auth | 0.1.3 |
