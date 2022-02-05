@@ -1,11 +1,10 @@
 #![allow(unused_imports)]
 use super::tree::CONF;
 use humphrey_server::config::config::{
-    BlacklistConfig, BlacklistMode, CacheConfig, Config, LoadBalancerMode, LoggingConfig,
-    RouteConfig,
+    BlacklistConfig, BlacklistMode, CacheConfig, Config, ConfigSource, HostConfig,
+    LoadBalancerMode, LoggingConfig, RouteConfig, RouteType,
 };
 use humphrey_server::config::tree::{parse_conf, ConfigNode};
-use humphrey_server::config::{HostConfig, RouteType};
 use humphrey_server::logger::LogLevel;
 
 #[cfg(feature = "plugins")]
@@ -31,6 +30,7 @@ fn test_parse_config() {
     };
 
     let expected_conf = Config {
+        source: ConfigSource::Default,
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
@@ -93,6 +93,7 @@ fn test_host_config() {
     let conf = Config::from_tree(tree).unwrap();
 
     let expected_conf = Config {
+        source: ConfigSource::Default,
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
@@ -158,6 +159,7 @@ fn comma_separated_routes() {
     let conf = Config::from_tree(tree).unwrap();
 
     let expected_conf = Config {
+        source: ConfigSource::Default,
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
