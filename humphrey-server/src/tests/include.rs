@@ -1,7 +1,7 @@
 use humphrey_server::config::tree::parse_conf;
 use humphrey_server::config::{
-    BlacklistConfig, BlacklistMode, CacheConfig, Config, HostConfig, LoadBalancerMode,
-    LoggingConfig, RouteConfig, RouteType,
+    BlacklistConfig, BlacklistMode, CacheConfig, Config, ConfigSource, HostConfig,
+    LoadBalancerMode, LoggingConfig, RouteConfig, RouteType,
 };
 use humphrey_server::logger::LogLevel;
 use humphrey_server::proxy::{EqMutex, LoadBalancer};
@@ -20,6 +20,7 @@ fn include_route() {
     let config = Config::from_tree(parse_conf(string, "include_route.conf").unwrap());
 
     let expected_conf = Ok(Config {
+        source: ConfigSource::Default,
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
@@ -68,6 +69,7 @@ fn nested_include() {
     let config = Config::from_tree(parse_conf(string, "nested_include_root.conf").unwrap());
 
     let expected_conf = Ok(Config {
+        source: ConfigSource::Default,
         address: "0.0.0.0".into(),
         port: 80,
         threads: 32,
