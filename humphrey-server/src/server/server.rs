@@ -1,6 +1,8 @@
 //! Provides the core server functionality and manages the underlying Humphrey app.
 
 use humphrey::http::{Request, Response};
+use humphrey::monitor::event::ToEventMask;
+use humphrey::monitor::MonitorConfig;
 use humphrey::stream::Stream;
 use humphrey::{App, SubApp};
 
@@ -10,16 +12,18 @@ use crate::plugins::manager::PluginManager;
 use crate::plugins::plugin::PluginLoadResult;
 #[cfg(feature = "plugins")]
 use std::process::exit;
+use std::thread::spawn;
 
 use crate::cache::Cache;
 use crate::config::{BlacklistMode, Config, HostConfig, RouteType};
-use crate::logger::Logger;
+use crate::logger::{monitor_thread, Logger};
 use crate::proxy::proxy_handler;
 use crate::r#static::{directory_handler, file_handler, redirect_handler};
 
 use std::error::Error;
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::sync::mpsc::channel;
 use std::sync::{Arc, RwLock};
 
 /// Represents the application state.
@@ -54,11 +58,17 @@ impl From<Config> for AppState {
 pub fn main(config: Config) {
     let connection_timeout = config.connection_timeout;
 
+    let (monitor_tx, monitor_rx) = channel();
+    let mask = config.logging.level.to_event_mask();
+
     let mut app: App<AppState> = App::new_with_config(config.threads, AppState::from(config))
         .with_connection_condition(verify_connection)
-        .with_connection_timeout(connection_timeout);
+        .with_connection_timeout(connection_timeout)
+        .with_monitor(MonitorConfig::new(monitor_tx).with_subscription_to(mask));
 
     let state = app.get_state();
+    let monitor_state = app.get_state();
+    spawn(move || monitor_thread(monitor_rx, monitor_state));
 
     for route in init_app_routes(&state.config.default_host, 0).routes {
         app = app.with_route(&route.route, route.handler);
@@ -77,10 +87,18 @@ pub fn main(config: Config) {
         app = app
             .with_cert(&tls_config.cert_file, &tls_config.key_file)
             .with_forced_https(tls_config.force);
+
+        if state.config.port != 443 {
+            state.logger.warn(&format!(
+                "HTTPS is typically served on port 443, so your setting of {} may cause issues.",
+                state.config.port,
+            ));
+        }
     }
 
     let addr = format!("{}:{}", state.config.address, state.config.port);
     let logger = &state.logger;
+
     logger.info("Starting server");
 
     #[cfg(feature = "plugins")]

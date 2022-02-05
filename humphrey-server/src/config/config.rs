@@ -190,6 +190,10 @@ impl Config {
             None
         };
 
+        if threads < 1 {
+            return Err("You cannot specify less than 1 thread");
+        }
+
         // Get and validate the blacklist file and mode
         let blacklist = {
             let blacklist_strings: Vec<String> =
@@ -221,6 +225,14 @@ impl Config {
             let cert_file = hashmap.get_owned("server.tls.cert_file");
             let key_file = hashmap.get_owned("server.tls.key_file");
             let force = hashmap.get_optional("server.tls.force", "false".into());
+
+            if force == "true" && threads < 2 {
+                return Err("A minimum of two threads are required to force HTTPS");
+            }
+
+            if force == "true" && port != 443 {
+                return Err("Forcing HTTPS redirects requires the port to be 443");
+            }
 
             if let Some(cert_file) = cert_file {
                 if let Some(key_file) = key_file {

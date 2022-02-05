@@ -89,8 +89,8 @@ pub fn proxy_handler(
 
         let target_sock = target.to_socket_addrs().unwrap().next().unwrap();
         let response = proxy_request(&proxied_request, target_sock, Duration::from_secs(5));
-        let status: u16 = response.status_code.clone().into();
-        let status_string: &str = response.status_code.clone().into();
+        let status: u16 = response.status_code.into();
+        let status_string: &str = response.status_code.into();
 
         state.logger.info(&format!(
             "{}: {} {} {}",

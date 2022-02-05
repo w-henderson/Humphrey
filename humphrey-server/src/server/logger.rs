@@ -3,16 +3,64 @@
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::str::FromStr;
-use std::sync::Mutex;
+use std::sync::mpsc::Receiver;
+use std::sync::{Arc, Mutex};
+
+use humphrey::http::date::DateTime;
+use humphrey::monitor::event::{Event, EventType, ToEventMask};
 
 use crate::config::Config;
-use humphrey::http::date::DateTime;
+use crate::AppState;
+
+/// Event mask for the `LogLevel::Error` log level.
+pub const INTERNAL_MASK_ERROR: u32 = EventType::ThreadPoolPanic as u32;
+
+/// Event mask for the `LogLevel::Warn` log level.
+pub const INTERNAL_MASK_WARN: u32 = INTERNAL_MASK_ERROR
+    | EventType::RequestServedError as u32
+    | EventType::RequestTimeout as u32
+    | EventType::StreamDisconnectedWhileWaiting as u32
+    | EventType::ThreadPoolOverload as u32
+    | EventType::ThreadRestarted as u32;
+
+/// Event mask for the `LogLevel::Info` log level.
+pub const INTERNAL_MASK_INFO: u32 = INTERNAL_MASK_WARN | EventType::HTTPSRedirect as u32;
+
+/// Event mask for the `LogLevel::Debug` log level.
+pub const INTERNAL_MASK_DEBUG: u32 = INTERNAL_MASK_INFO
+    | EventType::KeepAliveRespected as u32
+    | EventType::ThreadPoolProcessStarted as u32
+    | EventType::ConnectionSuccess as u32
+    | EventType::ConnectionClosed as u32;
 
 /// Encapsulates logging methods and configuration.
 pub struct Logger {
     level: LogLevel,
     console: bool,
     file: Option<Mutex<File>>,
+}
+
+/// Represents a log level.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum LogLevel {
+    /// Only errors will be logged.
+    Error,
+    /// Errors and warnings will be logged.
+    Warn,
+    /// Errors, warnings and general information will be logged.
+    Info,
+    /// Everything, including debug information, will be logged.
+    Debug,
+}
+
+impl Default for Logger {
+    fn default() -> Self {
+        Self {
+            level: LogLevel::Warn,
+            console: true,
+            file: None,
+        }
+    }
 }
 
 impl From<&Config> for Logger {
@@ -36,46 +84,36 @@ impl From<&Config> for Logger {
     }
 }
 
-impl Default for Logger {
-    fn default() -> Self {
-        Self {
-            level: LogLevel::Warn,
-            console: true,
-            file: None,
-        }
-    }
-}
-
 impl Logger {
     /// Logs an error message.
-    pub fn error(&self, message: &str) {
-        let string = format!("{} [ERROR] {}", Logger::time_format(), message);
+    pub fn error(&self, message: impl AsRef<str>) {
+        let string = format!("{} [ERROR] {}", Logger::time_format(), message.as_ref());
         self.log_to_console(&string);
         self.log_to_file(&string);
     }
 
     /// Logs a warning, provided that the log level allows this.
-    pub fn warn(&self, message: &str) {
+    pub fn warn(&self, message: impl AsRef<str>) {
         if self.level >= LogLevel::Warn {
-            let string = format!("{} [WARN]  {}", Logger::time_format(), message);
+            let string = format!("{} [WARN]  {}", Logger::time_format(), message.as_ref());
             self.log_to_console(&string);
             self.log_to_file(&string);
         }
     }
 
     /// Logs information, provided that the log level allows this.
-    pub fn info(&self, message: &str) {
+    pub fn info(&self, message: impl AsRef<str>) {
         if self.level >= LogLevel::Info {
-            let string = format!("{} [INFO]  {}", Logger::time_format(), message);
+            let string = format!("{} [INFO]  {}", Logger::time_format(), message.as_ref());
             self.log_to_console(&string);
             self.log_to_file(&string);
         }
     }
 
     /// Logs debug information, provided that the log level allows this.
-    pub fn debug(&self, message: &str) {
+    pub fn debug(&self, message: impl AsRef<str>) {
         if self.level == LogLevel::Debug {
-            let string = format!("{} [DEBUG] {}", Logger::time_format(), message);
+            let string = format!("{} [DEBUG] {}", Logger::time_format(), message.as_ref());
             self.log_to_console(&string);
             self.log_to_file(&string);
         }
@@ -112,19 +150,6 @@ impl Logger {
     }
 }
 
-/// Represents a log level.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum LogLevel {
-    /// Only errors will be logged
-    Error,
-    /// Errors and warnings will be logged
-    Warn,
-    /// Errors, warnings and general information will be logged
-    Info,
-    /// Everything, including debug information, will be logged
-    Debug,
-}
-
 impl FromStr for LogLevel {
     type Err = &'static str;
 
@@ -135,6 +160,71 @@ impl FromStr for LogLevel {
             "info" => Ok(Self::Info),
             "debug" => Ok(Self::Debug),
             _ => Err("Log level was invalid"),
+        }
+    }
+}
+
+impl ToEventMask for LogLevel {
+    fn to_event_mask(&self) -> u32 {
+        match self {
+            Self::Error => INTERNAL_MASK_ERROR,
+            Self::Warn => INTERNAL_MASK_WARN,
+            Self::Info => INTERNAL_MASK_INFO,
+            Self::Debug => INTERNAL_MASK_DEBUG,
+        }
+    }
+}
+
+/// Monitors internal events and logs them.
+pub fn monitor_thread(rx: Receiver<Event>, state: Arc<AppState>) {
+    for e in rx {
+        if e.kind == EventType::RequestServedError
+            && !e
+                .info
+                .as_ref()
+                .map(|i| i.starts_with("400"))
+                .unwrap_or(false)
+        {
+            continue;
+        }
+
+        let message = if let Some(info) = e.info {
+            if e.kind == EventType::RequestServedError || e.kind == EventType::RequestTimeout {
+                format!(
+                    "{}{}",
+                    e.peer
+                        .map(|p| p.ip().to_string() + ": ")
+                        .unwrap_or_else(|| "".into()),
+                    info
+                )
+            } else {
+                format!(
+                    "{}{}: {}",
+                    e.peer
+                        .map(|p| p.ip().to_string() + ": ")
+                        .unwrap_or_else(|| "".into()),
+                    e.kind.to_string(),
+                    info
+                )
+            }
+        } else {
+            format!(
+                "{}{}",
+                e.peer
+                    .map(|p| p.ip().to_string() + ": ")
+                    .unwrap_or_else(|| "".into()),
+                e.kind.to_string()
+            )
+        };
+
+        if e.kind.to_event_mask() & INTERNAL_MASK_ERROR != 0 {
+            state.logger.error(message);
+        } else if e.kind.to_event_mask() & INTERNAL_MASK_WARN != 0 {
+            state.logger.warn(message);
+        } else if e.kind.to_event_mask() & INTERNAL_MASK_INFO != 0 {
+            state.logger.info(message);
+        } else {
+            state.logger.debug(message);
         }
     }
 }
