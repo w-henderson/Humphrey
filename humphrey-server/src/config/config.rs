@@ -155,11 +155,16 @@ pub enum BlacklistMode {
     Forbidden,
 }
 
+/// Represents the source of the configuration.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ConfigSource {
+    /// The configuration was found at a path specified in a command-line argument.
     Argument,
+    /// The configuration was found at a path specified in the environment variable `HUMPHREY_CONF`.
     EnvironmentVariable,
+    /// The configuration was found in the current directory at `humphrey.conf`.
     CurrentDirectory,
+    /// The configuration was not found, so the default configuration was used.
     Default,
 }
 
