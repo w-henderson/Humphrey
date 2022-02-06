@@ -8,6 +8,7 @@ use crate::message::Message;
 use crate::restion::Restion;
 
 use std::io::{Read, Write};
+use std::net::SocketAddr;
 
 /// Represents a WebSocket stream.
 ///
@@ -61,8 +62,8 @@ where
     }
 }
 
-impl WebsocketStream<Stream<'_>> {
-    /// Attemps to receive a message from the stream without blocking.
+impl WebsocketStream<Stream> {
+    /// Attempts to receive a message from the stream without blocking.
     pub fn recv_nonblocking(&mut self) -> Restion<Message, WebsocketError> {
         let message = Message::from_stream_nonblocking(&mut self.stream);
 
@@ -71,6 +72,11 @@ impl WebsocketStream<Stream<'_>> {
         }
 
         message
+    }
+
+    /// Attempts to get the peer address of this stream.
+    pub fn peer_addr(&self) -> Result<SocketAddr, std::io::Error> {
+        self.stream.peer_addr()
     }
 }
 

@@ -1,5 +1,6 @@
 //! Provides a Humphrey-compatible WebSocket handler for performing the handshake.
 
+use crate::async_app::AsyncWebsocketApp;
 use crate::error::WebsocketError;
 use crate::stream::WebsocketStream;
 use crate::util::base64::Base64Encode;
@@ -11,7 +12,8 @@ use humphrey::http::{Request, Response, StatusCode};
 use humphrey::stream::Stream;
 
 use std::io::Write;
-use std::sync::Arc;
+use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex};
 
 /// Represents a function able to handle WebSocket streams.
 pub trait WebsocketHandler<S>: Fn(WebsocketStream<Stream>, Arc<S>) + Send + Sync {}
@@ -48,6 +50,19 @@ where
     move |request: Request, mut stream: Stream, state: Arc<S>| {
         if handshake(request, &mut stream).is_ok() {
             handler(WebsocketStream::new(stream), state);
+        }
+    }
+}
+
+pub fn async_websocket_handler<S>(
+    hook: Arc<Mutex<Sender<WebsocketStream<Stream>>>>,
+) -> impl Fn(Request, Stream, Arc<S>) {
+    move |request: Request, mut stream: Stream, _: Arc<S>| {
+        if handshake(request, &mut stream).is_ok() {
+            hook.lock()
+                .unwrap()
+                .send(WebsocketStream::new(stream))
+                .unwrap();
         }
     }
 }
