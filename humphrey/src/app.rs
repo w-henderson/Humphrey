@@ -309,8 +309,8 @@ where
                                     .with_peer_result(sock.peer_addr()),
                             );
 
-                            let mut server = ServerConnection::new(cloned_config).unwrap();
-                            let tls_stream = rustls::Stream::new(&mut server, &mut sock);
+                            let server = ServerConnection::new(cloned_config).unwrap();
+                            let tls_stream = rustls::StreamOwned::new(server, sock);
                             let stream = Stream::Tls(tls_stream);
 
                             (cloned_handler)(
