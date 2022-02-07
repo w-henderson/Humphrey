@@ -2,30 +2,39 @@
 
 #![allow(clippy::new_without_default)]
 
+use crate::handler::async_websocket_handler;
 use crate::message::Message;
 use crate::restion::Restion;
 use crate::stream::WebsocketStream;
 
 use humphrey::stream::Stream;
+use humphrey::App;
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
+use std::thread::spawn;
 
 /// Represents an asynchronous WebSocket app.
 pub struct AsyncWebsocketApp<State>
 where
     State: Send + Sync + 'static,
 {
+    /// Represents the link to a Humphrey application.
+    ///
+    /// This may be:
+    /// - `HumphreyLink::Internal`, in which case the app uses its own internal Humphrey application
+    /// - `HumphreyLink::External`, in which case the app is linked to an external Humphrey application and receives connections through a channel
+    ///
+    /// Each enum variant has corresponding fields for the configuration.
+    humphrey_link: HumphreyLink,
     /// Represents the state of the application.
     state: Arc<State>,
     /// A hashmap with the addresses as the keys and the actual streams as the values.
     streams: HashMap<SocketAddr, WebsocketStream<Stream>>,
     /// A receiver which is sent new streams to add to the hashmap.
     incoming_streams: Receiver<WebsocketStream<Stream>>,
-    /// A sender which is used by Humphrey Core to send new streams to the async app.
-    connect_hook: Arc<Mutex<Sender<WebsocketStream<Stream>>>>,
     /// A receiver which receives messages from handler threads to forward to clients.
     outgoing_messages: Receiver<OutgoingMessage>,
     /// A sender which is used by handler threads to send messages to clients.
@@ -54,6 +63,20 @@ pub enum OutgoingMessage {
     Message(SocketAddr, Message),
     /// A message to be sent to every connected client.
     Broadcast(Message),
+}
+
+/// Represents the link to a Humphrey application.
+///
+/// This may be:
+/// - `HumphreyLink::Internal`, in which case the app uses its own internal Humphrey application
+/// - `HumphreyLink::External`, in which case the app is linked to an external Humphrey application and receives connections through a channel
+///
+/// Each enum variant has corresponding fields for the configuration.
+pub enum HumphreyLink {
+    /// The app uses its own internal Humphrey application.
+    Internal(Box<App>, SocketAddr),
+    /// The app is linked to an external Humphrey application and receives connections through a channel.
+    External(Arc<Mutex<Sender<WebsocketStream<Stream>>>>),
 }
 
 /// Represents a function able to handle a WebSocket event (a connection or disconnection).
@@ -100,11 +123,94 @@ where
 
         let (message_sender, outgoing_messages) = channel();
 
+        let humphrey_app = App::new_with_config(1, ())
+            .with_websocket_route("/*", async_websocket_handler(connect_hook));
+
         Self {
+            humphrey_link: HumphreyLink::Internal(
+                Box::new(humphrey_app),
+                "0.0.0.0:80".to_socket_addrs().unwrap().next().unwrap(),
+            ),
             state: Default::default(),
             streams: Default::default(),
             incoming_streams,
-            connect_hook,
+            outgoing_messages,
+            message_sender,
+            on_connect: None,
+            on_disconnect: None,
+            on_message: None,
+        }
+    }
+
+    /// Creates a new asynchronous WebSocket app with a custom state and configuration.
+    pub fn new_with_config(threads: usize, state: State) -> Self {
+        let (connect_hook, incoming_streams) = channel();
+        let connect_hook = Arc::new(Mutex::new(connect_hook));
+
+        let (message_sender, outgoing_messages) = channel();
+
+        let humphrey_app = App::new_with_config(threads, ())
+            .with_websocket_route("/*", async_websocket_handler(connect_hook));
+
+        Self {
+            humphrey_link: HumphreyLink::Internal(
+                Box::new(humphrey_app),
+                "0.0.0.0:80".to_socket_addrs().unwrap().next().unwrap(),
+            ),
+            state: Arc::new(state),
+            streams: Default::default(),
+            incoming_streams,
+            outgoing_messages,
+            message_sender,
+            on_connect: None,
+            on_disconnect: None,
+            on_message: None,
+        }
+    }
+
+    /// Creates a new asynchronous WebSocket app without creating a Humphrey application.
+    ///
+    /// This is useful if you want to use the app as part of a Humphrey application, or if you want to use TLS.
+    ///
+    /// You'll need to manually link the app to a Humphrey application using the `connect_hook`.
+    pub fn new_unlinked() -> Self
+    where
+        State: Default,
+    {
+        let (connect_hook, incoming_streams) = channel();
+        let connect_hook = Arc::new(Mutex::new(connect_hook));
+
+        let (message_sender, outgoing_messages) = channel();
+
+        Self {
+            humphrey_link: HumphreyLink::External(connect_hook),
+            state: Default::default(),
+            streams: Default::default(),
+            incoming_streams,
+            outgoing_messages,
+            message_sender,
+            on_connect: None,
+            on_disconnect: None,
+            on_message: None,
+        }
+    }
+
+    /// Creates a new asynchronous WebSocket app with a custom state and configuration, without creating a Humphrey application.
+    ///
+    /// This is useful if you want to use the app as part of a Humphrey application, or if you want to use TLS.
+    ///
+    /// You'll need to manually link the app to a Humphrey application using the `connect_hook`.
+    pub fn new_unlinked_with_config(state: State) -> Self {
+        let (connect_hook, incoming_streams) = channel();
+        let connect_hook = Arc::new(Mutex::new(connect_hook));
+
+        let (message_sender, outgoing_messages) = channel();
+
+        Self {
+            humphrey_link: HumphreyLink::External(connect_hook),
+            state: Arc::new(state),
+            streams: Default::default(),
+            incoming_streams,
             outgoing_messages,
             message_sender,
             on_connect: None,
@@ -115,8 +221,13 @@ where
 
     /// Returns a reference to the connection hook of the application.
     /// This is used by Humphrey Core to send new streams to the app.
-    pub fn connect_hook(&self) -> Arc<Mutex<Sender<WebsocketStream<Stream>>>> {
-        self.connect_hook.clone()
+    ///
+    /// If the app is not linked to a Humphrey application, this will return `None`.
+    pub fn connect_hook(&self) -> Option<Arc<Mutex<Sender<WebsocketStream<Stream>>>>> {
+        match &self.humphrey_link {
+            HumphreyLink::External(connect_hook) => Some(connect_hook.clone()),
+            _ => None,
+        }
     }
 
     /// Set the event handler called when a new client connects.
@@ -157,6 +268,11 @@ where
 
     /// Start the application on the main thread.
     pub fn run(mut self) {
+        // Ensure that the underlying Humphrey application is running if it is internal.
+        if let HumphreyLink::Internal(app, addr) = self.humphrey_link {
+            spawn(move || app.run(addr).unwrap());
+        }
+
         loop {
             let keys: Vec<SocketAddr> = self.streams.keys().copied().collect();
 

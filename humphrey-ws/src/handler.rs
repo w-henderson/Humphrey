@@ -56,6 +56,10 @@ where
 /// Provides asynchronous WebSocket functionality.
 /// Supply a hook to an asynchronous WebSocket app to handle the subsequent messages.
 ///
+/// It is important to note that, unless you need to modify the underlying Humphrey application, it is
+///   easier to simply create a regular app with `AsyncWebsocketApp::new()` which manages the Humphrey
+///   application internally.
+///
 /// ## Example
 /// ```
 /// use humphrey::App;
@@ -68,10 +72,10 @@ where
 ///
 /// fn main() {
 ///     let websocket_app: AsyncWebsocketApp<()> =
-///         AsyncWebsocketApp::new().with_message_handler(message_handler);
+///         AsyncWebsocketApp::new_unlinked().with_message_handler(message_handler);
 ///
 ///     let humphrey_app: App<()> = App::new()
-///         .with_websocket_route("/ws", async_websocket_handler(websocket_app.connect_hook()));
+///         .with_websocket_route("/ws", async_websocket_handler(websocket_app.connect_hook().unwrap()));
 ///
 ///     spawn(move || humphrey_app.run("0.0.0.0:80").unwrap());
 ///
