@@ -1,6 +1,5 @@
 //! Provides a Humphrey-compatible WebSocket handler for performing the handshake.
 
-use crate::async_app::AsyncWebsocketApp;
 use crate::error::WebsocketError;
 use crate::stream::WebsocketStream;
 use crate::util::base64::Base64Encode;
@@ -54,6 +53,41 @@ where
     }
 }
 
+/// Provides asynchronous WebSocket functionality.
+/// Supply a hook to an asynchronous WebSocket app to handle the subsequent messages.
+///
+/// ## Example
+/// ```
+/// use humphrey::App;
+/// use humphrey_ws::async_app::{AsyncStream, AsyncWebsocketApp};
+/// use humphrey_ws::handler::async_websocket_handler;
+/// use humphrey_ws::message::Message;
+///
+/// use std::sync::Arc;
+/// use std::thread::spawn;
+///
+/// fn main() {
+///     let websocket_app: AsyncWebsocketApp<()> =
+///         AsyncWebsocketApp::new().with_message_handler(message_handler);
+///
+///     let humphrey_app: App<()> = App::new()
+///         .with_websocket_route("/ws", async_websocket_handler(websocket_app.connect_hook()));
+///
+///     spawn(move || humphrey_app.run("0.0.0.0:80").unwrap());
+///
+///     websocket_app.run();
+/// }
+///
+/// fn message_handler(stream: AsyncStream, message: Message, _: Arc<()>) {
+///     println!(
+///         "{}: Message received: {}",
+///         stream.peer_addr(),
+///         message.text().unwrap().trim()
+///     );
+///
+///     stream.send(Message::new("Message received!"));
+/// }
+/// ```
 pub fn async_websocket_handler<S>(
     hook: Arc<Mutex<Sender<WebsocketStream<Stream>>>>,
 ) -> impl Fn(Request, Stream, Arc<S>) {

@@ -1,3 +1,5 @@
+//! Provides asynchronous WebSocket functionality.
+
 #![allow(clippy::new_without_default)]
 
 use crate::message::Message;
@@ -54,9 +56,33 @@ pub enum OutgoingMessage {
     Broadcast(Message),
 }
 
+/// Represents a function able to handle a WebSocket event (a connection or disconnection).
+/// It is passed the stream which triggered the event as well as the app's state.
+///
+/// ## Example
+/// A basic example of an event handler would be as follows:
+/// ```
+/// fn connection_handler(stream: AsyncStream, state: Arc<()>) {
+///     println!("A new client connected! {:?}", stream.addr);
+///
+///     stream.send(Message::new("Hello, World!"));
+/// }
+/// ```
 pub trait EventHandler<S>: Fn(AsyncStream, Arc<S>) + Send + Sync + 'static {}
 impl<T, S> EventHandler<S> for T where T: Fn(AsyncStream, Arc<S>) + Send + Sync + 'static {}
 
+/// Represents a function able to handle a message event.
+/// It is passed the stream which sent the message, the message and the app's state.
+///
+/// ## Example
+/// A basic example of a message handler would be as follows:
+/// ```
+/// fn message_handler(stream: AsyncStream, message: Message, state: Arc<()>) {
+///    println!("A message was received from {:?}: {}", stream.addr, message.text().unwrap());
+///
+///    stream.send(Message::new("Message received."));
+/// }
+/// ```
 pub trait MessageHandler<S>: Fn(AsyncStream, Message, Arc<S>) + Send + Sync + 'static {}
 impl<T, S> MessageHandler<S> for T where T: Fn(AsyncStream, Message, Arc<S>) + Send + Sync + 'static {}
 
@@ -87,22 +113,49 @@ where
         }
     }
 
+    /// Returns a reference to the connection hook of the application.
+    /// This is used by Humphrey Core to send new streams to the app.
     pub fn connect_hook(&self) -> Arc<Mutex<Sender<WebsocketStream<Stream>>>> {
         self.connect_hook.clone()
     }
 
+    /// Set the event handler called when a new client connects.
     pub fn on_connect(&mut self, handler: impl EventHandler<State>) {
         self.on_connect = Some(Box::new(handler));
     }
 
+    /// Set the event handler called when a client disconnects.
     pub fn on_disconnect(&mut self, handler: impl EventHandler<State>) {
         self.on_disconnect = Some(Box::new(handler));
     }
 
+    /// Set the message handler called when a client sends a message.
     pub fn on_message(&mut self, handler: impl MessageHandler<State>) {
         self.on_message = Some(Box::new(handler));
     }
 
+    /// Set the event handler called when a new client connects.
+    /// Returns itself for use in a builder pattern.
+    pub fn with_connect_handler(mut self, handler: impl EventHandler<State>) -> Self {
+        self.on_connect(handler);
+        self
+    }
+
+    /// Set the event handler called when a client disconnects.
+    /// Returns itself for use in a builder pattern.
+    pub fn with_disconnect_handler(mut self, handler: impl EventHandler<State>) -> Self {
+        self.on_disconnect(handler);
+        self
+    }
+
+    /// Set the message handler called when a client sends a message.
+    /// Returns itself for use in a builder pattern.
+    pub fn with_message_handler(mut self, handler: impl MessageHandler<State>) -> Self {
+        self.on_message(handler);
+        self
+    }
+
+    /// Start the application on the main thread.
     pub fn run(mut self) {
         loop {
             let keys: Vec<SocketAddr> = self.streams.keys().copied().collect();
