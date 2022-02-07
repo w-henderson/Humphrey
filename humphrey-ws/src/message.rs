@@ -9,7 +9,7 @@ use crate::restion::Restion;
 use std::io::{Read, Write};
 
 /// Represents a WebSocket message.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Message {
     payload: Vec<u8>,
     text: bool,
@@ -172,11 +172,11 @@ impl Message {
     }
 
     /// Converts the message to a `Vec<u8>` for transmission.
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_frame(self) -> Vec<u8> {
         if self.text {
-            Frame::new(Opcode::Text, self.payload.clone()).into()
+            Frame::new(Opcode::Text, self.payload).into()
         } else {
-            Frame::new(Opcode::Binary, self.payload.clone()).into()
+            Frame::new(Opcode::Binary, self.payload).into()
         }
     }
 }

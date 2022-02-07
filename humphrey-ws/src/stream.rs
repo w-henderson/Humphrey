@@ -51,8 +51,16 @@ where
 
     /// Sends a message to the client.
     pub fn send(&mut self, message: Message) -> Result<(), WebsocketError> {
+        self.send_raw(message.to_frame())
+    }
+
+    /// Sends a raw frame to the client.
+    ///
+    /// ## Warning
+    /// This function does not check that the frame is valid.
+    pub(crate) fn send_raw(&mut self, bytes: impl AsRef<[u8]>) -> Result<(), WebsocketError> {
         self.stream
-            .write_all(&message.to_bytes())
+            .write_all(bytes.as_ref())
             .map_err(|_| WebsocketError::WriteError)
     }
 
