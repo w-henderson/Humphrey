@@ -20,6 +20,8 @@ where
     streams: HashMap<SocketAddr, WebsocketStream<Stream>>,
     incoming_streams: Receiver<WebsocketStream<Stream>>,
     connect_hook: Arc<Mutex<Sender<WebsocketStream<Stream>>>>,
+    outgoing_messages: Receiver<OutgoingMessage>,
+    message_sender: Sender<OutgoingMessage>,
     on_connect: Option<Box<dyn EventHandler<State>>>,
     on_disconnect: Option<Box<dyn EventHandler<State>>>,
     on_message: Option<Box<dyn MessageHandler<State>>>,
@@ -28,8 +30,14 @@ where
 /// Represents an asynchronous WebSocket stream.
 pub struct AsyncStream {
     addr: SocketAddr,
-    message_queue: Arc<Mutex<Vec<Message>>>,
+    sender: Sender<OutgoingMessage>,
     connected: bool,
+}
+
+/// Represents a message to be sent from the server to a client.
+pub struct OutgoingMessage {
+    addr: SocketAddr,
+    message: Message,
 }
 
 pub trait EventHandler<S>: Fn(AsyncStream, Arc<S>) + Send + Sync + 'static {}
@@ -42,6 +50,7 @@ impl<State> AsyncWebsocketApp<State>
 where
     State: Send + Sync + 'static,
 {
+    /// Creates a new asynchronous WebSocket app.
     pub fn new() -> Self
     where
         State: Default,
@@ -49,11 +58,15 @@ where
         let (connect_hook, incoming_streams) = channel();
         let connect_hook = Arc::new(Mutex::new(connect_hook));
 
+        let (message_sender, outgoing_messages) = channel();
+
         Self {
             state: Default::default(),
             streams: Default::default(),
             incoming_streams,
             connect_hook,
+            outgoing_messages,
+            message_sender,
             on_connect: None,
             on_disconnect: None,
             on_message: None,
@@ -87,19 +100,14 @@ where
 
                     match stream.recv_nonblocking() {
                         Restion::Ok(message) => {
-                            let messages = Arc::new(Mutex::new(Vec::new()));
-                            let async_stream = AsyncStream::new(addr, messages.clone());
+                            let async_stream = AsyncStream::new(addr, self.message_sender.clone());
                             if let Some(handler) = &self.on_message {
                                 handler(async_stream, message, self.state.clone());
                             }
-
-                            for message in messages.lock().unwrap().drain(..) {
-                                stream.send(message).unwrap();
-                            }
                         }
                         Restion::Err(_) => {
-                            let messages = Arc::new(Mutex::new(Vec::new()));
-                            let async_stream = AsyncStream::disconnected(addr, messages.clone());
+                            let async_stream =
+                                AsyncStream::disconnected(addr, self.message_sender.clone());
                             if let Some(handler) = &self.on_disconnect {
                                 handler(async_stream, self.state.clone());
                             }
@@ -113,40 +121,41 @@ where
             }
 
             // Add any streams awaiting connection.
-            for (addr, mut stream) in self
+            for (addr, stream) in self
                 .incoming_streams
                 .try_iter()
                 .filter_map(|s| s.peer_addr().map(|a| (a, s)).ok())
             {
-                let messages = Arc::new(Mutex::new(Vec::new()));
-                let async_stream = AsyncStream::new(addr, messages.clone());
+                let async_stream = AsyncStream::new(addr, self.message_sender.clone());
                 if let Some(handler) = &self.on_connect {
                     handler(async_stream, self.state.clone());
                 }
 
-                for message in messages.lock().unwrap().drain(..) {
-                    stream.send(message).unwrap();
-                }
-
                 self.streams.insert(addr, stream);
+            }
+
+            for message in self.outgoing_messages.try_iter() {
+                if let Some(stream) = self.streams.get_mut(&message.addr) {
+                    stream.send(message.message).unwrap();
+                }
             }
         }
     }
 }
 
 impl AsyncStream {
-    pub fn new(addr: SocketAddr, messages: Arc<Mutex<Vec<Message>>>) -> Self {
+    pub fn new(addr: SocketAddr, sender: Sender<OutgoingMessage>) -> Self {
         Self {
             addr,
-            message_queue: messages,
+            sender,
             connected: true,
         }
     }
 
-    pub fn disconnected(addr: SocketAddr, messages: Arc<Mutex<Vec<Message>>>) -> Self {
+    pub fn disconnected(addr: SocketAddr, sender: Sender<OutgoingMessage>) -> Self {
         Self {
             addr,
-            message_queue: messages,
+            sender,
             connected: false,
         }
     }
@@ -157,6 +166,11 @@ impl AsyncStream {
 
     pub fn send(&self, message: Message) {
         assert!(self.connected);
-        self.message_queue.lock().unwrap().push(message);
+        self.sender
+            .send(OutgoingMessage {
+                addr: self.addr,
+                message,
+            })
+            .unwrap();
     }
 }
