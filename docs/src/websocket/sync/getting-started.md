@@ -43,7 +43,7 @@ fn my_handler(mut stream: WebsocketStream<Stream>, _: Arc<()>) {
 If you run this code, the app will start, but all WebSocket connections will be immediately closed after printing their addresses since the handler function immediately returns and thus the stream is dropped. This can be a useful feature of the `WebsocketStream` type, since the client is automatically sent a "close" frame when it is dropped.
 
 ## Testing our WebSocket Handler (optional)
-In production, it is likely that our application would only ever be accessed from a browser. However, during development, it can be useful to connect to the server from a terminal with a tool like netcat for debugging. We'll use [`websocat`] for this, which is a simple Rust CLI to do exactly this. It can be installed with `cargo install websocat`.
+In production, it is likely that our application would only ever be accessed from a browser. However, during development, it can be useful to connect to the server from a terminal with a tool like netcat for debugging. We'll use [`websocat`](https://github.com/vi/websocat) for this, which is a simple Rust CLI to do exactly this. It can be installed with `cargo install websocat`.
 
 Let's connect to our server.
 
