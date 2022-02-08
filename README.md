@@ -5,7 +5,7 @@
 
   <p align="center">
     A Performance-Focused, Dependency-Free Web Server.<br>
-    <a href=https://humphrey.whenderson.dev"><strong>Getting Started »</strong></a><br><br>
+    <a href="https://humphrey.whenderson.dev"><strong>Getting Started »</strong></a><br><br>
     <a href="https://humphrey.whenderson.dev/core/index.html">Core Guide</a> ·
     <a href="https://humphrey.whenderson.dev/server/index.html">Server Guide</a> ·
     <a href="https://humphrey.whenderson.dev/websocket/index.html">WebSocket Guide</a> ·
