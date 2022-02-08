@@ -12,7 +12,13 @@ pub mod handler;
 pub mod message;
 pub mod stream;
 
+pub use handler::async_websocket_handler;
 pub use handler::websocket_handler;
+
+pub use async_app::{AsyncStream, AsyncWebsocketApp};
+pub use message::Message;
+pub use stream::WebsocketStream;
+
 pub use util::restion;
 
 mod frame;
