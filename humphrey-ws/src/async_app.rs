@@ -8,6 +8,7 @@ use crate::restion::Restion;
 use crate::stream::WebsocketStream;
 
 use humphrey::stream::Stream;
+use humphrey::thread::pool::ThreadPool;
 use humphrey::App;
 
 use std::collections::HashMap;
@@ -31,6 +32,8 @@ where
     humphrey_link: HumphreyLink,
     /// Represents the state of the application.
     state: Arc<State>,
+    /// The internal thread pool of the application.
+    thread_pool: ThreadPool,
     /// A hashmap with the addresses as the keys and the actual streams as the values.
     streams: HashMap<SocketAddr, WebsocketStream<Stream>>,
     /// A receiver which is sent new streams to add to the hashmap.
@@ -132,6 +135,7 @@ where
                 "0.0.0.0:80".to_socket_addrs().unwrap().next().unwrap(),
             ),
             state: Default::default(),
+            thread_pool: ThreadPool::new(32),
             streams: Default::default(),
             incoming_streams,
             outgoing_messages,
@@ -143,13 +147,21 @@ where
     }
 
     /// Creates a new asynchronous WebSocket app with a custom state and configuration.
-    pub fn new_with_config(threads: usize, state: State) -> Self {
+    ///
+    /// - `state`: The state of the application.
+    /// - `handler_threads`: The size of the handler thread pool.
+    /// - `connection_threads`: The size of the connection handler thread pool (the underlying Humphrey app).
+    pub fn new_with_config(
+        state: State,
+        handler_threads: usize,
+        connection_threads: usize,
+    ) -> Self {
         let (connect_hook, incoming_streams) = channel();
         let connect_hook = Arc::new(Mutex::new(connect_hook));
 
         let (message_sender, outgoing_messages) = channel();
 
-        let humphrey_app = App::new_with_config(threads, ())
+        let humphrey_app = App::new_with_config(connection_threads, ())
             .with_websocket_route("/*", async_websocket_handler(connect_hook));
 
         Self {
@@ -158,6 +170,7 @@ where
                 "0.0.0.0:80".to_socket_addrs().unwrap().next().unwrap(),
             ),
             state: Arc::new(state),
+            thread_pool: ThreadPool::new(handler_threads),
             streams: Default::default(),
             incoming_streams,
             outgoing_messages,
@@ -185,6 +198,7 @@ where
         Self {
             humphrey_link: HumphreyLink::External(connect_hook),
             state: Default::default(),
+            thread_pool: ThreadPool::new(32),
             streams: Default::default(),
             incoming_streams,
             outgoing_messages,
@@ -200,7 +214,10 @@ where
     /// This is useful if you want to use the app as part of a Humphrey application, or if you want to use TLS.
     ///
     /// You'll need to manually link the app to a Humphrey application using the `connect_hook`.
-    pub fn new_unlinked_with_config(state: State) -> Self {
+    ///
+    /// - `state`: The state of the application.
+    /// - `handler_threads`: The size of the handler thread pool.
+    pub fn new_unlinked_with_config(state: State, handler_threads: usize) -> Self {
         let (connect_hook, incoming_streams) = channel();
         let connect_hook = Arc::new(Mutex::new(connect_hook));
 
@@ -209,6 +226,7 @@ where
         Self {
             humphrey_link: HumphreyLink::External(connect_hook),
             state: Arc::new(state),
+            thread_pool: ThreadPool::new(handler_threads),
             streams: Default::default(),
             incoming_streams,
             outgoing_messages,
@@ -222,7 +240,7 @@ where
     /// Returns a reference to the connection hook of the application.
     /// This is used by Humphrey Core to send new streams to the app.
     ///
-    /// If the app is not linked to a Humphrey application, this will return `None`.
+    /// If the app is uses an internal Humphrey application, this will return `None`.
     pub fn connect_hook(&self) -> Option<Arc<Mutex<Sender<WebsocketStream<Stream>>>>> {
         match &self.humphrey_link {
             HumphreyLink::External(connect_hook) => Some(connect_hook.clone()),
@@ -273,6 +291,12 @@ where
             spawn(move || app.run(addr).unwrap());
         }
 
+        self.thread_pool.start();
+
+        let connect_handler = self.on_connect.map(Arc::new);
+        let disconnect_handler = self.on_disconnect.map(Arc::new);
+        let message_handler = self.on_message.map(Arc::new);
+
         loop {
             let keys: Vec<SocketAddr> = self.streams.keys().copied().collect();
 
@@ -283,16 +307,26 @@ where
 
                     match stream.recv_nonblocking() {
                         Restion::Ok(message) => {
-                            let async_stream = AsyncStream::new(addr, self.message_sender.clone());
-                            if let Some(handler) = &self.on_message {
-                                handler(async_stream, message, self.state.clone());
+                            if let Some(handler) = &message_handler {
+                                let async_stream =
+                                    AsyncStream::new(addr, self.message_sender.clone());
+                                let cloned_state = self.state.clone();
+                                let cloned_handler = handler.clone();
+
+                                self.thread_pool.execute(move || {
+                                    (cloned_handler)(async_stream, message, cloned_state)
+                                });
                             }
                         }
                         Restion::Err(_) => {
-                            let async_stream =
-                                AsyncStream::disconnected(addr, self.message_sender.clone());
-                            if let Some(handler) = &self.on_disconnect {
-                                handler(async_stream, self.state.clone());
+                            if let Some(handler) = &disconnect_handler {
+                                let async_stream =
+                                    AsyncStream::disconnected(addr, self.message_sender.clone());
+                                let cloned_state = self.state.clone();
+                                let cloned_handler = handler.clone();
+
+                                self.thread_pool
+                                    .execute(move || (cloned_handler)(async_stream, cloned_state));
                             }
 
                             self.streams.remove(&addr);
@@ -309,9 +343,14 @@ where
                 .try_iter()
                 .filter_map(|s| s.peer_addr().map(|a| (a, s)).ok())
             {
-                let async_stream = AsyncStream::new(addr, self.message_sender.clone());
-                if let Some(handler) = &self.on_connect {
-                    handler(async_stream, self.state.clone());
+                if let Some(handler) = &connect_handler {
+                    let async_stream = AsyncStream::new(addr, self.message_sender.clone());
+                    let cloned_state = self.state.clone();
+                    let cloned_handler = handler.clone();
+
+                    self.thread_pool.execute(move || {
+                        (cloned_handler)(async_stream, cloned_state);
+                    });
                 }
 
                 self.streams.insert(addr, stream);
