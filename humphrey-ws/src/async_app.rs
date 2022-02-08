@@ -284,6 +284,24 @@ where
         self
     }
 
+    /// Set the address to run the application on.
+    /// Returns itself for use in a builder pattern.
+    ///
+    /// This function has no effect if the app does not manage its own internal Humphrey application.
+    pub fn with_address<T>(mut self, address: T) -> Self
+    where
+        T: ToSocketAddrs,
+    {
+        self.humphrey_link = match self.humphrey_link {
+            HumphreyLink::Internal(app, _) => {
+                let address = address.to_socket_addrs().unwrap().next().unwrap();
+                HumphreyLink::Internal(app, address)
+            }
+            HumphreyLink::External(connect_hook) => HumphreyLink::External(connect_hook),
+        };
+        self
+    }
+
     /// Start the application on the main thread.
     pub fn run(mut self) {
         // Ensure that the underlying Humphrey application is running if it is internal.
