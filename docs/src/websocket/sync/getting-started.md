@@ -1,5 +1,5 @@
 # Getting Started
-This chapter will walk you through the steps to get started with Humphrey WebSocket.
+This chapter will walk you through the steps to get started with Humphrey WebSocket synchronously.
 
 ## Adding WebSocket Support to a Humphrey Project
 To add WebSocket support to an existing project, you just need to add the `humphrey_ws` dependency to your `Cargo.toml` file. It is important to ensure that the version is acceptable for that of the core crate, so you should ideally find out the latest version for each and fix the version accordingly.
@@ -127,4 +127,4 @@ When the client first connects, we use the `Message::new` constructor to create 
 You can now use `websocat` again to test your code.
 
 ## Conclusion
-In this chapter, we've learnt about sending and receiving WebSocket messages within a Humphrey application. Next, let's look at the [Broadcasting Messages](broadcasting-messages.md) chapter, which cover how to use non-blocking reads to create a simple broadcast server.
+In this chapter, we've learnt about sending and receiving WebSocket messages within a Humphrey application. Next, let's look at the [Broadcasting Messages](broadcasting-messages.md) chapter, which covers how to use non-blocking reads to create a simple broadcast server.
