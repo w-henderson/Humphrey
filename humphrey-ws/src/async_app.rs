@@ -60,6 +60,9 @@ pub struct AsyncStream {
     connected: bool,
 }
 
+/// Represents a broadcast sender.
+pub struct Broadcaster(Sender<OutgoingMessage>);
+
 /// Represents a message to be sent from the server to a client.
 pub enum OutgoingMessage {
     /// A message to be sent to a specific client.
@@ -248,6 +251,11 @@ where
         }
     }
 
+    /// Returns a new `Broadcaster`, which can be used to broadcast messages.
+    pub fn broadcaster(&self) -> Broadcaster {
+        Broadcaster(self.message_sender.clone())
+    }
+
     /// Set the event handler called when a new client connects.
     pub fn on_connect(&mut self, handler: impl EventHandler<State>) {
         self.on_connect = Some(Box::new(handler));
@@ -432,5 +440,12 @@ impl AsyncStream {
     /// Get the address of the stream.
     pub fn peer_addr(&self) -> SocketAddr {
         self.addr
+    }
+}
+
+impl Broadcaster {
+    /// Broadcast a message to all connected clients.
+    pub fn broadcast(&self, message: Message) {
+        self.0.send(OutgoingMessage::Broadcast(message)).unwrap();
     }
 }
