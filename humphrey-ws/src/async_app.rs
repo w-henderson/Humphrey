@@ -60,8 +60,8 @@ pub struct AsyncStream {
     connected: bool,
 }
 
-/// Represents a broadcast sender.
-pub struct Broadcaster(Sender<OutgoingMessage>);
+/// Represents a global sender which can send messages to clients without waiting for events.
+pub struct AsyncSender(Sender<OutgoingMessage>);
 
 /// Represents a message to be sent from the server to a client.
 pub enum OutgoingMessage {
@@ -251,9 +251,9 @@ where
         }
     }
 
-    /// Returns a new `Broadcaster`, which can be used to broadcast messages.
-    pub fn broadcaster(&self) -> Broadcaster {
-        Broadcaster(self.message_sender.clone())
+    /// Returns a new `AsyncSender`, which can be used to send messages.
+    pub fn sender(&self) -> AsyncSender {
+        AsyncSender(self.message_sender.clone())
     }
 
     /// Set the event handler called when a new client connects.
@@ -443,7 +443,14 @@ impl AsyncStream {
     }
 }
 
-impl Broadcaster {
+impl AsyncSender {
+    /// Send a message to the client identified by the socket address.
+    pub fn send(&self, address: SocketAddr, message: Message) {
+        self.0
+            .send(OutgoingMessage::Message(address, message))
+            .unwrap()
+    }
+
     /// Broadcast a message to all connected clients.
     pub fn broadcast(&self, message: Message) {
         self.0.send(OutgoingMessage::Broadcast(message)).unwrap();
