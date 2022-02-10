@@ -47,15 +47,15 @@ fn connect_handler(stream: AsyncStream, _: Arc<()>) {
 
 It's as simple as that! If we test this with `websocat` and connect from a few terminals, you'll see that each message is correctly echoed back to the client, and new connections are announced to everyone.
 
-## Broadcasting Messages without an Event
+## Sending Messages without an Event
 Broadcasts can also be triggered without an event. This is useful for sending messages to all connected clients from a separate thread, or for responding to non-WebSocket events. In this example, we'll broadcast the standard input to all connected clients.
 
-To do this, we'll use a `Broadcaster`. Let's get a new broadcaster from the app, and send it to a separate thread for handling user input.
+To do this, we'll use an `AsyncSender`, which allows us to send messages and broadcasts without waiting for an event. Let's get a new async sender from the app, and send it to a separate thread for handling user input.
 
 ```rs
 // --snip--
 
-use humphrey_ws::async_app::Broadcaster;
+use humphrey_ws::async_app::AsyncSender;
 
 use std::thread::spawn;
 
@@ -64,23 +64,23 @@ fn main() {
         .with_connect_handler(connect_handler)
         .with_message_handler(message_handler);
 
-    let broadcaster = websocket_app.broadcaster();
-    spawn(move || user_input(broadcaster));
+    let sender = websocket_app.sender();
+    spawn(move || user_input(sender));
 
     websocket_app.run();
 }
 
-fn user_input(broadcaster: Broadcaster) {
+fn user_input(sender: AsyncSender) {
   // TODO
 }
 
 // --snip--
 ```
 
-You can create as many broadcasters as you want from the app, but they can only be created from the main thread and must be created before the application is run.
+You can create as many senders as you want from the app, but they can only be created from the main thread and must be created before the application is run.
 
-## Using the Broadcaster
-Now that we have a broadcaster, we can use it to send messages to all connected clients. Let's use the same code from our synchronous example, but slightly modify it to work with a broadcaster instead of the bus.
+## Using the Sender
+Now that we have a sender, we can use it to send messages to all connected clients. Let's use the same code from our synchronous example, but slightly modify it to work with a sender instead of the bus.
 
 ```rs
 // --snip
@@ -89,12 +89,12 @@ use std::io::BufRead;
 
 // --snip--
 
-fn user_input(broadcaster: Broadcaster) {
+fn user_input(sender: AsyncSender) {
     let stdin = std::io::stdin();
     let handle = stdin.lock();
 
     for line in handle.lines().flatten() {
-        broadcaster.broadcast(Message::new(line));
+        sender.broadcast(Message::new(line));
     }
 }
 
@@ -107,7 +107,7 @@ If we run this code now, every line we type in the server console will be broadc
 The full source code for this example should look like this.
 
 ```rs
-use humphrey_ws::async_app::{AsyncStream, AsyncWebsocketApp, Broadcaster};
+use humphrey_ws::async_app::{AsyncStream, AsyncWebsocketApp, AsyncSender};
 use humphrey_ws::message::Message;
 
 use std::io::BufRead;
@@ -119,18 +119,18 @@ fn main() {
         .with_connect_handler(connect_handler)
         .with_message_handler(message_handler);
 
-    let broadcaster = websocket_app.broadcaster();
-    spawn(move || user_input(broadcaster));
+    let sender = websocket_app.sender();
+    spawn(move || user_input(sender));
 
     websocket_app.run();
 }
 
-fn user_input(broadcaster: Broadcaster) {
+fn user_input(sender: AsyncSender) {
     let stdin = std::io::stdin();
     let handle = stdin.lock();
 
     for line in handle.lines().flatten() {
-        broadcaster.broadcast(Message::new(line));
+        sender.broadcast(Message::new(line));
     }
 }
 
