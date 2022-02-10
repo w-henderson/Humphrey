@@ -6,12 +6,19 @@
 
 const MAGIC_STRING: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
+pub mod async_app;
 pub mod error;
 pub mod handler;
 pub mod message;
 pub mod stream;
 
+pub use handler::async_websocket_handler;
 pub use handler::websocket_handler;
+
+pub use async_app::{AsyncStream, AsyncWebsocketApp};
+pub use message::Message;
+pub use stream::WebsocketStream;
+
 pub use util::restion;
 
 mod frame;

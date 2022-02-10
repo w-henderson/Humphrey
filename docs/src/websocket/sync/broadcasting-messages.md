@@ -202,4 +202,4 @@ fn my_handler(mut stream: WebsocketStream<Stream>, read_handle: Arc<AppState>) {
 ```
 
 ## Conclusion
-Humphrey WebSocket provides powerful WebSocket support for Humphrey applications. When paired with other crates, like the `bus` crate here, it can be used for even more complex tasks with minimal code. To find out more about Humphrey WebSocket, check out the [API reference](https://docs.rs/humphrey-ws).
+Humphrey WebSocket provides powerful WebSocket support for Humphrey applications. When paired with other crates, like the `bus` crate here, it can be used for even more complex tasks with minimal code. We'll now take a look at how to do this asynchronously.

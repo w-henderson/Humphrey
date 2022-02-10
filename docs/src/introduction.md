@@ -13,7 +13,7 @@ The simple authentication system is also provided by a separate crate, often ref
 ## Quick Reference
 - [Setting up Humphrey Server](server/getting-started.md)
 - [A basic web application using Humphrey Core](core/getting-started.md)
-- [Using WebSocket with Humphrey Core](websocket/getting-started.md)
+- [Using WebSocket with Humphrey Core](websocket/sync/getting-started.md)
 - [Using PHP with Humphrey Server](server/using-php.md)
 - [Creating a Humphrey Server plugin](server/creating-a-plugin.md)
 

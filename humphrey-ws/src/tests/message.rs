@@ -26,7 +26,7 @@ fn test_read_fragmented_message() {
 #[test]
 fn test_write_message() {
     let message = Message::new("hello world");
-    let bytes = message.to_bytes();
+    let bytes = message.to_frame();
 
     assert_eq!(bytes, UNMASKED_BYTES);
 }

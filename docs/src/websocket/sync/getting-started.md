@@ -1,5 +1,5 @@
 # Getting Started
-This chapter will walk you through the steps to get started with Humphrey WebSocket.
+This chapter will walk you through the steps to get started with Humphrey WebSocket synchronously.
 
 ## Adding WebSocket Support to a Humphrey Project
 To add WebSocket support to an existing project, you just need to add the `humphrey_ws` dependency to your `Cargo.toml` file. It is important to ensure that the version is acceptable for that of the core crate, so you should ideally find out the latest version for each and fix the version accordingly.
@@ -43,7 +43,7 @@ fn my_handler(mut stream: WebsocketStream<Stream>, _: Arc<()>) {
 If you run this code, the app will start, but all WebSocket connections will be immediately closed after printing their addresses since the handler function immediately returns and thus the stream is dropped. This can be a useful feature of the `WebsocketStream` type, since the client is automatically sent a "close" frame when it is dropped.
 
 ## Testing our WebSocket Handler (optional)
-In production, it is likely that our application would only ever be accessed from a browser. However, during development, it can be useful to connect to the server from a terminal with a tool like netcat for debugging. We'll use [`websocat`] for this, which is a simple Rust CLI to do exactly this. It can be installed with `cargo install websocat`.
+In production, it is likely that our application would only ever be accessed from a browser. However, during development, it can be useful to connect to the server from a terminal with a tool like netcat for debugging. We'll use [`websocat`](https://github.com/vi/websocat) for this, which is a simple Rust CLI to do exactly this. It can be installed with `cargo install websocat`.
 
 Let's connect to our server.
 
@@ -127,4 +127,4 @@ When the client first connects, we use the `Message::new` constructor to create 
 You can now use `websocat` again to test your code.
 
 ## Conclusion
-In this chapter, we've learnt about sending and receiving WebSocket messages within a Humphrey application. Next, let's look at the [Broadcasting Messages](broadcasting-messages.md) chapter, which cover how to use non-blocking reads to create a simple broadcast server.
+In this chapter, we've learnt about sending and receiving WebSocket messages within a Humphrey application. Next, let's look at the [Broadcasting Messages](broadcasting-messages.md) chapter, which covers how to use non-blocking reads to create a simple broadcast server.

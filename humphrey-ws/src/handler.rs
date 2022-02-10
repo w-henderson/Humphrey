@@ -11,7 +11,8 @@ use humphrey::http::{Request, Response, StatusCode};
 use humphrey::stream::Stream;
 
 use std::io::Write;
-use std::sync::Arc;
+use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex};
 
 /// Represents a function able to handle WebSocket streams.
 pub trait WebsocketHandler<S>: Fn(WebsocketStream<Stream>, Arc<S>) + Send + Sync {}
@@ -48,6 +49,58 @@ where
     move |request: Request, mut stream: Stream, state: Arc<S>| {
         if handshake(request, &mut stream).is_ok() {
             handler(WebsocketStream::new(stream), state);
+        }
+    }
+}
+
+/// Provides asynchronous WebSocket functionality.
+/// Supply a hook to an asynchronous WebSocket app to handle the subsequent messages.
+///
+/// It is important to note that, unless you need to modify the underlying Humphrey application, it is
+///   easier to simply create a regular app with `AsyncWebsocketApp::new()` which manages the Humphrey
+///   application internally.
+///
+/// ## Example
+/// ```
+/// use humphrey::App;
+/// use humphrey_ws::async_app::{AsyncStream, AsyncWebsocketApp};
+/// use humphrey_ws::handler::async_websocket_handler;
+/// use humphrey_ws::message::Message;
+///
+/// use std::sync::Arc;
+/// use std::thread::spawn;
+///
+/// fn main() {
+///     let websocket_app: AsyncWebsocketApp<()> =
+///         AsyncWebsocketApp::new_unlinked().with_message_handler(message_handler);
+///
+///     let humphrey_app: App<()> = App::new()
+///         .with_websocket_route("/ws", async_websocket_handler(websocket_app.connect_hook().unwrap()));
+///
+///     spawn(move || humphrey_app.run("0.0.0.0:80").unwrap());
+///
+///     websocket_app.run();
+/// }
+///
+/// fn message_handler(stream: AsyncStream, message: Message, _: Arc<()>) {
+///     println!(
+///         "{}: Message received: {}",
+///         stream.peer_addr(),
+///         message.text().unwrap().trim()
+///     );
+///
+///     stream.send(Message::new("Message received!"));
+/// }
+/// ```
+pub fn async_websocket_handler<S>(
+    hook: Arc<Mutex<Sender<WebsocketStream<Stream>>>>,
+) -> impl Fn(Request, Stream, Arc<S>) {
+    move |request: Request, mut stream: Stream, _: Arc<S>| {
+        if handshake(request, &mut stream).is_ok() {
+            hook.lock()
+                .unwrap()
+                .send(WebsocketStream::new(stream))
+                .unwrap();
         }
     }
 }
