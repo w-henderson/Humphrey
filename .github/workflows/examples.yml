@@ -25,6 +25,12 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Check async WebSocket example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/async-websocket/Cargo.toml
+
       - name: Check auth example
         uses: actions-rs/cargo@v1
         with:
