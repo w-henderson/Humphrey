@@ -1,0 +1,45 @@
+div.App {
+  width: 1350px;
+  height: 800px;
+  max-width: calc(100% - 48px);
+  max-height: calc(100% - 48px);
+  background-color: var(--accent-light);
+  border-radius: 4px;
+  box-shadow: var(--shadow-wide);
+  overflow: hidden;
+
+  display: grid;
+  grid-template-columns: 30% 70%;
+  grid-template-rows: 72px 1fr;
+
+  border: 1px solid var(--accent-lightest);
+
+  animation: fade-in 500ms ease;
+
+  @media only screen and (max-width: 600px) {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    max-width: 100%;
+  }
+
+  &.leftColumn { grid-template-columns: 100% 0%; }
+  &.rightColumn { grid-template-columns: 0% 100%; }
+}
+
+div.SignIn {
+  animation: fade-in 500ms ease;
+
+  img {
+    display: block;
+    width: 250px;
+    margin-top: 10px;
+    filter: drop-shadow(var(--shadow-wide));
+    cursor: pointer;
+    transition: filter 100ms;
+
+    &:active {
+      filter: drop-shadow(var(--shadow-wide)) contrast(80%);
+    }
+  }
+}
