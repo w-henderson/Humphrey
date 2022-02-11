@@ -1,26 +1,20 @@
 import { Component } from "react";
 import "../styles/Messages.scss";
-import Message, { MessageType } from "./Message";
+import Message, { MessageProps, MessageType } from "./Message";
 
-export class Messages extends Component {
+interface MessagesProps {
+  messages: MessageProps[],
+}
+
+export class Messages extends Component<MessagesProps> {
   render() {
     return (
       <div className="Messages">
-        <Message
-          message="Hello, world!"
-          sender="Humphrey"
-          timestamp={1234567890123}
-          type={MessageType.Broadcast} />
-        <Message
-          message="Hello, world!"
-          sender="Humphrey"
-          timestamp={1234567890123}
-          type={MessageType.Remote} />
-        <Message
-          message="Hello, world!"
-          sender="Humphrey"
-          timestamp={1234567890123}
-          type={MessageType.Local} />
+        {this.props.messages.map((message, index) =>
+          <Message
+            key={index}
+            {...message} />
+        )}
       </div>
     )
   }

@@ -1,5 +1,5 @@
 div.Messages {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
 }

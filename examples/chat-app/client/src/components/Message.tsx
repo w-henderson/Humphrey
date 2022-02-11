@@ -2,7 +2,7 @@ import { Component } from "react";
 import humanize from "../DateHumanizer";
 import "../styles/Message.scss";
 
-interface MessageProps {
+export interface MessageProps {
   message: string,
   sender: string,
   type: MessageType,

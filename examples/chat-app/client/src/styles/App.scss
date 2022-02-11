@@ -27,20 +27,3 @@ div.App {
   &.leftColumn { grid-template-columns: 100% 0%; }
   &.rightColumn { grid-template-columns: 0% 100%; }
 }
-
-div.SignIn {
-  animation: fade-in 500ms ease;
-
-  img {
-    display: block;
-    width: 250px;
-    margin-top: 10px;
-    filter: drop-shadow(var(--shadow-wide));
-    cursor: pointer;
-    transition: filter 100ms;
-
-    &:active {
-      filter: drop-shadow(var(--shadow-wide)) contrast(80%);
-    }
-  }
-}
