@@ -18,7 +18,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, RwLock};
 use std::thread::spawn;
 
-static NEXT_UID: AtomicUsize = AtomicUsize::new(0);
+static NEXT_UID: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Default)]
 pub struct State {
@@ -61,6 +61,7 @@ fn connect_handler(stream: AsyncStream, state: Arc<State>) {
         loaded: false,
     };
 
+    stream.send(Message::new_binary(user.id.to_be_bytes()));
     state.set_user(stream.peer_addr(), user);
 }
 
@@ -71,7 +72,8 @@ fn disconnect_handler(stream: AsyncStream, state: Arc<State>) {
 
     let broadcast = BroadcastMessage {
         message: format!("{} has left the chat", user.name),
-        sender: None,
+        sender_id: 0,
+        sender_name: None,
     };
 
     stream.broadcast(broadcast.serialise())
@@ -83,7 +85,8 @@ fn message_handler(stream: AsyncStream, message: Message, state: Arc<State>) {
     if user.loaded {
         let broadcast = BroadcastMessage {
             message: message.text().unwrap().to_string(),
-            sender: Some(user.name),
+            sender_id: user.id,
+            sender_name: Some(user.name),
         };
 
         stream.broadcast(broadcast.serialise());
@@ -95,7 +98,8 @@ fn message_handler(stream: AsyncStream, message: Message, state: Arc<State>) {
 
         let broadcast = BroadcastMessage {
             message: format!("{} has joined the chat", message.text().unwrap()),
-            sender: None,
+            sender_id: 0,
+            sender_name: None,
         };
 
         stream.broadcast(broadcast.serialise());
