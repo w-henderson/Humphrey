@@ -1,1 +1,5 @@
-div.Messages {}
+div.Messages {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

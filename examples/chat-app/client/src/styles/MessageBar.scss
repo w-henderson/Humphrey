@@ -5,6 +5,9 @@ div.MessageBar {
   display: flex;
   place-items: center;
 
+  grid-row-start: 3;
+  grid-row-end: 4;
+
   width: 100%;
   height: 72px;
   padding: 12px;

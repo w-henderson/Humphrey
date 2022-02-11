@@ -19,3 +19,9 @@ div.Participants {
     }
   }
 }
+
+@media only screen and (max-width: 600px) {
+  div.Participants {
+    display: none;
+  }
+}

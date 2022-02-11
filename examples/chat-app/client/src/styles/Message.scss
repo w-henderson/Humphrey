@@ -1,4 +1,4 @@
-div.Message {
+div.Message:not(.broadcast) {
   margin: 20px;
   text-align: right;
   
@@ -20,17 +20,6 @@ div.Message {
     font-weight: 200;
   }
 
-  i {
-    cursor: unset;
-    vertical-align: bottom;
-    display: inline-block;
-    margin: 0 4px -4px 0;
-    line-height: 100%;
-    &:hover { opacity: 0.4 !important; }
-
-    &.bi-check { color: var(--text); }
-  }
-
   &.senderRemote {
     text-align: left;
 
@@ -38,5 +27,31 @@ div.Message {
       border-radius: 15px 15px 15px 0;
       background-color: var(--light);
     }
+
+    div.messageSender {
+      opacity: 0.5;
+      font-size: 0.8em;
+    }
+  }
+}
+
+div.Message.broadcast {
+  margin: 20px auto;
+  padding: 8px;
+  max-width: 80%;
+  min-width: 50%;
+  
+  background-color: var(--light);
+  border-radius: 16px;
+  text-align: center;
+
+  display: flex;
+  flex-direction: column;
+  animation: pop-up 500ms ease;
+
+  div.messageTime {
+    opacity: 0.5;
+    margin-right: 16px;
+    font-size: 0.8em;
   }
 }

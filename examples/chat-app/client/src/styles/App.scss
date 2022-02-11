@@ -21,6 +21,7 @@ div.App {
     height: 100%;
     max-height: 100%;
     max-width: 100%;
+    grid-template-columns: 1fr;
   }
 
   &.leftColumn { grid-template-columns: 100% 0%; }
