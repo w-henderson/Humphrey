@@ -1,0 +1,21 @@
+div.Participants {
+  background-color: var(--mid);
+  border-left: 1px solid var(--border);
+  grid-column-start: 2;
+  grid-column-end: 3;
+  grid-row-start: 2;
+  grid-row-end: 4;
+
+  padding: 0 24px;
+
+  div.container {
+    div {
+      margin-bottom: 12px;
+      font-size: 18px;
+      
+      span {
+        margin-left: 12px;
+      }
+    }
+  }
+}

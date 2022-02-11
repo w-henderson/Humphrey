@@ -3,16 +3,16 @@ div.App {
   height: 800px;
   max-width: calc(100% - 48px);
   max-height: calc(100% - 48px);
-  background-color: var(--accent-light);
+  background-color: var(--lightest);
   border-radius: 4px;
   box-shadow: var(--shadow-wide);
   overflow: hidden;
 
   display: grid;
-  grid-template-columns: 30% 70%;
-  grid-template-rows: 72px 1fr;
+  grid-template-columns: 1fr max(200px, 25%);
+  grid-template-rows: 72px 1fr 72px;
 
-  border: 1px solid var(--accent-lightest);
+  border: 1px solid var(--border);
 
   animation: fade-in 500ms ease;
 

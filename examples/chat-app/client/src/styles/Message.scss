@@ -1,0 +1,42 @@
+div.Message {
+  margin: 20px;
+  text-align: right;
+  
+  div.messageContent {
+    display: inline-block;
+    background-color: var(--accent-light);
+    border-radius: 15px 15px 0 15px;
+    padding: 10px;
+    max-width: calc(100% - 80px);
+    word-break: break-word;
+    animation: pop-up 500ms ease;
+  }
+
+  div.messageTime {
+    display: inline-block;
+    margin: 0 4px;
+    vertical-align: bottom;
+    opacity: 0.8;
+    font-weight: 200;
+  }
+
+  i {
+    cursor: unset;
+    vertical-align: bottom;
+    display: inline-block;
+    margin: 0 4px -4px 0;
+    line-height: 100%;
+    &:hover { opacity: 0.4 !important; }
+
+    &.bi-check { color: var(--text); }
+  }
+
+  &.senderRemote {
+    text-align: left;
+
+    div.messageContent {
+      border-radius: 15px 15px 15px 0;
+      background-color: var(--light);
+    }
+  }
+}

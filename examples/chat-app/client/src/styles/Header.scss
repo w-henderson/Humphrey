@@ -1,0 +1,11 @@
+div.Header {
+  width: 100%;
+  background-color: var(--light);
+  border-bottom: 1px solid var(--border);
+  grid-column-start: 1;
+  grid-column-end: 3;
+
+  display: flex;
+  place-items: center;
+  padding-left: 32px;
+}
