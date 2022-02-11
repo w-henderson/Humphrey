@@ -29,6 +29,7 @@ class SignUp extends Component<SignUpProps, SignUpState> {
             type="text"
             placeholder="Choose a username"
             value={this.state.username}
+            onKeyDown={(e) => { if (e.key === "Enter") this.props.onSignUp(this.state.username) }}
             onChange={(e) => this.setState({ username: e.target.value })} />
 
           <input

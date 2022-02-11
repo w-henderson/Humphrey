@@ -37,6 +37,7 @@ export class App extends Component<{}, AppState> {
     this.connect = this.connect.bind(this);
     this.recvId = this.recvId.bind(this);
     this.recvMessage = this.recvMessage.bind(this);
+    this.sendMessage = this.sendMessage.bind(this);
   }
 
   connect(username: string) {
@@ -92,6 +93,10 @@ export class App extends Component<{}, AppState> {
     this.setState({ messages });
   }
 
+  sendMessage(message: string) {
+    this.ws!.send(message);
+  }
+
   render() {
     if (this.state.phase === AppPhase.SignUp || this.state.phase === AppPhase.Connecting) {
       return <SignUp
@@ -103,7 +108,7 @@ export class App extends Component<{}, AppState> {
           <Header />
           <Messages messages={this.state.messages} />
           <Participants />
-          <MessageBar />
+          <MessageBar onSendMessage={this.sendMessage} />
         </div>
       )
     }
