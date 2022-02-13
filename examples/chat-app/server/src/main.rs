@@ -1,7 +1,7 @@
 mod serialise;
 mod user;
 
-use crate::serialise::BroadcastMessage;
+use crate::serialise::{BroadcastMessage, ParticipantUpdateMessage, SerialisableMessage};
 use crate::user::{User, UserManager};
 
 use humphrey::handlers::serve_dir;
@@ -62,6 +62,7 @@ fn connect_handler(stream: AsyncStream, state: Arc<State>) {
     };
 
     stream.send(Message::new_binary(user.id.to_be_bytes()));
+
     state.set_user(stream.peer_addr(), user);
 }
 
@@ -76,7 +77,13 @@ fn disconnect_handler(stream: AsyncStream, state: Arc<State>) {
         sender_name: None,
     };
 
-    stream.broadcast(broadcast.serialise())
+    stream.broadcast(broadcast.serialise());
+
+    let update = ParticipantUpdateMessage {
+        participants: state.list_users(),
+    };
+
+    stream.broadcast(update.serialise());
 }
 
 fn message_handler(stream: AsyncStream, message: Message, state: Arc<State>) {
@@ -103,5 +110,11 @@ fn message_handler(stream: AsyncStream, message: Message, state: Arc<State>) {
         };
 
         stream.broadcast(broadcast.serialise());
+
+        let update = ParticipantUpdateMessage {
+            participants: state.list_users(),
+        };
+
+        stream.broadcast(update.serialise());
     };
 }
