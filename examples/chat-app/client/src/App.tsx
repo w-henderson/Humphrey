@@ -11,7 +11,8 @@ import { MessageProps, MessageType } from "./components/Message";
 interface AppState {
   id: number | null,
   phase: AppPhase,
-  messages: MessageProps[]
+  messages: MessageProps[],
+  participants: string[] | null,
 }
 
 enum AppPhase {
@@ -31,12 +32,15 @@ export class App extends Component<{}, AppState> {
     this.state = {
       id: null,
       phase: AppPhase.SignUp,
-      messages: []
+      messages: [],
+      participants: null
     }
 
     this.connect = this.connect.bind(this);
     this.recvId = this.recvId.bind(this);
     this.recvMessage = this.recvMessage.bind(this);
+    this.recvChatMessage = this.recvChatMessage.bind(this);
+    this.recvParticipantUpdateMessage = this.recvParticipantUpdateMessage.bind(this);
     this.sendMessage = this.sendMessage.bind(this);
   }
 
@@ -58,8 +62,16 @@ export class App extends Component<{}, AppState> {
   }
 
   async recvMessage(e: MessageEvent) {
-    let buf = await e.data.arrayBuffer();
+    let buf: ArrayBuffer = await e.data.arrayBuffer();
 
+    let typeView = new DataView(buf, 0, 1);
+    let messageType = typeView.getUint8(0);
+
+    if (messageType === 0) this.recvChatMessage(buf.slice(1));
+    else if (messageType === 1) this.recvParticipantUpdateMessage(buf.slice(1));
+  }
+
+  recvChatMessage(buf: ArrayBuffer) {
     let messageLengthView = new DataView(buf, 4, 4);
     let messageLength = messageLengthView.getUint32(0, false);
     let messageView = Array.from(new Uint8Array(buf, 8, messageLength));
@@ -93,6 +105,16 @@ export class App extends Component<{}, AppState> {
     this.setState({ messages });
   }
 
+  recvParticipantUpdateMessage(buf: ArrayBuffer) {
+    let participantsLengthView = new DataView(buf, 4, 4);
+    let participantsLength = participantsLengthView.getUint32(0, false);
+
+    let participantsView = Array.from(new Uint8Array(buf, 8, participantsLength - 1));
+    let participants = String.fromCharCode(...participantsView).split("\n");
+
+    this.setState({ participants });
+  }
+
   sendMessage(message: string) {
     this.ws!.send(message);
   }
@@ -107,7 +129,7 @@ export class App extends Component<{}, AppState> {
         <div className="App">
           <Header />
           <Messages messages={this.state.messages} />
-          <Participants />
+          <Participants participants={this.state.participants} />
           <MessageBar onSendMessage={this.sendMessage} />
         </div>
       )
