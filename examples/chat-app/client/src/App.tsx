@@ -47,7 +47,10 @@ export class App extends Component<{}, AppState> {
   connect(username: string) {
     this.setState({ phase: AppPhase.Connecting });
 
-    this.ws = new WebSocket("ws://localhost/ws");
+    let websocketAddr = (window.location.protocol === "https:" ? "wss" : "ws")
+      + `://${window.location.host}/ws`;
+
+    this.ws = new WebSocket(websocketAddr);
     this.ws.onmessage = e => this.recvId(e, username);
   }
 
