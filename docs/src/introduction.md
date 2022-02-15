@@ -24,5 +24,5 @@ This book is up-to-date with the following crate versions.
 | ----- | ------- |
 | Humphrey Core | 0.5.0 |
 | Humphrey Server | 0.5.0 |
-| Humphrey WebSocket | 0.2.1 |
+| Humphrey WebSocket | 0.3.0 |
 | Humphrey Auth | 0.1.3 |
