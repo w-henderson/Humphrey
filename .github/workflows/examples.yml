@@ -49,6 +49,12 @@ jobs:
           command: check
           args: --manifest-path examples/broadcast/Cargo.toml
 
+      - name: Check chat app example
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/chat-app/server/Cargo.toml
+
       - name: Check database example
         uses: actions-rs/cargo@v1
         with:
