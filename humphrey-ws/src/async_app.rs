@@ -431,7 +431,6 @@ impl AsyncStream {
 
     /// Broadcast a message to all connected clients.
     pub fn broadcast(&self, message: Message) {
-        assert!(self.connected);
         self.sender
             .send(OutgoingMessage::Broadcast(message))
             .unwrap();
