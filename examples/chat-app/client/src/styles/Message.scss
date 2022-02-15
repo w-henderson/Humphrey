@@ -1,0 +1,57 @@
+div.Message:not(.broadcast) {
+  margin: 10px 20px;
+  text-align: right;
+  
+  div.messageContent {
+    display: inline-block;
+    background-color: var(--accent-light);
+    border-radius: 15px 15px 0 15px;
+    padding: 10px;
+    max-width: calc(100% - 80px);
+    word-break: break-word;
+    animation: pop-up 500ms ease;
+  }
+
+  div.messageTime {
+    display: inline-block;
+    margin: 0 4px;
+    vertical-align: bottom;
+    opacity: 0.8;
+    font-weight: 200;
+  }
+
+  &.senderRemote {
+    text-align: left;
+
+    div.messageContent {
+      border-radius: 15px 15px 15px 0;
+      background-color: var(--light);
+    }
+
+    div.messageSender {
+      opacity: 0.5;
+      font-size: 0.8em;
+    }
+  }
+}
+
+div.Message.broadcast {
+  margin: 20px auto;
+  padding: 8px;
+  max-width: 80%;
+  min-width: 50%;
+  
+  background-color: var(--light);
+  border-radius: 16px;
+  text-align: center;
+
+  display: flex;
+  flex-direction: column;
+  animation: pop-up 500ms ease;
+
+  div.messageTime {
+    opacity: 0.5;
+    margin-right: 16px;
+    font-size: 0.8em;
+  }
+}
