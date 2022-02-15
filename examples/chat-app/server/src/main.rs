@@ -31,7 +31,11 @@ fn main() {
         .with_connect_handler(connect_handler)
         .with_disconnect_handler(disconnect_handler);
 
-    let client_dir: &'static str = Box::leak(Box::new(
+    let mut args = std::env::args();
+
+    let client_dir: &'static str = Box::leak(Box::new(if let Some(path) = args.nth(1) {
+        path
+    } else {
         PathBuf::new()
             .join(env!("CARGO_MANIFEST_DIR"))
             .parent()
@@ -39,8 +43,8 @@ fn main() {
             .join("client")
             .join("build")
             .to_string_lossy()
-            .to_string(),
-    ));
+            .to_string()
+    }));
 
     let humphrey_app: App<()> = App::new()
         .with_path_aware_route("/*", serve_dir(client_dir))
