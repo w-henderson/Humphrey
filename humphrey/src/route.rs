@@ -4,6 +4,7 @@ use crate::app::{
     PathAwareRequestHandler, RequestHandler, StatelessRequestHandler, WebsocketHandler,
 };
 use crate::krauss;
+use crate::percent::PercentDecode;
 
 use std::fs::metadata;
 use std::path::PathBuf;
@@ -138,6 +139,8 @@ pub fn try_find_path(
     request_path: &str,
     index_files: &[&str],
 ) -> Option<LocatedPath> {
+    let request_path = String::from_utf8(request_path.percent_decode()?).ok()?;
+
     // Avoid path traversal exploits
     if request_path.contains("..") || request_path.contains(':') {
         return None;
