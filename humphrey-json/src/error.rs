@@ -10,7 +10,7 @@ pub enum ParseError {
     TrailingComma,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TracebackError {
     pub(crate) line: usize,
     pub(crate) column: usize,

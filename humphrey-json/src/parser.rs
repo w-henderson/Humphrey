@@ -18,6 +18,8 @@ struct Parser<'a> {
     chars: Peekable<Chars<'a>>,
     line: usize,
     column: usize,
+    next_line: usize,
+    next_column: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -26,16 +28,21 @@ impl<'a> Parser<'a> {
             chars: chars.peekable(),
             line: 1,
             column: 1,
+            next_line: 1,
+            next_column: 1,
         }
     }
 
     fn next(&mut self) -> Result<char, TracebackError> {
         if let Some(c) = self.chars.next() {
+            self.line = self.next_line;
+            self.column = self.next_column;
+
             if c == '\n' {
-                self.line += 1;
-                self.column = 1;
+                self.next_line += 1;
+                self.next_column = 0;
             } else {
-                self.column += 1;
+                self.next_column += 1;
             }
 
             return Ok(c);
