@@ -3,6 +3,19 @@ use crate::Value;
 use super::hashmap_helper::to_object;
 
 #[test]
+fn test_simple_object() {
+    let string = r#"{"asd":"sdf", "dfg":"fgh"}"#;
+    let value = Value::parse(string).unwrap();
+
+    let expected_value = Value::Object(to_object(vec![
+        ("asd", Value::String("sdf".into())),
+        ("dfg", Value::String("fgh".into())),
+    ]));
+
+    assert_eq!(value, expected_value);
+}
+
+#[test]
 fn test_object() {
     let string = include_str!("./testcases/object.json");
     let value = Value::parse(string).unwrap();

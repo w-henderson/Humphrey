@@ -171,6 +171,8 @@ impl<'a> Parser<'a> {
                     if object.is_empty() {
                         return Err(self.traceback(ParseError::InvalidToken));
                     }
+
+                    self.next()?;
                 }
                 Some(_) => {
                     trailing_comma = false;
@@ -193,8 +195,6 @@ impl<'a> Parser<'a> {
                 }
                 None => return Err(self.traceback(ParseError::UnexpectedEOF)),
             }
-
-            self.next()?;
         }
 
         self.next()?;
