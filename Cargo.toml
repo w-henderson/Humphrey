@@ -2,6 +2,7 @@
 members = [
   "humphrey",
   "humphrey-auth",
+  "humphrey-json",
   "humphrey-server",
   "humphrey-ws"
 ]
