@@ -174,7 +174,11 @@ impl<'a> Parser<'a> {
                 }
                 Some(_) => {
                     trailing_comma = false;
-                    self.next()?;
+                    let string_start = self.next()?;
+                    quiet_assert(
+                        string_start == '"',
+                        self.traceback(ParseError::InvalidToken),
+                    )?;
 
                     let key = self.parse_string()?.as_str().unwrap().to_string();
                     self.flush_whitespace();
