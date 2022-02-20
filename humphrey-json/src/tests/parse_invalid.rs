@@ -70,3 +70,17 @@ fn test_trailing_garbage() {
 
     assert_eq!(error, expected_error);
 }
+
+#[test]
+fn test_invalid_char() {
+    let string = "\"value\u{0}\"";
+    let error = Value::parse(string).unwrap_err();
+
+    let expected_error = TracebackError {
+        line: 1,
+        column: 7,
+        kind: ParseError::InvalidToken,
+    };
+
+    assert_eq!(error, expected_error);
+}

@@ -130,7 +130,10 @@ impl<'a> Parser<'a> {
             } else if c == '"' {
                 break;
             } else {
-                string.push(c);
+                match c as u32 {
+                    0x20..=0x21 | 0x23..=0x5b | 0x5d..=0x10ffff => string.push(c),
+                    _ => return Err(self.traceback(ParseError::InvalidToken)),
+                }
             }
         }
 
