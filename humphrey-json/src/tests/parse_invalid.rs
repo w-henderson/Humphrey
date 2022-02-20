@@ -56,3 +56,17 @@ fn test_invalid_escape_sequence() {
 
     assert_eq!(error, expected_error);
 }
+
+#[test]
+fn test_trailing_garbage() {
+    let string = "\"value\" garbage";
+    let error = Value::parse(string).unwrap_err();
+
+    let expected_error = TracebackError {
+        line: 1,
+        column: 8,
+        kind: ParseError::InvalidToken,
+    };
+
+    assert_eq!(error, expected_error);
+}

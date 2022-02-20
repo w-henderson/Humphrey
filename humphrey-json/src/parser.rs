@@ -10,7 +10,10 @@ impl Value {
     pub fn parse(s: impl AsRef<str>) -> Result<Self, TracebackError> {
         let chars = s.as_ref().chars();
         let mut parser = Parser::new(chars);
-        parser.parse_value()
+        let value = parser.parse_value()?;
+        parser.expect_eof()?;
+
+        Ok(value)
     }
 }
 
@@ -218,6 +221,15 @@ impl<'a> Parser<'a> {
                     .parse()
                     .map_err(|_| self.traceback(ParseError::InvalidToken))?,
             )),
+        }
+    }
+
+    fn expect_eof(&mut self) -> Result<(), TracebackError> {
+        self.flush_whitespace();
+
+        match self.chars.peek() {
+            Some(_) => Err(self.traceback(ParseError::InvalidToken)),
+            None => Ok(()),
         }
     }
 
