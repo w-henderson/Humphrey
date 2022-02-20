@@ -84,3 +84,17 @@ fn test_invalid_char() {
 
     assert_eq!(error, expected_error);
 }
+
+#[test]
+fn test_two_commas() {
+    let string = r#"{"a":"b",,"c":"d"}"#;
+    let error = Value::parse(string).unwrap_err();
+
+    let expected_error = TracebackError {
+        line: 1,
+        column: 9,
+        kind: ParseError::InvalidToken,
+    };
+
+    assert_eq!(error, expected_error);
+}

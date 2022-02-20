@@ -191,13 +191,17 @@ impl<'a> Parser<'a> {
                     }
                 }
                 Some(&',') => {
-                    trailing_comma = true;
-
-                    if object.is_empty() {
+                    if trailing_comma {
                         return Err(self.traceback(ParseError::InvalidToken));
-                    }
+                    } else {
+                        trailing_comma = true;
 
-                    self.next()?;
+                        if object.is_empty() {
+                            return Err(self.traceback(ParseError::InvalidToken));
+                        }
+
+                        self.next()?;
+                    }
                 }
                 Some(_) => {
                     trailing_comma = false;
