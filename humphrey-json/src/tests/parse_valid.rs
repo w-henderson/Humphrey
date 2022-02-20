@@ -130,3 +130,12 @@ fn test_escape_sequence() {
     let expected_value = Value::String("Hello, world!\n".into());
     assert_eq!(value, expected_value);
 }
+
+#[test]
+fn test_four_byte_unicode_value() {
+    let string = "\"\\ud83d\\ude02\"";
+    let value = Value::parse(string).unwrap();
+
+    let expected_value = Value::String("😂".into());
+    assert_eq!(value, expected_value);
+}

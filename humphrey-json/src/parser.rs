@@ -95,10 +95,29 @@ impl<'a> Parser<'a> {
                         let hex: String = [self.next()?, self.next()?, self.next()?, self.next()?]
                             .iter()
                             .collect();
-                        let code = u32::from_str_radix(&hex, 16)
+                        let code = u16::from_str_radix(&hex, 16)
                             .map_err(|_| self.traceback(ParseError::InvalidEscapeSequence))?;
-                        let new_char = char::from_u32(code)
-                            .ok_or_else(|| self.traceback(ParseError::InvalidEscapeSequence))?;
+
+                        let new_char = if let Some(new_char) = char::from_u32(code as u32) {
+                            new_char
+                        } else {
+                            quiet_assert(
+                                self.next()? == '\\' && self.next()? == 'u',
+                                self.traceback(ParseError::InvalidEscapeSequence),
+                            )?;
+
+                            let hex: String =
+                                [self.next()?, self.next()?, self.next()?, self.next()?]
+                                    .iter()
+                                    .collect();
+                            let code_2 = u16::from_str_radix(&hex, 16)
+                                .map_err(|_| self.traceback(ParseError::InvalidEscapeSequence))?;
+
+                            char::decode_utf16([code, code_2])
+                                .next()
+                                .ok_or_else(|| self.traceback(ParseError::InvalidEscapeSequence))?
+                                .map_err(|_| self.traceback(ParseError::InvalidEscapeSequence))?
+                        };
 
                         string.push(new_char);
                     }
