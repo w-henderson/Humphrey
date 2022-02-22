@@ -39,6 +39,18 @@ impl IntoJson for &str {
     }
 }
 
+impl<T> IntoJson for Option<T>
+where
+    T: IntoJson,
+{
+    fn to_json(&self) -> Value {
+        match self {
+            Some(v) => v.to_json(),
+            None => Value::Null,
+        }
+    }
+}
+
 macro_rules! impl_into_json_for_number {
     ($($t:ty),*) => {
         $(
