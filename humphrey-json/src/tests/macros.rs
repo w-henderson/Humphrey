@@ -1,7 +1,5 @@
 use crate::{json, Value};
 
-use super::hashmap_helper::to_object;
-
 #[test]
 fn test_macro_object() {
     let value = json!({
@@ -89,12 +87,12 @@ fn test_macro_embedded_variables() {
         "none": embedded_none
     });
 
-    let expected_value = Value::Object(to_object(vec![
-        ("string", Value::String("Hello, world!".into())),
-        ("number", Value::Number(1234.0)),
-        ("some", Value::String("value".into())),
-        ("none", Value::Null),
-    ]));
+    let expected_value = Value::Object(vec![
+        ("string".into(), Value::String("Hello, world!".into())),
+        ("number".into(), Value::Number(1234.0)),
+        ("some".into(), Value::String("value".into())),
+        ("none".into(), Value::Null),
+    ]);
 
     assert_eq!(value, expected_value);
 }

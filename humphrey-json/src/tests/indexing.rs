@@ -1,7 +1,5 @@
 use crate::Value;
 
-use super::hashmap_helper::to_object;
-
 #[test]
 fn test_index_object() {
     let string = include_str!("./testcases/object.json");
@@ -26,11 +24,11 @@ fn test_index_array() {
 
     assert_eq!(
         value[0],
-        Value::Object(to_object(vec![
-            ("name", Value::String("w-henderson".into())),
-            ("favouriteNumber", Value::Number(1.414)),
-            ("online", Value::Bool(true)),
-        ]))
+        Value::Object(vec![
+            ("name".into(), Value::String("w-henderson".into())),
+            ("favouriteNumber".into(), Value::Number(1.414)),
+            ("online".into(), Value::Bool(true)),
+        ])
     );
 }
 

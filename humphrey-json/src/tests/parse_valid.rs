@@ -1,16 +1,14 @@
 use crate::Value;
 
-use super::hashmap_helper::to_object;
-
 #[test]
 fn test_simple_object() {
     let string = r#"{"asd":"sdf", "dfg":"fgh"}"#;
     let value = Value::parse(string).unwrap();
 
-    let expected_value = Value::Object(to_object(vec![
-        ("asd", Value::String("sdf".into())),
-        ("dfg", Value::String("fgh".into())),
-    ]));
+    let expected_value = Value::Object(vec![
+        ("asd".into(), Value::String("sdf".into())),
+        ("dfg".into(), Value::String("fgh".into())),
+    ]);
 
     assert_eq!(value, expected_value);
 }
@@ -20,27 +18,27 @@ fn test_object() {
     let string = include_str!("./testcases/object.json");
     let value = Value::parse(string).unwrap();
 
-    let expected_value = Value::Object(to_object(vec![
-        ("name", Value::String("William Henderson".into())),
-        ("favouriteNumber", Value::Number(1.414)),
+    let expected_value = Value::Object(vec![
+        ("name".into(), Value::String("William Henderson".into())),
+        ("favouriteNumber".into(), Value::Number(1.414)),
         (
-            "languages",
+            "languages".into(),
             Value::Array(vec![
                 Value::String("Rust".into()),
                 Value::String("TypeScript".into()),
                 Value::Number(1234.0),
                 Value::Bool(false),
-                Value::Object(to_object(vec![
-                    ("name", Value::String("Python".into())),
-                    ("version", Value::Number(3.6)),
-                ])),
+                Value::Object(vec![
+                    ("name".into(), Value::String("Python".into())),
+                    ("version".into(), Value::Number(3.6)),
+                ]),
             ]),
         ),
-        ("weaknesses", Value::Array(vec![])),
-        ("funnyName", Value::Object(to_object(vec![]))),
-        ("online", Value::Bool(true)),
-        ("life", Value::Null),
-    ]));
+        ("weaknesses".into(), Value::Array(vec![])),
+        ("funnyName".into(), Value::Object(vec![])),
+        ("online".into(), Value::Bool(true)),
+        ("life".into(), Value::Null),
+    ]);
 
     assert_eq!(value, expected_value);
 }
@@ -51,16 +49,16 @@ fn test_array() {
     let value = Value::parse(string).unwrap();
 
     let expected_value = Value::Array(vec![
-        Value::Object(to_object(vec![
-            ("name", Value::String("w-henderson".into())),
-            ("favouriteNumber", Value::Number(1.414)),
-            ("online", Value::Bool(true)),
-        ])),
-        Value::Object(to_object(vec![
-            ("name", Value::String("flauntingspade4".into())),
-            ("favouriteNumber", Value::Number(69.0)),
-            ("online", Value::Bool(false)),
-        ])),
+        Value::Object(vec![
+            ("name".into(), Value::String("w-henderson".into())),
+            ("favouriteNumber".into(), Value::Number(1.414)),
+            ("online".into(), Value::Bool(true)),
+        ]),
+        Value::Object(vec![
+            ("name".into(), Value::String("flauntingspade4".into())),
+            ("favouriteNumber".into(), Value::Number(69.0)),
+            ("online".into(), Value::Bool(false)),
+        ]),
     ]);
 
     assert_eq!(value, expected_value);
@@ -116,7 +114,7 @@ fn test_whitespace() {
         Value::String("whitespace".into()),
         Value::Number(1234.0),
         Value::Bool(true),
-        Value::Object(to_object(vec![])),
+        Value::Object(vec![]),
     ]);
 
     assert_eq!(value, expected_value);

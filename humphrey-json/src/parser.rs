@@ -4,7 +4,6 @@ use crate::error::{ParseError, TracebackError};
 use crate::Value;
 
 use std::borrow::Borrow;
-use std::collections::HashMap;
 use std::iter::Peekable;
 use std::str::Chars;
 
@@ -194,7 +193,7 @@ impl<'a> Parser<'a> {
 
     /// Attempt to parse an object from the character stream.
     fn parse_object(&mut self) -> Result<Value, TracebackError> {
-        let mut object = HashMap::new();
+        let mut object: Vec<(String, Value)> = Vec::new();
         let mut trailing_comma = false;
 
         loop {
@@ -238,7 +237,7 @@ impl<'a> Parser<'a> {
 
                     let value = self.parse_value()?;
 
-                    object.insert(key, value);
+                    object.push((key, value));
                 }
                 None => return Err(self.traceback(ParseError::UnexpectedEOF)),
             }

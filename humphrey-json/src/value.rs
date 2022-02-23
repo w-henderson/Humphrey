@@ -1,6 +1,5 @@
 //! Provides the `Value` struct for interfacing with JSON values.
 
-use std::collections::HashMap;
 use std::ops::Index;
 
 /// Represents a JSON value.
@@ -34,8 +33,8 @@ pub enum Value {
     Array(Vec<Value>),
     /// An object mapping of values.
     ///
-    /// Can be extracted with `as_map()`.
-    Object(HashMap<String, Value>),
+    /// Can be extracted with `as_object()`.
+    Object(Vec<(String, Value)>),
 }
 
 impl Value {
@@ -71,8 +70,8 @@ impl Value {
         }
     }
 
-    /// Returns the encapsulated hash map value, or `None` if it not an object data type.
-    pub fn as_map(&self) -> Option<&HashMap<String, Value>> {
+    /// Returns the encapsulated object value, or `None` if it not an object data type.
+    pub fn as_object(&self) -> Option<&Vec<(String, Value)>> {
         match self {
             Value::Object(o) => Some(o),
             _ => None,
@@ -112,7 +111,7 @@ impl Index<&str> for Value {
 
     fn index(&self, index: &str) -> &Self::Output {
         match self {
-            Self::Object(o) => &o[index],
+            Self::Object(o) => &o.iter().find(|(k, _)| k == index).unwrap().1,
             _ => panic!("Indexing a non-object value with a string index"),
         }
     }

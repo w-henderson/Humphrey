@@ -33,16 +33,12 @@ macro_rules! json {
         $crate::Value::Array(vec![ $( json!($el) ),* ])
     };
     ({}) => {
-        $crate::Value::Object(::std::collections::HashMap::new())
+        $crate::Value::Object(Vec::new())
     };
     ({ $( $k:tt : $v:tt ),* }) => {
-        {
-            let mut map = ::std::collections::HashMap::new();
-            $(
-                map.insert($k.to_string(), json!($v));
-            )*
-            $crate::Value::Object(map)
-        }
+        $crate::Value::Object(vec![
+            $( ($k.to_string(), json!($v)) ),*
+        ])
     };
     ($v:tt) => {
         $crate::Value::from($v)
