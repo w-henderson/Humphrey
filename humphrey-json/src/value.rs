@@ -1,6 +1,6 @@
 //! Provides the `Value` struct for interfacing with JSON values.
 
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 
 /// Represents a JSON value.
 ///
@@ -112,6 +112,24 @@ impl Index<&str> for Value {
     fn index(&self, index: &str) -> &Self::Output {
         match self {
             Self::Object(o) => &o.iter().find(|(k, _)| k == index).unwrap().1,
+            _ => panic!("Indexing a non-object value with a string index"),
+        }
+    }
+}
+
+impl IndexMut<usize> for Value {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        match self {
+            Self::Array(a) => &mut a[index],
+            _ => panic!("Indexing a non-array value with an integer index"),
+        }
+    }
+}
+
+impl IndexMut<&str> for Value {
+    fn index_mut(&mut self, index: &str) -> &mut Self::Output {
+        match self {
+            Self::Object(o) => &mut o.iter_mut().find(|(k, _)| k == index).unwrap().1,
             _ => panic!("Indexing a non-object value with a string index"),
         }
     }

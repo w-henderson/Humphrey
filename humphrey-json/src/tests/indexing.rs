@@ -12,6 +12,14 @@ fn test_index_object() {
         value["languages"][4]["name"],
         Value::String("Python".into())
     );
+
+    let mut value_mut = value;
+
+    value_mut["name"] = json!("Humphrey");
+    value_mut["favouriteNumber"] = json!(1.2E1);
+
+    assert_eq!(value_mut["name"], Value::String("Humphrey".into()));
+    assert_eq!(value_mut["favouriteNumber"], Value::Number(12.0));
 }
 
 #[test]
@@ -28,6 +36,19 @@ fn test_index_array() {
             ("name".into(), Value::String("w-henderson".into())),
             ("favouriteNumber".into(), Value::Number(1.414)),
             ("online".into(), Value::Bool(true)),
+        ])
+    );
+
+    let mut value_mut = value;
+
+    value_mut[0]["online"] = json!(false);
+
+    assert_eq!(
+        value_mut[0],
+        Value::Object(vec![
+            ("name".into(), Value::String("w-henderson".into())),
+            ("favouriteNumber".into(), Value::Number(1.414)),
+            ("online".into(), Value::Bool(false)),
         ])
     );
 }
