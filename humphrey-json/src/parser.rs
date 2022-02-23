@@ -1,3 +1,5 @@
+//! Provides the core JSON-parsing functionality.
+
 use crate::error::{ParseError, TracebackError};
 use crate::Value;
 
@@ -7,6 +9,14 @@ use std::iter::Peekable;
 use std::str::Chars;
 
 impl Value {
+    /// Parse a string into a JSON value.
+    ///
+    /// If unsuccessful, returns a `TracebackError`, giving information about the location of the syntax error within the JSON string.
+    ///
+    /// ## Usage
+    /// ```rs
+    /// let value = Value::parse("[1, 2, 3]");
+    /// ```
     pub fn parse(s: impl AsRef<str>) -> Result<Self, TracebackError> {
         let chars = s.as_ref().chars();
         let mut parser = Parser::new(chars);
@@ -17,6 +27,7 @@ impl Value {
     }
 }
 
+/// Encapsulates the internal state of the parsing process.
 struct Parser<'a> {
     chars: Peekable<Chars<'a>>,
     line: usize,
@@ -26,6 +37,7 @@ struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
+    /// Initialise a new parser.
     fn new(chars: Chars<'a>) -> Self {
         Self {
             chars: chars.peekable(),
@@ -36,6 +48,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Get the next character to be parsed.
     fn next(&mut self) -> Result<char, TracebackError> {
         if let Some(c) = self.chars.next() {
             self.line = self.next_line;
@@ -54,6 +67,7 @@ impl<'a> Parser<'a> {
         Err(self.traceback(ParseError::UnexpectedEOF))
     }
 
+    /// Convert a regular parsing error into a traceback error containing the location of the error.
     fn traceback(&self, e: ParseError) -> TracebackError {
         TracebackError {
             line: self.line,
@@ -62,6 +76,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Attempt to parse a value from the character stream.
     fn parse_value(&mut self) -> Result<Value, TracebackError> {
         self.flush_whitespace();
 
@@ -74,6 +89,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Attempt to parse a string from the character stream.
     fn parse_string(&mut self) -> Result<Value, TracebackError> {
         let mut string = String::new();
         let mut backslash = false;
@@ -140,6 +156,7 @@ impl<'a> Parser<'a> {
         Ok(Value::String(string))
     }
 
+    /// Attempt to parse an array from the character stream.
     fn parse_array(&mut self) -> Result<Value, TracebackError> {
         let mut array: Vec<Value> = Vec::new();
 
@@ -175,6 +192,7 @@ impl<'a> Parser<'a> {
         Ok(Value::Array(array))
     }
 
+    /// Attempt to parse an object from the character stream.
     fn parse_object(&mut self) -> Result<Value, TracebackError> {
         let mut object = HashMap::new();
         let mut trailing_comma = false;
@@ -231,6 +249,7 @@ impl<'a> Parser<'a> {
         Ok(Value::Object(object))
     }
 
+    /// Attempt to parse a literal from the character stream.
     fn parse_literal(&mut self, c: char) -> Result<Value, TracebackError> {
         let mut string = String::from(c);
 
@@ -250,6 +269,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Assert that there are no more characters to be parsed, or return an error.
     fn expect_eof(&mut self) -> Result<(), TracebackError> {
         self.flush_whitespace();
 
@@ -259,6 +279,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Fast-forward the iterator until the next character is not whitespace.
     fn flush_whitespace(&mut self) {
         while self.chars.peek().map_or(false, is_whitespace) {
             self.next().ok();
@@ -266,6 +287,7 @@ impl<'a> Parser<'a> {
     }
 }
 
+/// Assert a condition, or return an error.
 fn quiet_assert(condition: bool, error: TracebackError) -> Result<(), TracebackError> {
     if condition {
         Ok(())
@@ -274,10 +296,12 @@ fn quiet_assert(condition: bool, error: TracebackError) -> Result<(), TracebackE
     }
 }
 
+/// Check whether a character is whitespace according to the specification.
 fn is_whitespace(c: impl Borrow<char>) -> bool {
     matches!(c.borrow(), ' ' | '\t' | '\n' | '\r')
 }
 
+/// Check whether the character is reserved.
 fn is_literal(c: impl Borrow<char>) -> bool {
     let c = c.borrow();
     !is_whitespace(c) && *c != ',' && *c != '}' && *c != ']'
