@@ -6,6 +6,7 @@
 
 pub mod error;
 pub mod parser;
+pub mod serialize;
 pub mod traits;
 pub mod value;
 
