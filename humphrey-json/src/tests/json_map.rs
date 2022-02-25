@@ -9,7 +9,7 @@ struct Person {
 
 #[derive(PartialEq, Debug)]
 struct GroupOfPeople {
-    best_person: Person,
+    best_person: Option<Person>,
     people: Vec<Person>,
 }
 
@@ -88,11 +88,11 @@ fn test_nested_from_json() {
     assert_eq!(
         group_of_people,
         GroupOfPeople {
-            best_person: Person {
+            best_person: Some(Person {
                 name: "w-henderson".into(),
                 favourite_number: 1.414,
                 online: true,
-            },
+            }),
             people: vec![
                 Person {
                     name: "w-henderson".into(),
@@ -112,11 +112,11 @@ fn test_nested_from_json() {
 #[test]
 fn test_nested_into_json() {
     let group_of_people = GroupOfPeople {
-        best_person: Person {
+        best_person: Some(Person {
             name: "w-henderson".into(),
             favourite_number: 1.414,
             online: true,
-        },
+        }),
         people: vec![
             Person {
                 name: "w-henderson".into(),
@@ -141,6 +141,85 @@ fn test_nested_into_json() {
                 "favouriteNumber": 1.414,
                 "online": true
             },
+            "people": [
+                {
+                    "name": "w-henderson",
+                    "favouriteNumber": 1.414,
+                    "online": true
+                },
+                {
+                    "name": "flauntingspade4",
+                    "favouriteNumber": 2.72,
+                    "online": false
+                }
+            ]
+        })
+    );
+}
+
+#[test]
+fn test_optional_missing_from_json() {
+    let value = json!({
+        "people": [
+            {
+                "name": "w-henderson",
+                "favouriteNumber": 1.414,
+                "online": true
+            },
+            {
+                "name": "flauntingspade4",
+                "favouriteNumber": 2.72,
+                "online": false
+            }
+        ]
+    });
+
+    let group_of_people = GroupOfPeople::from_json(&value).unwrap();
+
+    assert_eq!(
+        group_of_people,
+        GroupOfPeople {
+            best_person: None,
+            people: vec![
+                Person {
+                    name: "w-henderson".into(),
+                    favourite_number: 1.414,
+                    online: true,
+                },
+                Person {
+                    name: "flauntingspade4".into(),
+                    favourite_number: 2.72,
+                    online: false,
+                },
+            ],
+        }
+    );
+}
+
+#[test]
+fn test_optional_missing_into_json() {
+    let group_of_people = GroupOfPeople {
+        best_person: None,
+        people: vec![
+            Person {
+                name: "w-henderson".into(),
+                favourite_number: 1.414,
+                online: true,
+            },
+            Person {
+                name: "flauntingspade4".into(),
+                favourite_number: 2.72,
+                online: false,
+            },
+        ],
+    };
+
+    let value = group_of_people.to_json();
+
+    assert_eq!(
+        value,
+        json!({
+            "bestPerson": null,
             "people": [
                 {
                     "name": "w-henderson",
