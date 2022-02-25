@@ -57,7 +57,6 @@ macro_rules! json {
 ///
 /// ```
 /// use humphrey_json::prelude::*;
-/// use humphrey_json::Value;
 ///
 /// #[derive(Debug)]
 /// struct Point {
@@ -73,11 +72,11 @@ macro_rules! json {
 ///
 /// fn main() {
 ///     let point = Point { x: 1, y: 2 };
+///     let serialized = humphrey_json::to_string(&point);
 ///
-///     let serialized = point.to_json().serialize();
 ///     println!("serialized = {}", serialized);
+///     let deserialized: Point = humphrey_json::from_str(serialized).unwrap();
 ///
-///     let deserialized = Point::from_json(&Value::parse(serialized).unwrap()).unwrap();
 ///     println!("deserialized = {:?}", deserialized);
 /// }
 /// ```
