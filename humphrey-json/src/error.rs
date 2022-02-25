@@ -30,6 +30,12 @@ pub struct TracebackError {
     pub(crate) kind: ParseError,
 }
 
+impl From<TracebackError> for ParseError {
+    fn from(error: TracebackError) -> Self {
+        error.kind
+    }
+}
+
 impl Display for TracebackError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "error at {}:{}: {:?}", self.line, self.column, self.kind)
