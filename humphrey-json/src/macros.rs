@@ -6,7 +6,7 @@
 /// ## Usage
 /// The macro allows you to create any kind of JSON value.
 ///
-/// ```rs
+/// ```
 /// let value = json!({
 ///     "key": "value",
 ///     "array": [1, 2, 3],
@@ -17,7 +17,7 @@
 ///
 /// It can also be used as a shorthand to create literal values.
 ///
-/// ```rs
+/// ```
 /// assert_eq!(json!(true), Value::Bool(true));
 /// assert_eq!(json!(1234), Value::Number(1234.0));
 /// assert_eq!(json!("Hello, world!"), Value::String("Hello, world!".into()));
@@ -55,7 +55,7 @@ macro_rules! json {
 /// The first argument in a comma-separated list is the type of the Rust data structure.
 /// The rest of the arguments specify the mapping from the type to its JSON representation.
 ///
-/// ```rs
+/// ```
 /// use humphrey_json::prelude::*;
 /// use humphrey_json::Value;
 ///

@@ -13,7 +13,7 @@ impl Value {
     /// If unsuccessful, returns a `TracebackError`, giving information about the location of the syntax error within the JSON string.
     ///
     /// ## Usage
-    /// ```rs
+    /// ```
     /// let value = Value::parse("[1, 2, 3]");
     /// ```
     pub fn parse(s: impl AsRef<str>) -> Result<Self, TracebackError> {

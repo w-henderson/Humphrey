@@ -3,6 +3,7 @@
 //! Learn more about Humphrey JSON [here (coming soon)](https://humphrey.whenderson.dev/json/index.html).
 
 #![warn(missing_docs)]
+#![allow(clippy::needless_doctest_main)]
 
 pub mod error;
 pub mod indexing;
@@ -19,7 +20,7 @@ mod tests;
 
 /// Brings useful traits and macros into scope.
 ///
-/// ```rs
+/// ```
 /// use humphrey_json::prelude::*;
 /// ```
 pub mod prelude {
@@ -33,7 +34,7 @@ pub use value::Value;
 /// Deserialize a JSON string into a Rust data structure.
 ///
 /// ## Usage
-/// ```rs
+/// ```
 /// use humphrey_json::prelude::*;
 ///
 /// #[derive(Debug)]
@@ -77,7 +78,7 @@ where
 /// Serialize a Rust data structure into a JSON string.
 ///
 /// ## Usage
-/// ```rs
+/// ```
 /// use humphrey_json::prelude::*;
 ///
 /// struct User {

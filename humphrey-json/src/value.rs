@@ -6,7 +6,7 @@ use crate::indexing::Index;
 ///
 /// ## Constructing
 /// The `true` value, for example, can be constructed as any of the following:
-/// ```rs
+/// ```
 /// let _ = Value::Bool(true);
 /// let _ = json!(true);
 /// let _ = Value::parse("true");
@@ -40,7 +40,7 @@ pub enum Value {
 impl Value {
     /// Gets the value at the given index, or `None` if not found.
     ///
-    /// ```rs
+    /// ```
     /// let x = array.get(0);
     /// let y = object.get("name");
     /// ```
@@ -53,7 +53,7 @@ impl Value {
 
     /// Gets a mutable reference to the value at the given index, or `None` if not found.
     ///
-    /// ```rs
+    /// ```
     /// let x = array.get_mut(0);
     /// let y = object.get_mut("name");
     /// ```
