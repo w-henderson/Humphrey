@@ -38,6 +38,34 @@ pub enum Value {
 }
 
 impl Value {
+    /// Gets the value at the given index, or `None` if not found.
+    ///
+    /// ```rs
+    /// let x = array.get(0);
+    /// let y = object.get("name");
+    /// ```
+    pub fn get<I>(&self, index: I) -> Option<&Value>
+    where
+        I: Index,
+    {
+        index.json_index(self)
+    }
+
+    /// Gets a mutable reference to the value at the given index, or `None` if not found.
+    ///
+    /// ```rs
+    /// let x = array.get_mut(0);
+    /// let y = object.get_mut("name");
+    /// ```
+    ///
+    /// **Warning:** this creates a new null value at the given index if it does not exist in an object.
+    pub fn get_mut<I>(&mut self, index: I) -> Option<&mut Value>
+    where
+        I: Index,
+    {
+        index.json_index_mut(self)
+    }
+
     /// Returns the encapsulated boolean value, or `None` if it is not a boolean data type.
     pub fn as_bool(&self) -> Option<bool> {
         match self {

@@ -1,9 +1,14 @@
+//! Provides functionality for indexing into JSON values.
+
 use crate::Value;
 
 use std::ops;
 
+/// Represents the ability of a type to be used as an index into a JSON value.
 pub trait Index {
+    /// Indexes into a JSON value, returning a shared reference to the value if found.
     fn json_index<'v>(&self, v: &'v Value) -> Option<&'v Value>;
+    /// Indexes into a JSON value, returning a mutable reference to the value if found.
     fn json_index_mut<'v>(&self, v: &'v mut Value) -> Option<&'v mut Value>;
 }
 
