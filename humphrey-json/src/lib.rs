@@ -5,6 +5,7 @@
 #![warn(missing_docs)]
 
 pub mod error;
+pub mod indexing;
 pub mod parser;
 pub mod serialize;
 pub mod traits;

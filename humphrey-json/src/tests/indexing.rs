@@ -54,10 +54,33 @@ fn test_index_array() {
 }
 
 #[test]
-#[should_panic]
 fn test_invalid_index() {
     let string = "\"Hello, world!\"";
     let value = Value::parse(string).unwrap();
 
-    let _ = value["invalid"];
+    assert_eq!(value["name"], Value::Null);
+}
+
+#[test]
+fn test_add_index() {
+    let string = "{}";
+    let mut value = Value::parse(string).unwrap();
+
+    value["name"] = json!("Humphrey");
+
+    assert_eq!(
+        value,
+        json!({
+            "name": "Humphrey"
+        })
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_add_invalid_index() {
+    let string = "\"Hello, world!\"";
+    let mut value = Value::parse(string).unwrap();
+
+    value["name"] = json!("Humphrey");
 }
