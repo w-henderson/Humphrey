@@ -17,12 +17,14 @@ pub mod macros;
 #[cfg(test)]
 mod tests;
 
-/// Brings useful traits into scope.
+/// Brings useful traits and macros into scope.
 ///
 /// ```rs
 /// use humphrey_json::prelude::*;
 /// ```
 pub mod prelude {
+    pub use crate::json;
+    pub use crate::json_map;
     pub use crate::traits::*;
 }
 

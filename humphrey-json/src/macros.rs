@@ -1,4 +1,5 @@
-//! Provides the `json!` macro for creating JSON values.
+//! Provides the `json!` macro for creating JSON values and the `json_map!` macro
+//!   for serializing/deserializing them to and from Rust data structures.
 
 /// Create a JSON value from JSON-like syntax.
 ///
@@ -45,6 +46,41 @@ macro_rules! json {
     };
 }
 
+/// Specifies a mapping between a Rust data structure and a JSON value.
+///
+/// Behind the scenes, this macro automatically generates a `FromJson` and an `IntoJson` implementation.
+/// It is functionally equivalent to Serde's `Serialize` and `Deserialize` derive macros.
+///
+/// ## Usage
+/// The first argument in a comma-separated list is the type of the Rust data structure.
+/// The rest of the arguments specify the mapping from the type to its JSON representation.
+///
+/// ```rs
+/// use humphrey_json::prelude::*;
+/// use humphrey_json::Value;
+///
+/// #[derive(Debug)]
+/// struct Point {
+///     x: i32,
+///     y: i32,
+/// }
+///
+/// json_map! {
+///     Point,
+///     x => "x",
+///     y => "y"
+/// }
+///
+/// fn main() {
+///     let point = Point { x: 1, y: 2 };
+///
+///     let serialized = point.to_json().serialize();
+///     println!("serialized = {}", serialized);
+///
+///     let deserialized = Point::from_json(&Value::parse(serialized).unwrap()).unwrap();
+///     println!("deserialized = {:?}", deserialized);
+/// }
+/// ```
 #[macro_export]
 macro_rules! json_map {
     ($t:ty, $($struct_field:tt => $json_field:expr),*) => {
