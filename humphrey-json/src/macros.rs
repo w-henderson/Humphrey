@@ -87,7 +87,7 @@ macro_rules! json_map {
         impl $crate::traits::FromJson for $t {
             fn from_json(value: &$crate::Value) -> Result<Self, $crate::error::ParseError> {
                 Ok(Self {
-                    $($struct_field: $crate::traits::FromJson::from_json(value.get($json_field).ok_or($crate::error::ParseError::MissingField)?)?),*
+                    $($struct_field: $crate::traits::FromJson::from_json(value.get($json_field).unwrap_or(&$crate::Value::Null))?),*
                 })
             }
         }
