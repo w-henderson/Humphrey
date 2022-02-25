@@ -44,3 +44,24 @@ macro_rules! json {
         $crate::Value::from($v)
     };
 }
+
+#[macro_export]
+macro_rules! json_map {
+    ($t:ty, $($struct_field:tt => $json_field:expr),*) => {
+        impl $crate::traits::FromJson for $t {
+            fn from_json(value: &$crate::Value) -> Result<Self, $crate::error::ParseError> {
+                Ok(Self {
+                    $($struct_field: $crate::traits::FromJson::from_json(value.get($json_field).ok_or($crate::error::ParseError::MissingField)?)?),*
+                })
+            }
+        }
+
+        impl $crate::traits::IntoJson for $t {
+            fn to_json(&self) -> $crate::Value {
+                json!({
+                    $($json_field: (&self.$struct_field)),*
+                })
+            }
+        }
+    };
+}

@@ -16,6 +16,10 @@ pub enum ParseError {
     InvalidEscapeSequence,
     /// A trailing comma was encountered.
     TrailingComma,
+    /// The wrong type of value was encountered.
+    TypeError,
+    /// The field was missing.
+    MissingField,
 }
 
 /// Encapsulates a parse error and its location.
@@ -32,4 +36,12 @@ impl Display for TracebackError {
     }
 }
 
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 impl Error for TracebackError {}
+
+impl Error for ParseError {}
