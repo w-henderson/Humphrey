@@ -1,11 +1,14 @@
-mod serialise;
+mod messages;
 mod user;
 
-use crate::serialise::{BroadcastMessage, ParticipantUpdateMessage, SerialisableMessage};
+use crate::messages::{ClientMessage, ClientMessageKind, ServerMessage, ServerMessageKind};
 use crate::user::{User, UserManager};
 
 use humphrey::handlers::serve_dir;
 use humphrey::App;
+
+use humphrey_json::error::ParseError;
+use humphrey_json::prelude::*;
 
 use humphrey_ws::async_app::{AsyncStream, AsyncWebsocketApp};
 use humphrey_ws::handler::async_websocket_handler;
@@ -65,7 +68,14 @@ fn connect_handler(stream: AsyncStream, state: Arc<State>) {
         loaded: false,
     };
 
-    stream.send(Message::new_binary(user.id.to_be_bytes()));
+    let message = ServerMessage {
+        kind: ServerMessageKind::Id,
+        message: None,
+        sender_id: user.id,
+        sender_name: None,
+    };
+
+    stream.send(Message::new(humphrey_json::to_string(&message)));
 
     state.set_user(stream.peer_addr(), user);
 }
@@ -75,50 +85,56 @@ fn disconnect_handler(stream: AsyncStream, state: Arc<State>) {
 
     state.remove_user(stream.peer_addr());
 
-    let broadcast = BroadcastMessage {
-        message: format!("{} has left the chat", user.name),
-        sender_id: 0,
-        sender_name: None,
+    let message = ServerMessage {
+        kind: ServerMessageKind::Leave,
+        message: None,
+        sender_id: user.id,
+        sender_name: Some(user.name),
     };
 
-    stream.broadcast(broadcast.serialise());
-
-    let update = ParticipantUpdateMessage {
-        participants: state.list_users(),
-    };
-
-    stream.broadcast(update.serialise());
+    stream.broadcast(Message::new(humphrey_json::to_string(&message)));
 }
 
 fn message_handler(stream: AsyncStream, message: Message, state: Arc<State>) {
     let mut user = state.get_user(stream.peer_addr()).unwrap();
 
-    if user.loaded {
-        let broadcast = BroadcastMessage {
-            message: message.text().unwrap().to_string(),
+    let client_message: Result<ClientMessage, ParseError> =
+        humphrey_json::from_str(&message.text().unwrap());
+
+    let client_message = if let Ok(client_message) = client_message {
+        client_message
+    } else {
+        return;
+    };
+
+    if user.loaded && client_message.kind == ClientMessageKind::Chat {
+        let message = ServerMessage {
+            kind: ServerMessageKind::Chat,
+            message: Some(client_message.message),
             sender_id: user.id,
             sender_name: Some(user.name),
         };
 
-        stream.broadcast(broadcast.serialise());
-    } else {
-        user.name = message.text().unwrap().to_string();
+        stream.broadcast(Message::new(humphrey_json::to_string(&message)));
+    } else if client_message.kind == ClientMessageKind::Register {
+        user.name = client_message.message;
         user.loaded = true;
 
-        state.set_user(stream.peer_addr(), user);
+        state.set_user(stream.peer_addr(), user.clone());
 
-        let broadcast = BroadcastMessage {
-            message: format!("{} has joined the chat", message.text().unwrap()),
-            sender_id: 0,
-            sender_name: None,
+        let broadcast_message = ServerMessage {
+            kind: ServerMessageKind::Join,
+            message: None,
+            sender_id: user.id,
+            sender_name: Some(user.name),
         };
 
-        stream.broadcast(broadcast.serialise());
+        let private_message = json!({
+            "kind": (ServerMessageKind::Participants),
+            "participants": (state.list_users())
+        });
 
-        let update = ParticipantUpdateMessage {
-            participants: state.list_users(),
-        };
-
-        stream.broadcast(update.serialise());
+        stream.broadcast(Message::new(humphrey_json::to_string(&broadcast_message)));
+        stream.send(Message::new(private_message.serialize()));
     };
 }

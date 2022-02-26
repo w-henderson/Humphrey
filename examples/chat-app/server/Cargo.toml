@@ -8,5 +8,6 @@ edition = "2021"
 [dependencies]
 humphrey = { path = "../../../humphrey" }
 humphrey_ws = { path = "../../../humphrey-ws" }
+humphrey_json = { path = "../../../humphrey-json" }
 
 [workspace]
