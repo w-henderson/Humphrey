@@ -53,27 +53,42 @@ fn string_to_string(s: &str) -> String {
 }
 
 fn array_to_string(array: &[Value]) -> String {
-    let inner = array
-        .iter()
-        .map(|v| v.serialize())
-        .fold(String::new(), |acc, s| acc + &s + ",");
+    let mut inner = array.iter().map(|v| v.serialize()).fold(
+        {
+            let mut s = String::with_capacity(256);
+            s.push('[');
+            s
+        },
+        |acc, s| acc + &s + ",",
+    );
 
     if inner.ends_with(',') {
-        "[".to_string() + &inner[..inner.len() - 1] + "]"
-    } else {
-        "[".to_string() + &inner + "]"
+        inner.pop();
     }
+
+    inner.push(']');
+
+    inner
 }
 
 fn object_to_string(object: &[(String, Value)]) -> String {
-    let inner = object
+    let mut inner = object
         .iter()
         .map(|(k, v)| (Value::String(k.clone()).serialize(), v.serialize()))
-        .fold(String::new(), |acc, (k, v)| acc + &k + ":" + &v + ",");
+        .fold(
+            {
+                let mut s = String::with_capacity(256);
+                s.push('{');
+                s
+            },
+            |acc, (k, v)| acc + &k + ":" + &v + ",",
+        );
 
     if inner.ends_with(',') {
-        "{".to_string() + &inner[..inner.len() - 1] + "}"
-    } else {
-        "{".to_string() + &inner + "}"
+        inner.pop();
     }
+
+    inner.push('}');
+
+    inner
 }
