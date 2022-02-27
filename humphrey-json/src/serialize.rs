@@ -74,7 +74,7 @@ fn array_to_string(array: &[Value]) -> String {
 fn object_to_string(object: &[(String, Value)]) -> String {
     let mut inner = object
         .iter()
-        .map(|(k, v)| (Value::String(k.clone()).serialize(), v.serialize()))
+        .map(|(k, v)| (string_to_string(k), v.serialize()))
         .fold(
             {
                 let mut s = String::with_capacity(256);
