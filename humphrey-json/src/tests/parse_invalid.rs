@@ -8,7 +8,7 @@ fn test_trailing_comma() {
 
     let expected_error = TracebackError {
         line: 2,
-        column: 20,
+        column: 19,
         kind: ParseError::TrailingComma,
     };
 

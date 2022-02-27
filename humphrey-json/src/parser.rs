@@ -56,7 +56,7 @@ impl<'a> Parser<'a> {
             if c == '\n' {
                 self.next_line += 1;
                 self.next_column = 0;
-            } else {
+            } else if c != '\r' {
                 self.next_column += 1;
             }
 
