@@ -3,6 +3,7 @@ on:
     paths:
     - "humphrey/**"
     - "humphrey-auth/**"
+    - "humphrey-json/**"
     - "humphrey-server/**"
     - "humphrey-ws/**"
     - "examples/**"
