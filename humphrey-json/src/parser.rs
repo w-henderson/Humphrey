@@ -90,7 +90,7 @@ impl<'a> Parser<'a> {
 
     /// Attempt to parse a string from the character stream.
     fn parse_string(&mut self) -> Result<Value, TracebackError> {
-        let mut string = String::new();
+        let mut string = String::with_capacity(256);
         let mut backslash = false;
 
         loop {
@@ -157,7 +157,7 @@ impl<'a> Parser<'a> {
 
     /// Attempt to parse an array from the character stream.
     fn parse_array(&mut self) -> Result<Value, TracebackError> {
-        let mut array: Vec<Value> = Vec::new();
+        let mut array: Vec<Value> = Vec::with_capacity(16);
 
         loop {
             self.flush_whitespace();
@@ -193,7 +193,7 @@ impl<'a> Parser<'a> {
 
     /// Attempt to parse an object from the character stream.
     fn parse_object(&mut self) -> Result<Value, TracebackError> {
-        let mut object: Vec<(String, Value)> = Vec::new();
+        let mut object: Vec<(String, Value)> = Vec::with_capacity(16);
         let mut trailing_comma = false;
 
         loop {
