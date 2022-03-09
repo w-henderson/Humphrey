@@ -8,6 +8,8 @@ The underlying Rust crate is often referred to as "Humphrey Core", and provides 
 
 The WebSocket functionality is provided by a separate crate, often referred to as "Humphrey WebSocket", which integrates with the core crate for ease of development. You can learn how to Humphrey WebSocket in your own application [here](websocket/index.md).
 
+Humphrey also provides a simple JSON library called "Humphrey JSON". It allows for the manipulation of JSON data in a variety of ways. You can learn how to use Humphrey JSON [here](json/index.md).
+
 The simple authentication system is also provided by a separate crate, often referred to as "Humphrey Auth", which extends the core crate with authentication-related features. You can learn how to use Humphrey Auth in your own application [here](auth/index.md).
 
 ## Quick Reference
@@ -16,6 +18,7 @@ The simple authentication system is also provided by a separate crate, often ref
 - [Using WebSocket with Humphrey Core](websocket/sync/getting-started.md)
 - [Using PHP with Humphrey Server](server/using-php.md)
 - [Creating a Humphrey Server plugin](server/creating-a-plugin.md)
+- [Using Humphrey JSON](json/index.md)
 
 ## Latest Versions
 This book is up-to-date with the following crate versions.
@@ -25,4 +28,5 @@ This book is up-to-date with the following crate versions.
 | Humphrey Core | 0.5.0 |
 | Humphrey Server | 0.5.0 |
 | Humphrey WebSocket | 0.3.0 |
+| Humphrey JSON | 0.1.0 |
 | Humphrey Auth | 0.1.3 |

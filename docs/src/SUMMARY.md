@@ -21,4 +21,7 @@
     - [Getting Started](websocket/async/getting-started.md)
     - [Broadcasting Messages](websocket/async/broadcasting-messages.md)
     - [Using with an Existing Humphrey App](websocket/async/linking.md)
+- [Humphrey JSON](json/index.md)
+  - [Untyped JSON Values](json/untyped-values.md)
+  - [Strongly-Typed Data Structures](json/data-structures.md)
 - [Humphrey Auth](auth/index.md)
