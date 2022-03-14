@@ -2,6 +2,13 @@
 name = "humphrey_json"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+homepage = "https://github.com/w-henderson/Humphrey"
+repository = "https://github.com/w-henderson/Humphrey"
+readme = "README.md"
+description = "A JSON library for the Humphrey ecosystem."
+keywords = ["json"]
+categories = ["encoding", "parsing"]
 
 [lib]
 doctest = false
