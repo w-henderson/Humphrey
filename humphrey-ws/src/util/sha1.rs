@@ -88,7 +88,7 @@ where
         // Return the final hash
         let mut result: [u8; 20] = [0; 20];
         let h_values = [h0, h1, h2, h3, h4];
-        let h_iter = h_values.iter().map(|x| x.to_be_bytes()).flatten();
+        let h_iter = h_values.iter().flat_map(|x| x.to_be_bytes());
 
         for (ret, src) in result.iter_mut().zip(h_iter) {
             *ret = src;

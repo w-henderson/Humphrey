@@ -256,6 +256,11 @@ where
         AsyncSender(self.message_sender.clone())
     }
 
+    /// Gets a reference to the app’s state. This should only be used in the main thread, as the state is passed to event handlers otherwise.
+    pub fn get_state(&self) -> Arc<State> {
+        self.state.clone()
+    }
+
     /// Set the event handler called when a new client connects.
     pub fn on_connect(&mut self, handler: impl EventHandler<State>) {
         self.on_connect = Some(Box::new(handler));
