@@ -1,9 +1,9 @@
 //! Provides an HTTP client implementation for Humphrey.
 
 use crate::http::address::Address;
-use crate::http::headers::{RequestHeader, RequestHeaderMap};
+use crate::http::headers::{RequestHeader, RequestHeaderMap, ResponseHeader};
 use crate::http::method::Method;
-use crate::http::{Request, Response};
+use crate::http::{Request, Response, StatusCode};
 
 use std::error::Error;
 use std::io::Write;
@@ -52,6 +52,7 @@ impl Client {
             client: self,
             protocol: url.protocol,
             request,
+            follow_redirects: false,
         })
     }
 
@@ -77,6 +78,7 @@ impl Client {
             client: self,
             protocol: url.protocol,
             request,
+            follow_redirects: false,
         })
     }
 
@@ -102,6 +104,7 @@ impl Client {
             client: self,
             protocol: url.protocol,
             request,
+            follow_redirects: false,
         })
     }
 
@@ -123,6 +126,7 @@ impl Client {
             client: self,
             protocol: url.protocol,
             request,
+            follow_redirects: false,
         })
     }
 
@@ -247,6 +251,7 @@ pub struct ClientRequest<'a> {
     protocol: Protocol,
     address: SocketAddr,
     request: Request,
+    follow_redirects: bool,
 }
 
 impl<'a> ClientRequest<'a> {
@@ -258,11 +263,62 @@ impl<'a> ClientRequest<'a> {
         self
     }
 
+    /// Specifies whether to follow redirects.
+    pub fn with_redirects(mut self, follow_redirects: bool) -> Self {
+        self.follow_redirects = follow_redirects;
+        self
+    }
+
     /// Sends the request.
-    pub fn send(self) -> Result<Response, Box<dyn Error>> {
-        match self.protocol {
-            Protocol::Http => self.client.request(self.address, self.request),
-            Protocol::Https => self.client.request_tls(self.address, self.request),
+    pub fn send(mut self) -> Result<Response, Box<dyn Error>> {
+        let response = match self.protocol {
+            Protocol::Http => self.client.request(self.address, self.request.clone()),
+            Protocol::Https => self.client.request_tls(self.address, self.request.clone()),
+        };
+
+        // Follow a redirect if appropriate.
+        if self.follow_redirects
+            && response
+                .as_ref()
+                .map(|r| {
+                    r.status_code == StatusCode::MovedPermanently
+                        || r.status_code == StatusCode::TemporaryRedirect
+                        || r.status_code == StatusCode::Found
+                })
+                .unwrap_or(false)
+        {
+            response
+                .and_then(|r| {
+                    r.headers
+                        .get(&ResponseHeader::Location)
+                        .map_or(Err("No location header".into()), |s| {
+                            Ok(s.as_str().to_string())
+                        })
+                })
+                .and_then(|l| {
+                    if l.starts_with('/') {
+                        self.request.uri = l;
+                    } else {
+                        let new_url = Client::parse_url(l).ok_or("Invalid URL")?;
+                        let request = Request {
+                            method: self.request.method,
+                            uri: new_url.path,
+                            headers: new_url.host_headers,
+                            query: new_url.query,
+                            version: "HTTP/1.1".to_string(),
+                            content: self.request.content,
+                            address: Address::new(new_url.host).unwrap(),
+                        };
+
+                        self.protocol = new_url.protocol;
+                        self.address = new_url.host;
+                        self.request = request;
+                    }
+
+                    self.send()
+                })
+        } else {
+            response
         }
     }
 }
