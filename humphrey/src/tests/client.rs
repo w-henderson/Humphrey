@@ -50,6 +50,9 @@ fn test_url_parser() {
     ];
 
     for (url, expected_url) in urls.iter().zip(expected_urls.iter()) {
-        assert_eq!(url, expected_url);
+        assert_eq!(url.protocol, expected_url.protocol);
+        assert_eq!(url.path, expected_url.path);
+        assert_eq!(url.query, expected_url.query);
+        assert_eq!(url.host_headers, expected_url.host_headers);
     }
 }
