@@ -1,3 +1,4 @@
+pub mod client;
 pub mod date;
 pub mod krauss;
 pub mod method;

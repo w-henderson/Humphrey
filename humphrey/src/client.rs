@@ -198,7 +198,7 @@ impl Client {
     }
 
     /// Parses a URL into a URL struct.
-    fn parse_url(url: impl AsRef<str>) -> Option<ParsedUrl> {
+    pub(crate) fn parse_url(url: impl AsRef<str>) -> Option<ParsedUrl> {
         let url = url.as_ref();
 
         if let Some(stripped) = url.strip_prefix("http://") {
@@ -323,15 +323,17 @@ impl<'a> ClientRequest<'a> {
     }
 }
 
-struct ParsedUrl {
-    protocol: Protocol,
-    host: SocketAddr,
-    host_headers: RequestHeaderMap,
-    path: String,
-    query: String,
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ParsedUrl {
+    pub(crate) protocol: Protocol,
+    pub(crate) host: SocketAddr,
+    pub(crate) host_headers: RequestHeaderMap,
+    pub(crate) path: String,
+    pub(crate) query: String,
 }
 
-enum Protocol {
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Protocol {
     Http,
     Https,
 }
