@@ -9,12 +9,24 @@ use std::error::Error;
 use std::io::Write;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 
+#[cfg(feature = "tls")]
+use rustls::{Certificate, ClientConfig, ClientConnection, RootCertStore, StreamOwned};
+#[cfg(feature = "tls")]
+use rustls_native_certs::load_native_certs;
+#[cfg(feature = "tls")]
+use std::convert::TryInto;
+#[cfg(feature = "tls")]
+use std::sync::Arc;
+
 /// Represents an HTTP client.
 ///
 /// When TLS is enabled, this is fairly expensive to instantiate,
 ///   so should only be done once per program instead of once per request.
 #[derive(Default)]
-pub struct Client;
+pub struct Client {
+    #[cfg(feature = "tls")]
+    tls_config: Option<Arc<ClientConfig>>,
+}
 
 impl Client {
     /// Creates a new HTTP client.
@@ -23,7 +35,7 @@ impl Client {
     }
 
     /// Creates a GET request to the given URL.
-    pub fn get(&self, url: impl AsRef<str>) -> Result<ClientRequest, Box<dyn Error>> {
+    pub fn get(&mut self, url: impl AsRef<str>) -> Result<ClientRequest, Box<dyn Error>> {
         let url = Self::parse_url(url).ok_or("Invalid URL")?;
         let request = Request {
             method: Method::Get,
@@ -45,7 +57,7 @@ impl Client {
 
     /// Creates a POST request to the given URL.
     pub fn post(
-        &self,
+        &mut self,
         url: impl AsRef<str>,
         data: Vec<u8>,
     ) -> Result<ClientRequest, Box<dyn Error>> {
@@ -70,7 +82,7 @@ impl Client {
 
     /// Creates a PUT request to the given URL.
     pub fn put(
-        &self,
+        &mut self,
         url: impl AsRef<str>,
         data: Vec<u8>,
     ) -> Result<ClientRequest, Box<dyn Error>> {
@@ -94,7 +106,7 @@ impl Client {
     }
 
     /// Creates a DELETE request to the given URL.
-    pub fn delete(&self, url: impl AsRef<str>) -> Result<ClientRequest, Box<dyn Error>> {
+    pub fn delete(&mut self, url: impl AsRef<str>) -> Result<ClientRequest, Box<dyn Error>> {
         let url = Self::parse_url(url).ok_or("Invalid URL")?;
         let request = Request {
             method: Method::Delete,
@@ -132,11 +144,53 @@ impl Client {
     /// Sends a raw request to the given address using TLS.
     #[cfg(not(feature = "tls"))]
     pub fn request_tls(
-        &self,
+        &mut self,
         _: impl ToSocketAddrs,
         _: Request,
     ) -> Result<Response, Box<dyn Error>> {
         Err("TLS feature is not enabled".into())
+    }
+
+    /// Sends a raw request to the given address using TLS.
+    #[cfg(feature = "tls")]
+    pub fn request_tls(
+        &mut self,
+        address: impl ToSocketAddrs,
+        request: Request,
+    ) -> Result<Response, Box<dyn Error>> {
+        if self.tls_config.is_none() {
+            let mut roots = RootCertStore::empty();
+            for cert in load_native_certs()? {
+                roots.add(&Certificate(cert.0))?;
+            }
+
+            let conf = ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+
+            self.tls_config = Some(Arc::new(conf))
+        }
+
+        let conn = ClientConnection::new(
+            self.tls_config.as_ref().unwrap().clone(),
+            request
+                .headers
+                .get(&RequestHeader::Host)
+                .unwrap()
+                .as_str()
+                .try_into()
+                .unwrap(),
+        )?;
+        let sock = TcpStream::connect(address)?;
+        let mut tls = StreamOwned::new(conn, sock);
+
+        let request_bytes: Vec<u8> = request.into();
+        tls.write_all(&request_bytes)?;
+
+        let response = Response::from_stream(&mut tls)?;
+
+        Ok(response)
     }
 
     /// Parses a URL into a URL struct.
@@ -164,7 +218,7 @@ impl Client {
             })
         } else if let Some(stripped) = url.strip_prefix("https://") {
             let protocol = Protocol::Https;
-            let (host, path) = stripped.split_once('/').unwrap_or((stripped, "/"));
+            let (host, path) = stripped.split_once('/').unwrap_or((stripped, ""));
 
             let mut headers = RequestHeaderMap::new();
             headers.insert(RequestHeader::Host, host.to_string());
@@ -189,7 +243,7 @@ impl Client {
 
 /// Represents a request to be sent.
 pub struct ClientRequest<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
     protocol: Protocol,
     address: SocketAddr,
     request: Request,
