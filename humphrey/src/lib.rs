@@ -5,6 +5,7 @@
 #![warn(missing_docs)]
 
 pub mod app;
+pub mod client;
 pub mod handlers;
 pub mod http;
 pub mod krauss;
@@ -18,4 +19,5 @@ pub mod thread;
 mod tests;
 
 pub use app::App;
+pub use client::Client;
 pub use route::SubApp;
