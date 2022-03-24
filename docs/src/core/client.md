@@ -11,9 +11,8 @@ use std::error::Error;
 fn main() -> Result<(), Box<dyn Error>> {
     let mut client = Client::new();
     let response = client.get("https://api.ipify.org")?.send()?;
-    let my_ip = String::from_utf8(response.body)?;
 
-    println!("IP address: {}", my_ip);
+    println!("IP address: {}", response.text().ok_or("Invalid text")?);
 
     Ok(())
 }
@@ -34,9 +33,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with_redirects(true)
         .with_header(RequestHeader::UserAgent, "HumphreyExample/1.0")
         .send()?;
-    let my_ip = String::from_utf8(response.body)?;
 
-    println!("IP address: {}", my_ip);
+    println!("IP address: {}", response.text().ok_or("Invalid text")?);
 
     Ok(())
 }
