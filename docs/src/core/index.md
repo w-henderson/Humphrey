@@ -7,5 +7,6 @@ This section of the guide will cover the following topics:
 3. [Integrating static and dynamic content](static-content.md)
 4. [Serving applications over HTTPS](https.md)
 5. [Monitoring and logging internal events](monitoring.md)
+6. [Using Humphrey Core as a client](client.md)
 
 It's recommended that you have basic familiarity with Rust before reading this section, as only Humphrey-specific concepts are explained, and knowledge of the Rust language is required to understand many of them.
