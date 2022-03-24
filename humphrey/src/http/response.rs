@@ -195,6 +195,11 @@ impl Response {
         &self.headers
     }
 
+    /// Returns the body as text, if possible.
+    pub fn text(&self) -> Option<String> {
+        String::from_utf8(self.body.clone()).ok()
+    }
+
     /// Attemps to read and parse one HTTP response from the given stream.
     ///
     /// Converts chunked transfer encoding into a regular body.
