@@ -1,6 +1,6 @@
 [package]
 name = "humphrey"
-version = "0.5.4"
+version = "0.5.5"
 edition = "2018"
 license = "MIT"
 homepage = "https://github.com/w-henderson/Humphrey"
@@ -13,11 +13,11 @@ categories = ["web-programming::http-server", "network-programming"]
 [dependencies.rustls]
 version = "^0.20.0"
 default-features = false
+features = ["tls12"]
 optional = true
 
 [dependencies.rustls-native-certs]
 version = "^0.6.1"
-default-features = false
 optional = true
 
 [dependencies.rustls-pemfile]
