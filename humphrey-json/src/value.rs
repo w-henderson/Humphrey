@@ -2,6 +2,8 @@
 
 use crate::indexing::Index;
 
+use std::hash::Hash;
+
 /// Represents a JSON value.
 ///
 /// ## Constructing
@@ -122,3 +124,20 @@ impl PartialEq for Value {
 }
 
 impl Eq for Value {}
+
+// This is a dodgy implementation since `Value::Number` contains an `f64` value.
+// Some weird stuff might happen with `Value::Number(f64::NAN)`, but it should hold up mostly.
+impl Hash for Value {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+
+        match self {
+            Self::Bool(b) => b.hash(state),
+            Self::Number(n) => (n.to_bits()).hash(state),
+            Self::String(s) => s.hash(state),
+            Self::Array(a) => a.hash(state),
+            Self::Object(o) => o.hash(state),
+            Self::Null => (),
+        }
+    }
+}
