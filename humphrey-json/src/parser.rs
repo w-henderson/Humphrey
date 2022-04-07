@@ -7,6 +7,8 @@ use std::borrow::Borrow;
 use std::iter::Peekable;
 use std::str::Chars;
 
+const MAX_DEPTH: usize = 256;
+
 impl Value {
     /// Parse a string into a JSON value.
     ///
@@ -29,6 +31,7 @@ impl Value {
 /// Encapsulates the internal state of the parsing process.
 struct Parser<'a> {
     chars: Peekable<Chars<'a>>,
+    depth: usize,
     line: usize,
     column: usize,
     next_line: usize,
@@ -40,6 +43,7 @@ impl<'a> Parser<'a> {
     fn new(chars: Chars<'a>) -> Self {
         Self {
             chars: chars.peekable(),
+            depth: 0,
             line: 1,
             column: 1,
             next_line: 1,
@@ -157,6 +161,8 @@ impl<'a> Parser<'a> {
 
     /// Attempt to parse an array from the character stream.
     fn parse_array(&mut self) -> Result<Value, TracebackError> {
+        self.inc_depth()?;
+
         let mut array: Vec<Value> = Vec::with_capacity(16);
 
         loop {
@@ -187,12 +193,15 @@ impl<'a> Parser<'a> {
         }
 
         self.next()?;
+        self.dec_depth();
 
         Ok(Value::Array(array))
     }
 
     /// Attempt to parse an object from the character stream.
     fn parse_object(&mut self) -> Result<Value, TracebackError> {
+        self.inc_depth()?;
+
         let mut object: Vec<(String, Value)> = Vec::with_capacity(16);
         let mut trailing_comma = false;
 
@@ -244,6 +253,7 @@ impl<'a> Parser<'a> {
         }
 
         self.next()?;
+        self.dec_depth();
 
         Ok(Value::Object(object))
     }
@@ -283,6 +293,19 @@ impl<'a> Parser<'a> {
         while self.chars.peek().map_or(false, is_whitespace) {
             self.next().ok();
         }
+    }
+
+    fn inc_depth(&mut self) -> Result<(), TracebackError> {
+        if self.depth == MAX_DEPTH {
+            Err(self.traceback(ParseError::RecursionDepthExceeded))
+        } else {
+            self.depth += 1;
+            Ok(())
+        }
+    }
+
+    fn dec_depth(&mut self) {
+        self.depth -= 1;
     }
 }
 
