@@ -20,6 +20,8 @@ pub enum ParseError {
     TypeError,
     /// The field was missing.
     MissingField,
+    /// The maximum recursion depth was exceeded.
+    RecursionDepthExceeded,
 }
 
 /// Encapsulates a parse error and its location.
