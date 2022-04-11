@@ -15,7 +15,8 @@ use std::collections::HashMap;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
-use std::thread::spawn;
+use std::thread::{sleep, spawn};
+use std::time::Duration;
 
 /// Represents an asynchronous WebSocket app.
 pub struct AsyncWebsocketApp<State>
@@ -34,6 +35,8 @@ where
     state: Arc<State>,
     /// The internal thread pool of the application.
     thread_pool: ThreadPool,
+    /// The amount of time between polling.
+    poll_interval: Option<Duration>,
     /// A hashmap with the addresses as the keys and the actual streams as the values.
     streams: HashMap<SocketAddr, WebsocketStream<Stream>>,
     /// A receiver which is sent new streams to add to the hashmap.
@@ -138,6 +141,7 @@ where
                 "0.0.0.0:80".to_socket_addrs().unwrap().next().unwrap(),
             ),
             state: Default::default(),
+            poll_interval: Some(Duration::from_millis(10)),
             thread_pool: ThreadPool::new(32),
             streams: Default::default(),
             incoming_streams,
@@ -173,6 +177,7 @@ where
                 "0.0.0.0:80".to_socket_addrs().unwrap().next().unwrap(),
             ),
             state: Arc::new(state),
+            poll_interval: Some(Duration::from_millis(10)),
             thread_pool: ThreadPool::new(handler_threads),
             streams: Default::default(),
             incoming_streams,
@@ -201,6 +206,7 @@ where
         Self {
             humphrey_link: HumphreyLink::External(connect_hook),
             state: Default::default(),
+            poll_interval: Some(Duration::from_millis(10)),
             thread_pool: ThreadPool::new(32),
             streams: Default::default(),
             incoming_streams,
@@ -229,6 +235,7 @@ where
         Self {
             humphrey_link: HumphreyLink::External(connect_hook),
             state: Arc::new(state),
+            poll_interval: Some(Duration::from_millis(10)),
             thread_pool: ThreadPool::new(handler_threads),
             streams: Default::default(),
             incoming_streams,
@@ -312,6 +319,14 @@ where
             }
             HumphreyLink::External(connect_hook) => HumphreyLink::External(connect_hook),
         };
+        self
+    }
+
+    /// Sets the polling interval of the async app.
+    ///
+    /// By default, this is 10ms, meaning the app will check for new events 100 times a second.
+    pub fn with_polling_interval(mut self, interval: Option<Duration>) -> Self {
+        self.poll_interval = interval;
         self
     }
 
@@ -401,6 +416,10 @@ where
                         }
                     }
                 }
+            }
+
+            if let Some(interval) = self.poll_interval {
+                sleep(interval);
             }
         }
     }
