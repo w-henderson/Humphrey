@@ -4,7 +4,7 @@ use crate::config::LoadBalancerMode;
 use crate::rand::{Choose, Lcg};
 use crate::server::server::AppState;
 
-use humphrey::http::headers::ResponseHeader;
+use humphrey::http::headers::HeaderType;
 use humphrey::http::proxy::proxy_request;
 use humphrey::http::{Request, Response, StatusCode};
 
@@ -76,7 +76,7 @@ pub fn proxy_handler(
             request.address, request.uri
         ));
         Response::empty(StatusCode::Forbidden)
-            .with_header(ResponseHeader::ContentType, "text/html".into())
+            .with_header(HeaderType::ContentType, "text/html")
             .with_bytes(b"<h1>403 Forbidden</h1>")
     } else {
         // Gets a load balancer target using the thread-safe `Mutex`
