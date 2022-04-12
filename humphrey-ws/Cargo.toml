@@ -1,6 +1,6 @@
 [package]
 name = "humphrey_ws"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2018"
 license = "MIT"
 homepage = "https://github.com/w-henderson/Humphrey"
@@ -14,4 +14,4 @@ categories = ["web-programming::websocket", "network-programming"]
 doctest = false
 
 [dependencies]
-humphrey = { version = "^0.5.1" }
+humphrey = { version = "^0.6.0", path = "../humphrey" }
