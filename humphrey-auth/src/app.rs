@@ -3,7 +3,7 @@
 use crate::database::AuthDatabase;
 use crate::AuthProvider;
 
-use humphrey::http::headers::RequestHeader;
+use humphrey::http::headers::HeaderType;
 use humphrey::http::{Request, Response, StatusCode};
 use humphrey::App;
 
@@ -73,7 +73,7 @@ where
         T: AuthRequestHandler<S> + 'static,
     {
         self.with_route(route, move |request: Request, state: Arc<S>| {
-            if let Some(cookie) = request.headers.get(&RequestHeader::Cookie) {
+            if let Some(cookie) = request.headers.get(&HeaderType::Cookie) {
                 let token = cookie
                     .split(';')
                     .find(|s| s.trim().starts_with("HumphreyToken="))
