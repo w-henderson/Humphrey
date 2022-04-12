@@ -1,8 +1,11 @@
 [workspace]
 members = [
   "humphrey",
-#  "humphrey-auth",
-#  "humphrey-json",
-#  "humphrey-server",
-#  "humphrey-ws"
+  "humphrey-auth",
+  "humphrey-json",
+  "humphrey-server",
+  "humphrey-ws"
 ]
+
+[patch.crates-io]
+humphrey = { path = "./humphrey" }
