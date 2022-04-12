@@ -205,7 +205,7 @@ impl Client {
             let (host, path) = stripped.split_once('/').unwrap_or((stripped, ""));
 
             let mut headers = Headers::new();
-            headers.add(HeaderType::Host, host.to_string());
+            headers.add(HeaderType::Host, host);
 
             let host = format!("{}:80", host);
             let host = host.to_socket_addrs().ok()?.next()?;
@@ -224,7 +224,7 @@ impl Client {
             let (host, path) = stripped.split_once('/').unwrap_or((stripped, ""));
 
             let mut headers = Headers::new();
-            headers.add(HeaderType::Host, host.to_string());
+            headers.add(HeaderType::Host, host);
 
             let host = format!("{}:443", host);
             let host = host.to_socket_addrs().ok()?.next()?;

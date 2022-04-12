@@ -157,8 +157,7 @@ impl Request {
                     line_parts
                         .next()
                         .to_error(RequestError::Request)?
-                        .trim_start()
-                        .to_string(),
+                        .trim_start(),
                 );
             }
         }

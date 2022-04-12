@@ -1,49 +1,79 @@
 //! Provides functionality for handling HTTP headers.
 
+/// Represents a collection of headers as part of a request or response.
+///
+/// Headers can be added with the following methods:
+///   - `add(HeaderType::ContentType, "text/html")`: create and add a header
+///   - `push(Header::new(HeaderType::ContentType, "text/html"))`: add an existing header
+///
+/// Anywhere where you would specify the header type, e.g. `HeaderType::ContentType`, you can replace it
+///   with the string name of the header, e.g. `Content-Type`, since both these types implement `HeaderLike`.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Headers(Vec<Header>);
 
+/// Represents an individual header.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Header {
+    /// The name of the header.
     pub name: HeaderType,
+    /// The value of the header.
     pub value: String,
 }
 
 impl Headers {
+    /// Create an empty collection of headers.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Get the number of headers in the collection.
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
-    pub fn add(&mut self, name: impl HeaderLike, value: impl AsRef<str>) {
-        self.0.push(Header::new(name.as_header(), value));
+    /// Returns `true` if the collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
+    /// Create and add a new header with the given name and value.
+    pub fn add(&mut self, name: impl HeaderLike, value: impl AsRef<str>) {
+        self.0.push(Header::new(name.to_header(), value));
+    }
+
+    /// Add an existing header to the collection.
     pub fn push(&mut self, header: Header) {
         self.0.push(header);
     }
 
+    /// Get a reference to the value of the first header with the given name.
+    ///
+    /// You can either specify the header type as a `HeaderType`, e.g. `HeaderType::ContentType`, or as
+    ///   a string, e.g. `Content-Type`.
     pub fn get(&self, name: impl HeaderLike) -> Option<&str> {
-        let header = name.as_header();
+        let header = name.to_header();
         self.0
             .iter()
             .find(|h| h.name == header)
             .map(|h| h.value.as_str())
     }
 
+    /// Get a mutable reference to the value of the first header with the given name.
+    ///
+    /// You can either specify the header type as a `HeaderType`, e.g. `HeaderType::ContentType`, or as
+    ///   a string, e.g. `Content-Type`.
     pub fn get_mut(&mut self, name: impl HeaderLike) -> Option<&mut String> {
-        let header = name.as_header();
+        let header = name.to_header();
         self.0
             .iter_mut()
             .find(|h| h.name == header)
             .map(|h| &mut h.value)
     }
 
+    /// Get a list of all the values of the headers with the given name.
+    /// If no headers with the given name exist, an empty list is returned.
     pub fn get_all(&self, name: impl HeaderLike) -> Vec<&str> {
-        let header = name.as_header();
+        let header = name.to_header();
         self.0
             .iter()
             .filter(|h| h.name == header)
@@ -51,11 +81,13 @@ impl Headers {
             .collect()
     }
 
+    /// Remove all headers with the given name.
     pub fn remove(&mut self, name: impl HeaderLike) {
-        let header = name.as_header();
+        let header = name.to_header();
         self.0.retain(|h| h.name != header);
     }
 
+    /// Return an iterator over the headers in the collection.
     pub fn iter(&self) -> impl Iterator<Item = Header> {
         let mut headers = self.0.clone();
         headers.sort_unstable_by_key(|h| h.name.clone());
@@ -64,26 +96,34 @@ impl Headers {
 }
 
 impl Header {
+    /// Create a new header with the given name and value.
+    ///
+    /// You can either specify the header type as a `HeaderType`, e.g. `HeaderType::ContentType`, or as
+    ///   a string, e.g. `Content-Type`.
     pub fn new(name: impl HeaderLike, value: impl AsRef<str>) -> Self {
         Self {
-            name: name.as_header(),
+            name: name.to_header(),
             value: value.as_ref().to_string(),
         }
     }
 }
 
+/// Represents a type which can be interpreted as a header.
+///
+/// This includes `HeaderType` and strings.
 pub trait HeaderLike {
-    fn as_header(self) -> HeaderType;
+    /// Consume the value and return the corresponding header type.
+    fn to_header(self) -> HeaderType;
 }
 
 impl HeaderLike for HeaderType {
-    fn as_header(self) -> HeaderType {
+    fn to_header(self) -> HeaderType {
         self
     }
 }
 
 impl HeaderLike for &HeaderType {
-    fn as_header(self) -> HeaderType {
+    fn to_header(self) -> HeaderType {
         self.clone()
     }
 }
@@ -92,7 +132,7 @@ impl<T> HeaderLike for T
 where
     T: AsRef<str>,
 {
-    fn as_header(self) -> HeaderType {
+    fn to_header(self) -> HeaderType {
         HeaderType::from(self.as_ref())
     }
 }

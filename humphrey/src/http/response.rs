@@ -89,8 +89,7 @@ impl Response {
     where
         T: AsRef<str>,
     {
-        Self::empty(StatusCode::MovedPermanently)
-            .with_header(HeaderType::Location, location.as_ref().to_string())
+        Self::empty(StatusCode::MovedPermanently).with_header(HeaderType::Location, location)
     }
 
     /// Adds the given header to the response.
@@ -158,10 +157,7 @@ impl Response {
                 safe_assert(line.len() >= 2)?;
                 let line_without_crlf = &line[0..line.len() - 2];
                 let line_parts: Vec<&str> = line_without_crlf.splitn(2, ':').collect();
-                headers.add(
-                    HeaderType::from(line_parts[0]),
-                    line_parts[1].trim_start().to_string(),
-                );
+                headers.add(HeaderType::from(line_parts[0]), line_parts[1].trim_start());
             }
         }
 

@@ -544,7 +544,7 @@ fn client_handler<State>(
 
         // If the request is valid an is a WebSocket request, call the corresponding handler
         if let Ok(req) = &request {
-            if req.headers.get(&HeaderType::Upgrade) == Some(&"websocket".to_string()) {
+            if req.headers.get(&HeaderType::Upgrade) == Some("websocket") {
                 monitor.send(Event::new(EventType::WebsocketConnectionRequested).with_peer(addr));
 
                 call_websocket_handler(req, &subapps, &default_subapp, cloned_state, stream);
