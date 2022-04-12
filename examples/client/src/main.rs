@@ -1,4 +1,4 @@
-use humphrey::http::headers::RequestHeader;
+use humphrey::http::headers::HeaderType;
 use humphrey::Client;
 use std::error::Error;
 
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let response = client
         .post("https://jsonplaceholder.typicode.com/posts", data)?
         .with_header(
-            RequestHeader::ContentType,
+            HeaderType::ContentType,
             "application/json; charset=UTF-8",
         )
         .send()?;
