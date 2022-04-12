@@ -19,7 +19,7 @@ use std::io::{BufRead, BufReader, Read};
 /// ```
 /// Response::empty(StatusCode::OK)
 ///     .with_bytes(b"Success")
-///     .with_header(ResponseHeader::ContentType, "text/plain".into())
+///     .with_header(HeaderType::ContentType, "text/plain")
 /// ```
 #[derive(Debug)]
 pub struct Response {
