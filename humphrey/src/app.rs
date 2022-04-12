@@ -2,8 +2,9 @@
 
 #![allow(clippy::new_without_default)]
 
-use crate::http::headers::RequestHeader;
-use crate::http::request::Request;
+use crate::http::date::DateTime;
+use crate::http::headers::HeaderType;
+use crate::http::request::{Request, RequestError};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
 use crate::krauss::wildcard_match;
@@ -13,6 +14,7 @@ use crate::route::{Route, SubApp};
 use crate::stream::Stream;
 use crate::thread::pool::ThreadPool;
 
+use std::io::Write;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
 use std::time::Duration;
@@ -523,13 +525,6 @@ fn client_handler<State>(
     monitor: MonitorConfig,
     timeout: Option<Duration>,
 ) {
-    use std::collections::btree_map::Entry;
-    use std::io::Write;
-
-    use crate::http::date::DateTime;
-    use crate::http::headers::ResponseHeader;
-    use crate::http::request::RequestError;
-
     let addr = if let Ok(addr) = stream.peer_addr() {
         addr
     } else {
@@ -549,7 +544,7 @@ fn client_handler<State>(
 
         // If the request is valid an is a WebSocket request, call the corresponding handler
         if let Ok(req) = &request {
-            if req.headers.get(&RequestHeader::Upgrade) == Some(&"websocket".to_string()) {
+            if req.headers.get(&HeaderType::Upgrade) == Some(&"websocket".to_string()) {
                 monitor.send(Event::new(EventType::WebsocketConnectionRequested).with_peer(addr));
 
                 call_websocket_handler(req, &subapps, &default_subapp, cloned_state, stream);
@@ -561,7 +556,7 @@ fn client_handler<State>(
 
         // Get the keep alive information from the request before it is consumed by the handler
         let keep_alive = if let Ok(request) = &request {
-            if let Some(connection) = request.headers.get(&RequestHeader::Connection) {
+            if let Some(connection) = request.headers.get(&HeaderType::Connection) {
                 connection.to_ascii_lowercase() == "keep-alive"
             } else {
                 false
@@ -576,35 +571,39 @@ fn client_handler<State>(
                 let mut response = call_handler(request, &subapps, &default_subapp, state.clone());
 
                 // Automatically generate required headers
-                match response.headers.entry(ResponseHeader::Connection) {
-                    Entry::Occupied(_) => (),
-                    Entry::Vacant(v) => {
-                        if let Some(connection) = &request.headers.get(&RequestHeader::Connection) {
-                            v.insert(connection.to_string());
+                match response.headers.get_mut(HeaderType::Connection) {
+                    Some(_) => (),
+                    None => {
+                        if let Some(connection) = &request.headers.get(&HeaderType::Connection) {
+                            response.headers.add(HeaderType::Connection, connection);
                         } else {
-                            v.insert("Close".to_string());
+                            response.headers.add(HeaderType::Connection, "Close");
                         }
                     }
                 }
 
-                match response.headers.entry(ResponseHeader::Server) {
-                    Entry::Occupied(_) => (),
-                    Entry::Vacant(v) => {
-                        v.insert("Humphrey".to_string());
+                match response.headers.get_mut(HeaderType::Server) {
+                    Some(_) => (),
+                    None => {
+                        response.headers.add(HeaderType::Server, "Humphrey");
                     }
                 }
 
-                match response.headers.entry(ResponseHeader::Date) {
-                    Entry::Occupied(_) => (),
-                    Entry::Vacant(v) => {
-                        v.insert(DateTime::now().to_string());
+                match response.headers.get_mut(HeaderType::Date) {
+                    Some(_) => (),
+                    None => {
+                        response
+                            .headers
+                            .add(HeaderType::Date, DateTime::now().to_string());
                     }
                 }
 
-                match response.headers.entry(ResponseHeader::ContentLength) {
-                    Entry::Occupied(_) => (),
-                    Entry::Vacant(v) => {
-                        v.insert(response.body.len().to_string());
+                match response.headers.get_mut(HeaderType::ContentLength) {
+                    Some(_) => (),
+                    None => {
+                        response
+                            .headers
+                            .add(HeaderType::ContentLength, response.body.len().to_string());
                     }
                 }
 
@@ -686,7 +685,7 @@ pub(crate) fn call_handler<State>(
     state: Arc<State>,
 ) -> Response {
     // Iterate over the sub-apps and find the one which matches the host
-    if let Some(host) = request.headers.get(&RequestHeader::Host) {
+    if let Some(host) = request.headers.get(&HeaderType::Host) {
         if let Some(subapp) = subapps
             .iter()
             .find(|subapp| wildcard_match(&subapp.host, host))
@@ -726,7 +725,7 @@ fn call_websocket_handler<State>(
     stream: Stream,
 ) {
     // Iterate over the sub-apps and find the one which matches the host
-    if let Some(host) = request.headers.get(&RequestHeader::Host) {
+    if let Some(host) = request.headers.get(&HeaderType::Host) {
         if let Some(subapp) = subapps
             .iter()
             .find(|subapp| wildcard_match(&subapp.host, host))
@@ -755,27 +754,24 @@ fn call_websocket_handler<State>(
 
 #[cfg(feature = "tls")]
 fn force_https_thread(monitor: MonitorConfig) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::http::headers::ResponseHeader;
-    use std::io::Write;
-
     let socket = TcpListener::bind("0.0.0.0:80")?;
 
     for mut stream in socket.incoming().flatten() {
         let addr = stream.peer_addr()?;
         let request = Request::from_stream(&mut stream, addr)?;
 
-        let response = if let Some(host) = request.headers.get(&RequestHeader::Host) {
+        let response = if let Some(host) = request.headers.get(&HeaderType::Host) {
             Response::empty(StatusCode::MovedPermanently)
                 .with_header(
-                    ResponseHeader::Location,
+                    HeaderType::Location,
                     format!("https://{}{}", host, request.uri),
                 )
-                .with_header(ResponseHeader::Connection, "Close".into())
+                .with_header(HeaderType::Connection, "Close")
         } else {
             Response::empty(StatusCode::OK)
                 .with_bytes(b"<h1>Please access over HTTPS</h1>")
-                .with_header(ResponseHeader::ContentLength, "33".into())
-                .with_header(ResponseHeader::Connection, "Close".into())
+                .with_header(HeaderType::ContentLength, "33")
+                .with_header(HeaderType::Connection, "Close")
         };
 
         let response_bytes: Vec<u8> = response.into();

@@ -1,10 +1,8 @@
 //! Provides functionality for handling HTTP responses.
 
-use crate::http::date::DateTime;
-use crate::http::headers::{RequestHeader, ResponseHeader, ResponseHeaderMap};
-use crate::http::request::Request;
+use crate::http::headers::{HeaderLike, HeaderType, Headers};
 use crate::http::status::StatusCode;
-use std::collections::btree_map::Entry;
+
 use std::convert::TryFrom;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read};
@@ -29,8 +27,8 @@ pub struct Response {
     pub version: String,
     /// The status code of the response, for example 200 OK.
     pub status_code: StatusCode,
-    /// A map of the headers included in the response.
-    pub headers: ResponseHeaderMap,
+    /// A list of the headers included in the response.
+    pub headers: Headers,
     /// The body of the response.
     pub body: Vec<u8>,
 }
@@ -70,7 +68,7 @@ impl Response {
         Self {
             version: "HTTP/1.1".to_string(),
             status_code,
-            headers: ResponseHeaderMap::new(),
+            headers: Headers::new(),
             body: bytes.as_ref().to_vec(),
         }
     }
@@ -81,7 +79,7 @@ impl Response {
         Self {
             version: "HTTP/1.1".to_string(),
             status_code,
-            headers: ResponseHeaderMap::new(),
+            headers: Headers::new(),
             body: Vec::new(),
         }
     }
@@ -92,15 +90,16 @@ impl Response {
         T: AsRef<str>,
     {
         Self::empty(StatusCode::MovedPermanently)
-            .with_header(ResponseHeader::Location, location.as_ref().to_string())
+            .with_header(HeaderType::Location, location.as_ref().to_string())
     }
 
     /// Adds the given header to the response.
     /// Returns itself for use in a builder pattern.
-    pub fn with_header(mut self, header: ResponseHeader, value: String) -> Self {
-        self.headers.insert(header, value);
+    pub fn with_header(mut self, header: impl HeaderLike, value: impl AsRef<str>) -> Self {
+        self.headers.add(header, value);
         self
     }
+
     /// Appends the given bytes to the body.
     /// Returns itself for use in a builder pattern.
     pub fn with_bytes<T>(mut self, bytes: T) -> Self
@@ -111,87 +110,8 @@ impl Response {
         self
     }
 
-    /// Ensures compatibility with the request it is responding to.
-    /// This is done by respecting the `Connection` header of the request (if supplied), as well as
-    ///   setting the HTTP version to that of the request. While this is not required, it is
-    ///   strongly recommended to fully comply with the browser's request.
-    ///
-    /// Returns itself for use in a builder pattern.
-    ///
-    /// ## Deprecated
-    /// This function is deprecated and will be removed in a future release. It is automatically performed
-    ///   on every response before being sent, so you can safely remove it.
-    #[deprecated(
-        since = "0.3.0",
-        note = "This is automatically performed on every response."
-    )]
-    pub fn with_request_compatibility(mut self, request: &Request) -> Self {
-        if let Some(connection) = request.headers.get(&RequestHeader::Connection) {
-            self.headers
-                .insert(ResponseHeader::Connection, connection.to_string());
-        } else {
-            self.headers
-                .insert(ResponseHeader::Connection, "Close".to_string());
-        }
-
-        self.version = request.version.clone();
-
-        self
-    }
-
-    /// Automatically generates required headers.
-    /// **This is required** and must be called after calling `.with_bytes(body)` so the content length is accurate.
-    /// It will not overwrite any already applied headers.
-    ///
-    /// The generated headers are:
-    /// - `Content-Length`: the calculated content length of the body if non-zero
-    /// - `Server`: the server which responded to the request, in this case the string "Humphrey"
-    /// - `Date`: the formatted date when the response was created
-    /// - `Connection`: will be set to `Close` unless previously set, for example in `.with_request_compatibility(request)`
-    ///
-    /// Returns itself for use in a builder pattern.
-    ///
-    /// ## Deprecated
-    /// This function is deprecated and will be removed in a future release. It is automatically performed
-    ///   on every response before being sent, so you can safely remove it.
-    #[deprecated(
-        since = "0.3.0",
-        note = "This is automatically performed on every response."
-    )]
-    pub fn with_generated_headers(mut self) -> Self {
-        match self.headers.entry(ResponseHeader::Server) {
-            Entry::Occupied(_) => (),
-            Entry::Vacant(v) => {
-                v.insert("Humphrey".to_string());
-            }
-        }
-
-        match self.headers.entry(ResponseHeader::Date) {
-            Entry::Occupied(_) => (),
-            Entry::Vacant(v) => {
-                v.insert(DateTime::now().to_string());
-            }
-        }
-
-        match self.headers.entry(ResponseHeader::Connection) {
-            Entry::Occupied(_) => (),
-            Entry::Vacant(v) => {
-                v.insert("Close".to_string());
-            }
-        }
-
-        match self.headers.entry(ResponseHeader::ContentLength) {
-            Entry::Occupied(_) => (),
-            Entry::Vacant(v) => {
-                v.insert(self.body.len().to_string());
-            }
-        }
-
-        self
-    }
-
     /// Returns a reference to the response's headers.
-    pub fn get_headers(&self) -> &ResponseHeaderMap {
+    pub fn get_headers(&self) -> &Headers {
         &self.headers
     }
 
@@ -223,7 +143,7 @@ impl Response {
         let status_code: u16 = start_line[1].parse().map_err(|_| ResponseError::Response)?;
         let status = StatusCode::try_from(status_code).map_err(|_| ResponseError::Response)?;
 
-        let mut headers = ResponseHeaderMap::new();
+        let mut headers = Headers::new();
 
         loop {
             let mut line_buf: Vec<u8> = Vec::new();
@@ -238,15 +158,15 @@ impl Response {
                 safe_assert(line.len() >= 2)?;
                 let line_without_crlf = &line[0..line.len() - 2];
                 let line_parts: Vec<&str> = line_without_crlf.splitn(2, ':').collect();
-                headers.insert(
-                    ResponseHeader::from(line_parts[0]),
+                headers.add(
+                    HeaderType::from(line_parts[0]),
                     line_parts[1].trim_start().to_string(),
                 );
             }
         }
 
         if headers
-            .get(&ResponseHeader::TransferEncoding)
+            .get(&HeaderType::TransferEncoding)
             .and_then(|te| if te == "chunked" { Some(()) } else { None })
             .is_some()
         {
@@ -256,8 +176,8 @@ impl Response {
                 body.extend(chunk);
             }
 
-            headers.remove(&ResponseHeader::TransferEncoding);
-            headers.insert(ResponseHeader::ContentLength, body.len().to_string());
+            headers.remove(&HeaderType::TransferEncoding);
+            headers.add(HeaderType::ContentLength, body.len().to_string());
 
             Ok(Self {
                 version,
@@ -265,7 +185,7 @@ impl Response {
                 headers,
                 body,
             })
-        } else if let Some(content_length) = headers.get(&ResponseHeader::ContentLength) {
+        } else if let Some(content_length) = headers.get(&HeaderType::ContentLength) {
             let content_length: usize = content_length
                 .parse()
                 .map_err(|_| ResponseError::Response)?;
@@ -304,11 +224,11 @@ impl From<Response> for Vec<u8> {
             Vec::with_capacity(status_line.len() + val.body.len() + val.headers.len() * 32);
         bytes.extend(status_line.as_bytes());
 
-        for (header, value) in val.headers {
+        for header in val.get_headers().iter() {
             bytes.extend(b"\r\n");
-            bytes.extend(header.to_string().as_bytes());
+            bytes.extend(header.name.to_string().as_bytes());
             bytes.extend(b": ");
-            bytes.extend(value.as_bytes());
+            bytes.extend(header.value.as_bytes());
         }
 
         bytes.extend(b"\r\n\r\n");

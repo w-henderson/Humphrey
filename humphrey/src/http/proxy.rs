@@ -1,6 +1,5 @@
 //! Provides functionality for HTTP proxying.
 
-use crate::http::headers::RequestHeader;
 use crate::http::response::ResponseError;
 use crate::http::{Request, Response, StatusCode};
 
@@ -27,12 +26,9 @@ fn proxy_request_internal(
         TcpStream::connect_timeout(&target, timeout).map_err(|_| ResponseError::Stream)?;
 
     let mut cloned_request = request.clone();
-    cloned_request.headers.insert(
-        RequestHeader::Custom {
-            name: "X-Forwarded-For".to_string(),
-        },
-        request.address.origin_addr.to_string(),
-    );
+    cloned_request
+        .headers
+        .add("X-Forwarded-For", request.address.origin_addr.to_string());
     let request_bytes: Vec<u8> = cloned_request.into();
     stream
         .write_all(&request_bytes)

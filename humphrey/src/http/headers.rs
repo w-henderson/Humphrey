@@ -1,16 +1,105 @@
 //! Provides functionality for handling HTTP headers.
 
-use std::collections::BTreeMap;
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct Headers(Vec<Header>);
 
-/// Alias for a map of request headers and their values.
-pub type RequestHeaderMap = BTreeMap<RequestHeader, String>;
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Header {
+    pub name: HeaderType,
+    pub value: String,
+}
 
-/// Alias for a map of response headers and their values.
-pub type ResponseHeaderMap = BTreeMap<ResponseHeader, String>;
+impl Headers {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn add(&mut self, name: impl HeaderLike, value: impl AsRef<str>) {
+        self.0.push(Header::new(name.as_header(), value));
+    }
+
+    pub fn push(&mut self, header: Header) {
+        self.0.push(header);
+    }
+
+    pub fn get(&self, name: impl HeaderLike) -> Option<&str> {
+        let header = name.as_header();
+        self.0
+            .iter()
+            .find(|h| h.name == header)
+            .map(|h| h.value.as_str())
+    }
+
+    pub fn get_mut(&mut self, name: impl HeaderLike) -> Option<&mut String> {
+        let header = name.as_header();
+        self.0
+            .iter_mut()
+            .find(|h| h.name == header)
+            .map(|h| &mut h.value)
+    }
+
+    pub fn get_all(&self, name: impl HeaderLike) -> Vec<&str> {
+        let header = name.as_header();
+        self.0
+            .iter()
+            .filter(|h| h.name == header)
+            .map(|h| h.value.as_str())
+            .collect()
+    }
+
+    pub fn remove(&mut self, name: impl HeaderLike) {
+        let header = name.as_header();
+        self.0.retain(|h| h.name != header);
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = Header> {
+        let mut headers = self.0.clone();
+        headers.sort_unstable_by_key(|h| h.name.clone());
+        headers.into_iter()
+    }
+}
+
+impl Header {
+    pub fn new(name: impl HeaderLike, value: impl AsRef<str>) -> Self {
+        Self {
+            name: name.as_header(),
+            value: value.as_ref().to_string(),
+        }
+    }
+}
+
+pub trait HeaderLike {
+    fn as_header(self) -> HeaderType;
+}
+
+impl HeaderLike for HeaderType {
+    fn as_header(self) -> HeaderType {
+        self
+    }
+}
+
+impl HeaderLike for &HeaderType {
+    fn as_header(self) -> HeaderType {
+        self.clone()
+    }
+}
+
+impl<T> HeaderLike for T
+where
+    T: AsRef<str>,
+{
+    fn as_header(self) -> HeaderType {
+        HeaderType::from(self.as_ref())
+    }
+}
 
 /// Represents a header received in a request.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub enum RequestHeader {
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum HeaderType {
     /// Informs the server about the types of data that can be sent back.
     Accept,
     /// Informs the server about the accepted character encodings.
@@ -60,40 +149,18 @@ pub enum RequestHeader {
     /// Contains information about possible problems with the request.
     Warning,
 
-    /// Custom header with a lowercase name
-    Custom {
-        /// The name of the header.
-        name: String,
-    },
-}
-
-/// Represents a header sent in a response.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum ResponseHeader {
     /// Indicates whether the response can be shared with other origins.
     AccessControlAllowOrigin,
     /// Contains the time in seconds that the object has been cached.
     Age,
     /// The set of methods supported by the resource.
     Allow,
-    /// Indicates how the cache should behave.
-    CacheControl,
-    /// Indicates what should happen to the connection after the request is served.
-    Connection,
     /// Indicates whether the response is to be displayed as a webpage or downloaded directly.
     ContentDisposition,
-    /// Lists any encodings used on the payload.
-    ContentEncoding,
     /// Informs the client of the language of the payload body.
     ContentLanguage,
-    /// Indicates the length of the payload body.
-    ContentLength,
     /// Indicates an alternative location for the returned data.
     ContentLocation,
-    /// Indicates the MIME type of the payload body.
-    ContentType,
-    /// Indicates the date and time at which the response was created.
-    Date,
     /// Identifies a specific version of a resource.
     ETag,
     /// Contains the date and time at which the response is considered expired.
@@ -104,29 +171,18 @@ pub enum ResponseHeader {
     Link,
     /// Indicates the location at which the resource can be found, used for redirects.
     Location,
-    /// Contains backwards-compatible caching information.
-    Pragma,
     /// Contains information about the server which served the request.
     Server,
     /// Indicates that the client should set the specified cookies.
     SetCookie,
     /// Indicates the encoding used in the transfer of the payload body.
     TransferEncoding,
-    /// Indicates that the connection is to be upgraded to a different protocol, e.g. WebSocket.
-    Upgrade,
-    /// Contains the addresses of proxies through which the response has been forwarded.
-    Via,
-    /// Contains information about possible problems with the response.
-    Warning,
 
     /// Custom header with a lowercase name
-    Custom {
-        /// The name of the header.
-        name: String,
-    },
+    Custom(String),
 }
 
-impl PartialOrd for ResponseHeader {
+impl PartialOrd for HeaderType {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         if self.category() != other.category() {
             self.category().partial_cmp(&other.category())
@@ -136,13 +192,13 @@ impl PartialOrd for ResponseHeader {
     }
 }
 
-impl Ord for ResponseHeader {
+impl Ord for HeaderType {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap()
     }
 }
 
-impl From<&str> for RequestHeader {
+impl From<&str> for HeaderType {
     fn from(name: &str) -> Self {
         match name.to_ascii_lowercase().as_str() {
             "accept" => Self::Accept,
@@ -169,115 +225,70 @@ impl From<&str> for RequestHeader {
             "user-agent" => Self::UserAgent,
             "via" => Self::Via,
             "warning" => Self::Warning,
-            custom => Self::Custom {
-                name: custom.to_string(),
-            },
+            "access-control-allow-origin" => Self::AccessControlAllowOrigin,
+            "age" => Self::Age,
+            "allow" => Self::Allow,
+            "content-disposition" => Self::ContentDisposition,
+            "content-language" => Self::ContentLanguage,
+            "content-location" => Self::ContentLocation,
+            "etag" => Self::ETag,
+            "expires" => Self::Expires,
+            "last-modified" => Self::LastModified,
+            "link" => Self::Link,
+            "location" => Self::Location,
+            "server" => Self::Server,
+            "set-cookie" => Self::SetCookie,
+            "transfer-encoding" => Self::TransferEncoding,
+            custom => Self::Custom(custom.to_string()),
         }
     }
 }
 
-impl From<&str> for ResponseHeader {
-    fn from(name: &str) -> Self {
-        match name {
-            "Access-Control-Allow-Origin" => Self::AccessControlAllowOrigin,
-            "Age" => Self::Age,
-            "Allow" => Self::Allow,
-            "Cache-Control" => Self::CacheControl,
-            "Connection" => Self::Connection,
-            "Content-Disposition" => Self::ContentDisposition,
-            "Content-Encoding" => Self::ContentEncoding,
-            "Content-Language" => Self::ContentLanguage,
-            "Content-Length" => Self::ContentLength,
-            "Content-Location" => Self::ContentLocation,
-            "Content-Type" => Self::ContentType,
-            "Date" => Self::Date,
-            "ETag" => Self::ETag,
-            "Expires" => Self::Expires,
-            "Last-Modified" => Self::LastModified,
-            "Link" => Self::Link,
-            "Location" => Self::Location,
-            "Pragma" => Self::Pragma,
-            "Server" => Self::Server,
-            "Set-Cookie" => Self::SetCookie,
-            "Transfer-Encoding" => Self::TransferEncoding,
-            "Upgrade" => Self::Upgrade,
-            "Via" => Self::Via,
-            "Warning" => Self::Warning,
-            custom => Self::Custom {
-                name: custom.to_string(),
-            },
-        }
-    }
-}
-
-impl ToString for RequestHeader {
+impl ToString for HeaderType {
     fn to_string(&self) -> String {
-        if let RequestHeader::Custom { name } = self {
+        if let HeaderType::Custom(name) = self {
             return name.clone();
         }
 
         match self {
-            RequestHeader::Accept => "Accept",
-            RequestHeader::AcceptCharset => "Accept-Charset",
-            RequestHeader::AcceptEncoding => "Accept-Encoding",
-            RequestHeader::AcceptLanguage => "Accept-Language",
-            RequestHeader::AccessControlRequestMethod => "Access-Control-Request-Method",
-            RequestHeader::Authorization => "Authorization",
-            RequestHeader::CacheControl => "Cache-Control",
-            RequestHeader::Connection => "Connection",
-            RequestHeader::ContentEncoding => "Content-Encoding",
-            RequestHeader::ContentLength => "Content-Length",
-            RequestHeader::ContentType => "Content-Type",
-            RequestHeader::Cookie => "Cookie",
-            RequestHeader::Date => "Date",
-            RequestHeader::Expect => "Expect",
-            RequestHeader::Forwarded => "Forwarded",
-            RequestHeader::From => "From",
-            RequestHeader::Host => "Host",
-            RequestHeader::Origin => "Origin",
-            RequestHeader::Pragma => "Pragma",
-            RequestHeader::Referer => "Referer",
-            RequestHeader::Upgrade => "Upgrade",
-            RequestHeader::UserAgent => "User-Agent",
-            RequestHeader::Via => "Via",
-            RequestHeader::Warning => "Warning",
-            _ => "",
-        }
-        .to_string()
-    }
-}
-
-impl ToString for ResponseHeader {
-    fn to_string(&self) -> String {
-        if let ResponseHeader::Custom { name } = self {
-            return name.clone();
-        }
-
-        match self {
-            ResponseHeader::AccessControlAllowOrigin => "Access-Control-Allow-Origin",
-            ResponseHeader::Age => "Age",
-            ResponseHeader::Allow => "Allow",
-            ResponseHeader::CacheControl => "Cache-Control",
-            ResponseHeader::Connection => "Connection",
-            ResponseHeader::ContentDisposition => "Content-Disposition",
-            ResponseHeader::ContentEncoding => "Content-Encoding",
-            ResponseHeader::ContentLanguage => "Content-Language",
-            ResponseHeader::ContentLength => "Content-Length",
-            ResponseHeader::ContentLocation => "Content-Location",
-            ResponseHeader::ContentType => "Content-Type",
-            ResponseHeader::Date => "Date",
-            ResponseHeader::ETag => "ETag",
-            ResponseHeader::Expires => "Expires",
-            ResponseHeader::LastModified => "Last-Modified",
-            ResponseHeader::Link => "Link",
-            ResponseHeader::Location => "Location",
-            ResponseHeader::Pragma => "Pragma",
-            ResponseHeader::Server => "Server",
-            ResponseHeader::SetCookie => "Set-Cookie",
-            ResponseHeader::TransferEncoding => "Transfer-Encoding",
-            ResponseHeader::Upgrade => "Upgrade",
-            ResponseHeader::Via => "Via",
-            ResponseHeader::Warning => "Warning",
+            HeaderType::Accept => "Accept",
+            HeaderType::AcceptCharset => "Accept-Charset",
+            HeaderType::AcceptEncoding => "Accept-Encoding",
+            HeaderType::AcceptLanguage => "Accept-Language",
+            HeaderType::AccessControlRequestMethod => "Access-Control-Request-Method",
+            HeaderType::Authorization => "Authorization",
+            HeaderType::CacheControl => "Cache-Control",
+            HeaderType::Connection => "Connection",
+            HeaderType::ContentEncoding => "Content-Encoding",
+            HeaderType::ContentLength => "Content-Length",
+            HeaderType::ContentType => "Content-Type",
+            HeaderType::Cookie => "Cookie",
+            HeaderType::Date => "Date",
+            HeaderType::Expect => "Expect",
+            HeaderType::Forwarded => "Forwarded",
+            HeaderType::From => "From",
+            HeaderType::Host => "Host",
+            HeaderType::Origin => "Origin",
+            HeaderType::Pragma => "Pragma",
+            HeaderType::Referer => "Referer",
+            HeaderType::Upgrade => "Upgrade",
+            HeaderType::UserAgent => "User-Agent",
+            HeaderType::Via => "Via",
+            HeaderType::Warning => "Warning",
+            HeaderType::AccessControlAllowOrigin => "Access-Control-Allow-Origin",
+            HeaderType::Age => "Age",
+            HeaderType::Allow => "Allow",
+            HeaderType::ContentDisposition => "Content-Disposition",
+            HeaderType::ContentLanguage => "Content-Language",
+            HeaderType::ContentLocation => "Content-Location",
+            HeaderType::ETag => "ETag",
+            HeaderType::Expires => "Expires",
+            HeaderType::LastModified => "Last-Modified",
+            HeaderType::Link => "Link",
+            HeaderType::Location => "Location",
+            HeaderType::Server => "Server",
+            HeaderType::SetCookie => "Set-Cookie",
+            HeaderType::TransferEncoding => "Transfer-Encoding",
             _ => "",
         }
         .to_string()
@@ -294,34 +305,48 @@ enum HeaderCategory {
     Other,
 }
 
-impl ResponseHeader {
+impl HeaderType {
     fn category(&self) -> HeaderCategory {
         match self {
-            ResponseHeader::AccessControlAllowOrigin => HeaderCategory::Other,
-            ResponseHeader::Age => HeaderCategory::Response,
-            ResponseHeader::Allow => HeaderCategory::Entity,
-            ResponseHeader::CacheControl => HeaderCategory::General,
-            ResponseHeader::Connection => HeaderCategory::General,
-            ResponseHeader::ContentDisposition => HeaderCategory::Entity,
-            ResponseHeader::ContentEncoding => HeaderCategory::Entity,
-            ResponseHeader::ContentLanguage => HeaderCategory::Entity,
-            ResponseHeader::ContentLength => HeaderCategory::Entity,
-            ResponseHeader::ContentLocation => HeaderCategory::Entity,
-            ResponseHeader::ContentType => HeaderCategory::Entity,
-            ResponseHeader::Date => HeaderCategory::General,
-            ResponseHeader::ETag => HeaderCategory::Response,
-            ResponseHeader::Expires => HeaderCategory::Entity,
-            ResponseHeader::LastModified => HeaderCategory::Entity,
-            ResponseHeader::Link => HeaderCategory::Other,
-            ResponseHeader::Location => HeaderCategory::Response,
-            ResponseHeader::Pragma => HeaderCategory::General,
-            ResponseHeader::Server => HeaderCategory::Response,
-            ResponseHeader::SetCookie => HeaderCategory::Other,
-            ResponseHeader::TransferEncoding => HeaderCategory::Entity,
-            ResponseHeader::Upgrade => HeaderCategory::General,
-            ResponseHeader::Via => HeaderCategory::General,
-            ResponseHeader::Warning => HeaderCategory::General,
-            ResponseHeader::Custom { name: _ } => HeaderCategory::Other,
+            HeaderType::AccessControlAllowOrigin => HeaderCategory::Other,
+            HeaderType::Age => HeaderCategory::Response,
+            HeaderType::Allow => HeaderCategory::Entity,
+            HeaderType::CacheControl => HeaderCategory::General,
+            HeaderType::Connection => HeaderCategory::General,
+            HeaderType::ContentDisposition => HeaderCategory::Entity,
+            HeaderType::ContentEncoding => HeaderCategory::Entity,
+            HeaderType::ContentLanguage => HeaderCategory::Entity,
+            HeaderType::ContentLength => HeaderCategory::Entity,
+            HeaderType::ContentLocation => HeaderCategory::Entity,
+            HeaderType::ContentType => HeaderCategory::Entity,
+            HeaderType::Date => HeaderCategory::General,
+            HeaderType::ETag => HeaderCategory::Response,
+            HeaderType::Expires => HeaderCategory::Entity,
+            HeaderType::LastModified => HeaderCategory::Entity,
+            HeaderType::Link => HeaderCategory::Other,
+            HeaderType::Location => HeaderCategory::Response,
+            HeaderType::Pragma => HeaderCategory::General,
+            HeaderType::Server => HeaderCategory::Response,
+            HeaderType::SetCookie => HeaderCategory::Other,
+            HeaderType::TransferEncoding => HeaderCategory::Entity,
+            HeaderType::Upgrade => HeaderCategory::General,
+            HeaderType::Via => HeaderCategory::General,
+            HeaderType::Warning => HeaderCategory::General,
+            HeaderType::Custom(_) => HeaderCategory::Other,
+            HeaderType::Accept => HeaderCategory::Entity,
+            HeaderType::AcceptCharset => HeaderCategory::Entity,
+            HeaderType::AcceptEncoding => HeaderCategory::Entity,
+            HeaderType::AcceptLanguage => HeaderCategory::Entity,
+            HeaderType::AccessControlRequestMethod => HeaderCategory::Other,
+            HeaderType::Authorization => HeaderCategory::General,
+            HeaderType::Cookie => HeaderCategory::General,
+            HeaderType::Expect => HeaderCategory::Entity,
+            HeaderType::Forwarded => HeaderCategory::Response,
+            HeaderType::From => HeaderCategory::Response,
+            HeaderType::Host => HeaderCategory::General,
+            HeaderType::Origin => HeaderCategory::General,
+            HeaderType::Referer => HeaderCategory::General,
+            HeaderType::UserAgent => HeaderCategory::General,
         }
     }
 }

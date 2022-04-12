@@ -1,7 +1,7 @@
 //! Provides an HTTP client implementation for Humphrey.
 
 use crate::http::address::Address;
-use crate::http::headers::{RequestHeader, RequestHeaderMap, ResponseHeader};
+use crate::http::headers::{HeaderLike, HeaderType, Headers};
 use crate::http::method::Method;
 use crate::http::{Request, Response, StatusCode};
 
@@ -180,9 +180,8 @@ impl Client {
             self.tls_config.as_ref().unwrap().clone(),
             request
                 .headers
-                .get(&RequestHeader::Host)
+                .get(&HeaderType::Host)
                 .unwrap()
-                .as_str()
                 .try_into()
                 .unwrap(),
         )?;
@@ -205,8 +204,8 @@ impl Client {
             let protocol = Protocol::Http;
             let (host, path) = stripped.split_once('/').unwrap_or((stripped, ""));
 
-            let mut headers = RequestHeaderMap::new();
-            headers.insert(RequestHeader::Host, host.to_string());
+            let mut headers = Headers::new();
+            headers.add(HeaderType::Host, host.to_string());
 
             let host = format!("{}:80", host);
             let host = host.to_socket_addrs().ok()?.next()?;
@@ -224,8 +223,8 @@ impl Client {
             let protocol = Protocol::Https;
             let (host, path) = stripped.split_once('/').unwrap_or((stripped, ""));
 
-            let mut headers = RequestHeaderMap::new();
-            headers.insert(RequestHeader::Host, host.to_string());
+            let mut headers = Headers::new();
+            headers.add(HeaderType::Host, host.to_string());
 
             let host = format!("{}:443", host);
             let host = host.to_socket_addrs().ok()?.next()?;
@@ -256,10 +255,8 @@ pub struct ClientRequest<'a> {
 
 impl<'a> ClientRequest<'a> {
     /// Adds a header to the request.
-    pub fn with_header(mut self, header: RequestHeader, value: impl AsRef<str>) -> Self {
-        self.request
-            .headers
-            .insert(header, value.as_ref().to_string());
+    pub fn with_header(mut self, header: impl HeaderLike, value: impl AsRef<str>) -> Self {
+        self.request.headers.add(header, value);
         self
     }
 
@@ -290,10 +287,8 @@ impl<'a> ClientRequest<'a> {
             response
                 .and_then(|r| {
                     r.headers
-                        .get(&ResponseHeader::Location)
-                        .map_or(Err("No location header".into()), |s| {
-                            Ok(s.as_str().to_string())
-                        })
+                        .get(&HeaderType::Location)
+                        .map_or(Err("No location header".into()), |s| Ok(s.to_string()))
                 })
                 .and_then(|l| {
                     if l.starts_with('/') {
@@ -327,7 +322,7 @@ impl<'a> ClientRequest<'a> {
 pub(crate) struct ParsedUrl {
     pub(crate) protocol: Protocol,
     pub(crate) host: SocketAddr,
-    pub(crate) host_headers: RequestHeaderMap,
+    pub(crate) host_headers: Headers,
     pub(crate) path: String,
     pub(crate) query: String,
 }

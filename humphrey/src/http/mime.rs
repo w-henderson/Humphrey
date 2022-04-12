@@ -84,7 +84,13 @@ impl MimeType {
 
 impl From<MimeType> for String {
     fn from(val: MimeType) -> Self {
-        match val {
+        val.to_string()
+    }
+}
+
+impl ToString for MimeType {
+    fn to_string(&self) -> String {
+        match self {
             MimeType::TextCss => "text/css",
             MimeType::TextHtml => "text/html",
             MimeType::TextJavaScript => "text/javascript",
