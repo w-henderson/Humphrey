@@ -1,4 +1,4 @@
-use humphrey::http::headers::{RequestHeader, ResponseHeaderMap};
+use humphrey::http::headers::{HeaderType, Headers};
 use humphrey::http::{Request, Response, StatusCode};
 use humphrey::route::{try_find_path, LocatedPath};
 
@@ -8,7 +8,7 @@ use humphrey_server::declare_plugin;
 use humphrey_server::plugins::plugin::{Plugin, PluginLoadResult};
 use humphrey_server::server::server::AppState;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::io::Write;
 use std::net::{Shutdown, TcpStream};
@@ -172,14 +172,14 @@ impl PhpPlugin {
 
             // Forward supported headers
             for (forwarded_header, param_name) in [
-                (RequestHeader::Host, "HTTP_HOST"),
-                (RequestHeader::ContentType, "CONTENT_TYPE"),
-                (RequestHeader::Cookie, "HTTP_COOKIE"),
-                (RequestHeader::UserAgent, "HTTP_USER_AGENT"),
-                (RequestHeader::Authorization, "HTTP_AUTHORIZATION"),
+                (HeaderType::Host, "HTTP_HOST"),
+                (HeaderType::ContentType, "CONTENT_TYPE"),
+                (HeaderType::Cookie, "HTTP_COOKIE"),
+                (HeaderType::UserAgent, "HTTP_USER_AGENT"),
+                (HeaderType::Authorization, "HTTP_AUTHORIZATION"),
             ] {
                 if let Some(value) = request.headers.get(&forwarded_header) {
-                    params.insert(param_name.into(), value.clone());
+                    params.insert(param_name.into(), value.to_string());
                 }
             }
 
@@ -232,7 +232,7 @@ impl PhpPlugin {
 
             // Parse the headers
             let content = std::str::from_utf8(&content_bytes).unwrap();
-            let mut headers: ResponseHeaderMap = BTreeMap::new();
+            let mut headers = Headers::new();
             let mut content_split = content.splitn(2, "\r\n\r\n");
             let mut status = StatusCode::OK;
 
@@ -249,19 +249,19 @@ impl PhpPlugin {
                             status = new_status;
                         }
                     } else {
-                        headers.insert(name.into(), value.into());
+                        headers.add(name, value);
                     }
                 }
             }
 
             // Create a response
-            let mut response = Response::empty(status.clone())
-                .with_bytes(content_split.next().unwrap_or("").as_bytes());
+            let mut response =
+                Response::empty(status).with_bytes(content_split.next().unwrap_or("").as_bytes());
 
             // Add the headers
             response.headers = headers;
 
-            let status_code_number: u16 = status.clone().into();
+            let status_code_number: u16 = status.into();
             let status_code_string: &str = status.into();
 
             state.logger.info(&format!(
