@@ -1,5 +1,6 @@
 //! Provides functionality for handling HTTP responses.
 
+use crate::http::cookie::SetCookie;
 use crate::http::headers::{HeaderLike, HeaderType, Headers};
 use crate::http::status::StatusCode;
 
@@ -96,6 +97,25 @@ impl Response {
     /// Returns itself for use in a builder pattern.
     pub fn with_header(mut self, header: impl HeaderLike, value: impl AsRef<str>) -> Self {
         self.headers.add(header, value);
+        self
+    }
+
+    /// Adds the given cookie to the response in the `Set-Cookie` header.
+    /// Returns itself for use in a builder pattern.
+    ///
+    /// ## Example
+    /// ```
+    /// Response::empty(StatusCode::OK)
+    ///     .with_bytes(b"Success")
+    ///     .with_cookie(
+    ///         SetCookie::new("SessionToken", "abc123")
+    ///             .with_max_age(Duration::from_secs(3600))
+    ///             .with_secure(true)
+    ///             .with_path("/")
+    ///     )
+    /// ```
+    pub fn with_cookie(mut self, cookie: SetCookie) -> Self {
+        self.headers.push(cookie.into());
         self
     }
 
