@@ -5,6 +5,7 @@ use crate::http::headers::Header;
 use std::time::Duration;
 
 /// Represents an HTTP cookie as in the `Cookie` header.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Cookie {
     /// The name of the cookie.
     pub name: String,
@@ -15,6 +16,7 @@ pub struct Cookie {
 /// Represents an HTTP cookie as in the `Set-Cookie` header.
 ///
 /// Contains additional information about the cookie, such as its expiration.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SetCookie {
     /// The name of the cookie.
     pub name: String,
