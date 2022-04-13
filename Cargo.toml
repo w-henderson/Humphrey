@@ -6,3 +6,6 @@ members = [
   "humphrey-server",
   "humphrey-ws"
 ]
+
+[patch.crates-io]
+humphrey = { path = "./humphrey" }

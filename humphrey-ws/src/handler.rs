@@ -6,7 +6,7 @@ use crate::util::base64::Base64Encode;
 use crate::util::sha1::SHA1Hash;
 use crate::MAGIC_STRING;
 
-use humphrey::http::headers::{RequestHeader, ResponseHeader};
+use humphrey::http::headers::HeaderType;
 use humphrey::http::{Request, Response, StatusCode};
 use humphrey::stream::Stream;
 
@@ -110,9 +110,7 @@ fn handshake(request: Request, stream: &mut Stream) -> Result<(), WebsocketError
     // Get the handshake key header
     let handshake_key = request
         .headers
-        .get(&RequestHeader::Custom {
-            name: "sec-websocket-key".into(),
-        })
+        .get("Sec-WebSocket-Key")
         .ok_or(WebsocketError::HandshakeError)?;
 
     // Calculate the handshake response
@@ -120,14 +118,9 @@ fn handshake(request: Request, stream: &mut Stream) -> Result<(), WebsocketError
 
     // Serialise the handshake response
     let response = Response::empty(StatusCode::SwitchingProtocols)
-        .with_header(ResponseHeader::Upgrade, "websocket".into())
-        .with_header(ResponseHeader::Connection, "Upgrade".into())
-        .with_header(
-            ResponseHeader::Custom {
-                name: "Sec-WebSocket-Accept".into(),
-            },
-            sec_websocket_accept,
-        );
+        .with_header(HeaderType::Upgrade, "websocket")
+        .with_header(HeaderType::Connection, "Upgrade")
+        .with_header("Sec-WebSocket-Accept", sec_websocket_accept);
 
     // Transmit the handshake response
     let response_bytes: Vec<u8> = response.into();

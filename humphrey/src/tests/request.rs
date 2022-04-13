@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_imports)]
 use crate::http::address::Address;
-use crate::http::headers::RequestHeader;
+use crate::http::headers::{Header, HeaderType, Headers};
 use crate::http::method::Method;
 use crate::http::Request;
 use crate::tests::mock_stream::MockStream;
@@ -28,8 +28,8 @@ fn test_request_from_stream() {
     assert_eq!(request.content, None);
     assert_eq!(request.address, Address::new("1.2.3.4:5678").unwrap());
 
-    let mut expected_headers: BTreeMap<RequestHeader, String> = BTreeMap::new();
-    expected_headers.insert(RequestHeader::Host, "localhost".to_string());
+    let mut expected_headers: Headers = Headers::new();
+    expected_headers.add(HeaderType::Host, "localhost");
     assert_eq!(request.headers, expected_headers);
 }
 
@@ -40,17 +40,13 @@ fn test_bytes_from_request() {
         uri: "/test".into(),
         query: "foo=bar".into(),
         version: "HTTP/1.1".into(),
-        headers: BTreeMap::new(),
+        headers: Headers::new(),
         content: Some(b"this is a test".to_vec()),
         address: Address::new("1.2.3.4:5678").unwrap(),
     };
 
-    test_data
-        .headers
-        .insert(RequestHeader::ContentLength, "14".into());
-    test_data
-        .headers
-        .insert(RequestHeader::ContentType, "text/plain".into());
+    test_data.headers.add(HeaderType::ContentLength, "14");
+    test_data.headers.add(HeaderType::ContentType, "text/plain");
 
     let expected_bytes = b"GET /test?foo=bar HTTP/1.1\r\nContent-Length: 14\r\nContent-Type: text/plain\r\n\r\nthis is a test".to_vec();
 
@@ -83,13 +79,9 @@ fn test_proxied_request_from_stream() {
         }
     );
 
-    let mut expected_headers: BTreeMap<RequestHeader, String> = BTreeMap::new();
-    expected_headers.insert(RequestHeader::Host, "localhost".to_string());
-    expected_headers.insert(
-        RequestHeader::Custom {
-            name: "x-forwarded-for".into(),
-        },
-        "9.10.11.12,13.14.15.16".to_string(),
-    );
+    let mut expected_headers: Headers = Headers::new();
+    expected_headers.add(HeaderType::Host, "localhost");
+    expected_headers.add("X-Forwarded-For", "9.10.11.12,13.14.15.16");
+
     assert_eq!(request.headers, expected_headers);
 }

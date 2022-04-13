@@ -1,7 +1,7 @@
 //! Provides a number of useful handlers for Humphrey apps.
 
 use crate::app::error_handler;
-use crate::http::headers::ResponseHeader;
+use crate::http::headers::HeaderType;
 use crate::http::mime::MimeType;
 use crate::http::{Request, Response, StatusCode};
 use crate::route::{try_find_path, LocatedPath};
@@ -23,8 +23,8 @@ pub fn serve_file<T>(file_path: &'static str) -> impl Fn(Request, Arc<T>) -> Res
             if file.read_to_end(&mut buf).is_ok() {
                 return if let Some(extension) = path_buf.extension() {
                     Response::new(StatusCode::OK, buf).with_header(
-                        ResponseHeader::ContentType,
-                        MimeType::from_extension(extension.to_str().unwrap()).into(),
+                        HeaderType::ContentType,
+                        MimeType::from_extension(extension.to_str().unwrap()).to_string(),
                     )
                 } else {
                     Response::new(StatusCode::OK, buf)
@@ -57,8 +57,8 @@ pub fn serve_as_file_path<T>(directory_path: &'static str) -> impl Fn(Request, A
             if file.read_to_end(&mut buf).is_ok() {
                 return if let Some(extension) = path_buf.extension() {
                     Response::new(StatusCode::OK, buf).with_header(
-                        ResponseHeader::ContentType,
-                        MimeType::from_extension(extension.to_str().unwrap()).into(),
+                        HeaderType::ContentType,
+                        MimeType::from_extension(extension.to_str().unwrap()).to_string(),
                     )
                 } else {
                     Response::new(StatusCode::OK, buf)
@@ -88,15 +88,16 @@ pub fn serve_dir<T>(directory_path: &'static str) -> impl Fn(Request, Arc<T>, &s
         if let Some(located) = located {
             match located {
                 LocatedPath::Directory => Response::empty(StatusCode::MovedPermanently)
-                    .with_header(ResponseHeader::Location, format!("{}/", &request.uri)),
+                    .with_header(HeaderType::Location, format!("{}/", &request.uri)),
                 LocatedPath::File(path) => {
                     if let Ok(mut file) = File::open(&path) {
                         let mut buf = Vec::new();
                         if file.read_to_end(&mut buf).is_ok() {
                             return if let Some(extension) = path.extension() {
                                 Response::new(StatusCode::OK, buf).with_header(
-                                    ResponseHeader::ContentType,
-                                    MimeType::from_extension(extension.to_str().unwrap()).into(),
+                                    HeaderType::ContentType,
+                                    MimeType::from_extension(extension.to_str().unwrap())
+                                        .to_string(),
                                 )
                             } else {
                                 Response::new(StatusCode::OK, buf)

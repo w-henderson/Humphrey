@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 Headers can be added to the request by using the `with_header` method on the `ClientRequest` struct. For this example, we'll use the `User-Agent` header to identify the client. Redirects can be followed by using `with_redirects` and specifying to follow redirects.
 
 ```rs
-use humphrey::http::headers::RequestHeader;
+use humphrey::http::headers::HeaderType;
 use humphrey::Client;
 use std::error::Error;
 
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let response = client
         .get("https://api.ipify.org")?
         .with_redirects(true)
-        .with_header(RequestHeader::UserAgent, "HumphreyExample/1.0")
+        .with_header(HeaderType::UserAgent, "HumphreyExample/1.0")
         .send()?;
 
     println!("IP address: {}", response.text().ok_or("Invalid text")?);

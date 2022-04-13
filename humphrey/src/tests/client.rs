@@ -1,5 +1,5 @@
 use crate::client::{Client, ParsedUrl, Protocol};
-use crate::http::headers::{RequestHeader, RequestHeaderMap};
+use crate::http::headers::{HeaderType, Headers};
 
 use std::net::ToSocketAddrs;
 
@@ -15,8 +15,8 @@ fn test_url_parser() {
         Client::parse_url("https://google.com/search?q=test").unwrap(),
     ];
 
-    let mut expected_host_headers = RequestHeaderMap::new();
-    expected_host_headers.insert(RequestHeader::Host, "google.com".to_string());
+    let mut expected_host_headers = Headers::new();
+    expected_host_headers.add(HeaderType::Host, "google.com");
 
     let expected_urls = [
         ParsedUrl {

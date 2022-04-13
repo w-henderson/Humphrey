@@ -1,4 +1,4 @@
-use humphrey::http::headers::ResponseHeader;
+use humphrey::http::headers::HeaderType;
 use humphrey::http::{Request, Response, StatusCode};
 
 use humphrey_server::config::RouteConfig;
@@ -33,8 +33,8 @@ impl Plugin for ExamplePlugin {
 
             return Some(
                 Response::empty(StatusCode::OK)
-                    .with_bytes(b"Response overridden by example plugin :)".to_vec())
-                    .with_header(ResponseHeader::ContentType, "text/plain".into()),
+                    .with_bytes(b"Response overridden by example plugin :)")
+                    .with_header(HeaderType::ContentType, "text/plain"),
             );
         }
 
@@ -43,12 +43,7 @@ impl Plugin for ExamplePlugin {
 
     fn on_response(&self, response: &mut Response, state: Arc<AppState>) {
         // Insert a header to the response
-        response.headers.insert(
-            ResponseHeader::Custom {
-                name: "X-Example-Plugin".into(),
-            },
-            "true".into(),
-        );
+        response.headers.add("X-Example-Plugin", "true");
 
         state
             .logger

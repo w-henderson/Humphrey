@@ -1,6 +1,6 @@
 //! Provides functionality for parsing and representing network addresses.
 
-use crate::http::headers::{RequestHeader, RequestHeaderMap};
+use crate::http::headers::Headers;
 
 use std::error::Error;
 use std::fmt::Display;
@@ -37,12 +37,10 @@ impl Address {
     /// Create a new `Address` object from a request's headers and the socket address.
     /// This looks for the `X-Forwarded-For` header, used by proxies and CDNs, to find the origin address.
     pub fn from_headers(
-        headers: &RequestHeaderMap,
+        headers: &Headers,
         addr: impl ToSocketAddrs,
     ) -> Result<Self, Box<dyn Error>> {
-        if let Some(forwarded) = headers.get(&RequestHeader::Custom {
-            name: "x-forwarded-for".into(),
-        }) {
+        if let Some(forwarded) = headers.get("X-Forwarded-For") {
             let mut proxies: Vec<IpAddr> = forwarded
                 .split(',')
                 .filter_map(|s| IpAddr::from_str(s).ok())

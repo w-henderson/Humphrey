@@ -3,7 +3,7 @@ mod database;
 use database::WrappedDatabase;
 
 use humphrey::handlers::serve_dir;
-use humphrey::http::headers::ResponseHeader;
+use humphrey::http::headers::HeaderType;
 use humphrey::http::method::Method;
 use humphrey::http::{Request, Response, StatusCode};
 use humphrey::App;
@@ -99,7 +99,7 @@ fn login(request: Request, state: Arc<AppState>) -> Response {
 
                 return Response::empty(StatusCode::OK)
                     .with_header(
-                        ResponseHeader::SetCookie,
+                        HeaderType::SetCookie,
                         format!("HumphreyToken={}; Path=/; MaxAge=3600", token),
                     )
                     .with_bytes(b"OK");
@@ -172,10 +172,10 @@ fn sign_out(_: Request, state: Arc<AppState>, uid: String) -> Response {
     // Return a response which redirects the client to the homepage as well as resets the cookie.
     Response::empty(StatusCode::Found)
         .with_bytes("OK")
-        .with_header(ResponseHeader::Location, "/".into())
+        .with_header(HeaderType::Location, "/")
         .with_header(
-            ResponseHeader::SetCookie,
-            "HumphreyToken=deleted; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT".into(),
+            HeaderType::SetCookie,
+            "HumphreyToken=deleted; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
         )
 }
 
@@ -195,10 +195,10 @@ fn delete_account(_: Request, state: Arc<AppState>, uid: String) -> Response {
     // Return a response which redirects the client to the homepage as well as resets the cookie.
     Response::empty(StatusCode::Found)
         .with_bytes("OK")
-        .with_header(ResponseHeader::Location, "/".into())
+        .with_header(HeaderType::Location, "/")
         .with_header(
-            ResponseHeader::SetCookie,
-            "HumphreyToken=deleted; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT".into(),
+            HeaderType::SetCookie,
+            "HumphreyToken=deleted; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
         )
 }
 
@@ -213,7 +213,7 @@ fn profile(_: Request, state: Arc<AppState>, uid: String) -> Response {
 
     // Return the response.
     Response::empty(StatusCode::OK)
-        .with_header(ResponseHeader::ContentType, "text/html".into())
+        .with_header(HeaderType::ContentType, "text/html")
         .with_bytes(html)
 }
 

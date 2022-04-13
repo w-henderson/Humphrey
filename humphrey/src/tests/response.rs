@@ -1,5 +1,5 @@
 #![allow(unused_imports)]
-use crate::http::headers::{ResponseHeader, ResponseHeaderMap};
+use crate::http::headers::{HeaderType, Headers};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
 use crate::tests::mock_stream::MockStream;
@@ -11,22 +11,19 @@ use std::iter::FromIterator;
 fn test_response() {
     let response = Response::empty(StatusCode::OK)
         .with_bytes(b"<body>test</body>")
-        .with_header(ResponseHeader::ContentType, "text/html".to_string())
-        .with_header(ResponseHeader::ContentLanguage, "en-GB".to_string())
-        .with_header(
-            ResponseHeader::Date,
-            "Thu, 1 Jan 1970 00:00:00 GMT".to_string(),
-        ); // this would never be manually set in prod, but is obviously required for testing
+        .with_header(HeaderType::ContentType, "text/html")
+        .with_header(HeaderType::ContentLanguage, "en-GB")
+        .with_header(HeaderType::Date, "Thu, 1 Jan 1970 00:00:00 GMT"); // this would never be manually set in prod, but is obviously required for testing
 
     assert!(response
         .get_headers()
-        .get(&ResponseHeader::ContentType)
+        .get(&HeaderType::ContentType)
         .is_some());
 
     assert_eq!(
         response
             .get_headers()
-            .get(&ResponseHeader::ContentType)
+            .get(&HeaderType::ContentType)
             .unwrap(),
         "text/html"
     );
@@ -51,7 +48,7 @@ fn test_response_from_stream() {
     assert_eq!(response.version, "HTTP/1.1".to_string());
     assert_eq!(response.status_code, StatusCode::NotFound);
 
-    let mut expected_headers: BTreeMap<ResponseHeader, String> = BTreeMap::new();
-    expected_headers.insert(ResponseHeader::ContentLength, "51".into());
+    let mut expected_headers: Headers = Headers::new();
+    expected_headers.add(HeaderType::ContentLength, "51");
     assert_eq!(response.headers, expected_headers);
 }

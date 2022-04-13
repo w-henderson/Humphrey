@@ -1,7 +1,7 @@
 //! Provides functionality for handling HTTP requests.
 
 use crate::http::address::Address;
-use crate::http::headers::{RequestHeader, RequestHeaderMap};
+use crate::http::headers::{HeaderType, Headers};
 use crate::http::method::Method;
 use crate::stream::Stream;
 
@@ -22,8 +22,8 @@ pub struct Request {
     pub query: String,
     /// The HTTP version of the request.
     pub version: String,
-    /// A map of headers included in the request.
-    pub headers: RequestHeaderMap,
+    /// A list of headers included in the request.
+    pub headers: Headers,
     /// The request body, if supplied.
     pub content: Option<Vec<u8>>,
     /// The address from which the request came
@@ -137,7 +137,7 @@ impl Request {
         let uri = uri_iter.next().unwrap().to_string();
         let query = uri_iter.next().unwrap_or("").to_string();
 
-        let mut headers = RequestHeaderMap::new();
+        let mut headers = Headers::new();
 
         loop {
             let mut line_buf: Vec<u8> = Vec::with_capacity(256);
@@ -152,13 +152,12 @@ impl Request {
                 safe_assert(line.len() >= 2)?;
                 let line_without_crlf = &line[0..line.len() - 2];
                 let mut line_parts = line_without_crlf.splitn(2, ':');
-                headers.insert(
-                    RequestHeader::from(line_parts.next().to_error(RequestError::Request)?),
+                headers.add(
+                    HeaderType::from(line_parts.next().to_error(RequestError::Request)?),
                     line_parts
                         .next()
                         .to_error(RequestError::Request)?
-                        .trim_start()
-                        .to_string(),
+                        .trim_start(),
                 );
             }
         }
@@ -166,7 +165,7 @@ impl Request {
         let address =
             Address::from_headers(&headers, address).map_err(|_| RequestError::Request)?;
 
-        if let Some(content_length) = headers.get(&RequestHeader::ContentLength) {
+        if let Some(content_length) = headers.get(&HeaderType::ContentLength) {
             let content_length: usize =
                 content_length.parse().map_err(|_| RequestError::Request)?;
             let mut content_buf: Vec<u8> = vec![0u8; content_length];
@@ -216,7 +215,7 @@ impl From<Request> for Vec<u8> {
         let headers = req
             .headers
             .iter()
-            .map(|(k, v)| format!("{}: {}", k.to_string(), v))
+            .map(|h| format!("{}: {}", h.name.to_string(), h.value))
             .collect::<Vec<String>>()
             .join("\r\n");
 

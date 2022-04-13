@@ -55,7 +55,7 @@ Let's add some code which will intercept all requests to the `/example` route, a
 ```rs
 // --snip--
 
-use humphrey::http::headers::ResponseHeader;
+use humphrey::http::headers::HeaderType;
 use humphrey::http::{Request, Response, StatusCode};
 use humphrey_server::config::RouteConfig;
 use humphrey_server::AppState;
@@ -83,7 +83,7 @@ impl Plugin for MyPlugin {
             return Some(
                 Response::empty(StatusCode::OK)
                     .with_bytes("Hello, world!")
-                    .with_header(ResponseHeader::ContentType, "text/plain".into()),
+                    .with_header(HeaderType::ContentType, "text/plain"),
             );
         }
 
@@ -105,12 +105,7 @@ impl Plugin for MyPlugin {
 
     fn on_response(&self, response: &mut Response, state: Arc<AppState>) {
         // Insert a header to the response
-        response.headers.insert(
-            ResponseHeader::Custom {
-                name: "X-Example-Plugin".into(),
-            },
-            "true".into(),
-        );
+        response.headers.add("X-Example-Plugin", "true");
 
         state
             .logger

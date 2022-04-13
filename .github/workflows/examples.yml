@@ -15,11 +15,13 @@ jobs:
   examples:
     name: Check Examples
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
 
       - name: Install stable toolchain
+        if: always()
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -27,90 +29,105 @@ jobs:
           override: true
 
       - name: Check async WebSocket example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/async-websocket/Cargo.toml
 
       - name: Check auth example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/auth/Cargo.toml
 
       - name: Check basic example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/basic/Cargo.toml
 
       - name: Check broadcast example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/broadcast/Cargo.toml
 
       - name: Check chat app example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/chat-app/server/Cargo.toml
 
       - name: Check client example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/client/Cargo.toml
 
       - name: Check database example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/database/Cargo.toml
 
       - name: Check host example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/host/Cargo.toml
           
       - name: Check monitor example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/monitor/Cargo.toml
 
       - name: Check plugin example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/plugin/Cargo.toml
 
       - name: Check stateful example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/stateful/Cargo.toml
 
       - name: Check static content example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/static-content/Cargo.toml
 
       - name: Check TLS example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/tls/Cargo.toml
 
       - name: Check WebSocket example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/websocket/Cargo.toml
 
       - name: Check wildcard example
+        if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
