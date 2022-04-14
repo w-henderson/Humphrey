@@ -44,6 +44,26 @@ impl Cookie {
             value: value.as_ref().to_string(),
         }
     }
+
+    /// Convert a collection of cookies into a `Cookie` header.
+    pub fn to_header(cookies: impl AsRef<[Cookie]>) -> Option<Header> {
+        let cookies = cookies.as_ref();
+
+        if cookies.is_empty() {
+            return None;
+        }
+
+        let mut value = String::with_capacity(cookies.len() * 32);
+
+        for cookie in cookies {
+            value.push_str(&cookie.name);
+            value.push('=');
+            value.push_str(&cookie.value);
+            value.push_str("; ");
+        }
+
+        Some(Header::new("Cookie", &value[..value.len() - 2]))
+    }
 }
 
 impl SetCookie {
