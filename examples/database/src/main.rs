@@ -3,19 +3,20 @@ use humphrey::http::method::Method;
 use humphrey::http::{Request, Response, StatusCode};
 use humphrey::App;
 
-use jasondb::database::Database;
-use jasondb::prelude::*;
-use jasondb::JasonDB;
+use jasondb::Database;
 
-use std::{error::Error, sync::Arc};
+use std::error::Error;
+use std::sync::{Arc, Mutex};
+use std::time::UNIX_EPOCH;
+
+type AppState = Mutex<Database<String>>;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Open the database or create it if it doesn't exist.
-    // This automatically starts a background thread to synchronize the database to disk.
-    let database = JasonDB::open("database.jdb").unwrap_or_else(new_db);
+    let database: Database<String> = Database::new("database.jdb")?;
 
     // Create an app with the database as the state.
-    let app: App<JasonDB> = App::new_with_config(32, database)
+    let app: App<AppState> = App::new_with_config(32, Mutex::new(database))
         // Add a handler for the root path since we'll need that to be dynamic.
         .with_route("/", home)
         // Add an API endpoint to add a message to the database.
@@ -30,14 +31,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// The handler for the root path.
-fn home(_: Request, db: Arc<JasonDB>) -> Response {
-    let messages = collection!(db.read(), "messages") // Use the `collection!` macro to get a collection from the database.
-        .list() // List the documents in the collection.
-        .iter() // Iterate over the documents, using `fold` to join together the document values.
-        .fold(String::new(), |mut acc, message| {
-            acc.push_str(&format!("<li>{}</li>", message.json)); // WARNING: XSS vulnerability!
-            acc
-        });
+fn home(_: Request, db: Arc<AppState>) -> Response {
+    // Query the database for all messages.
+    let mut messages = db.lock().unwrap().iter().flatten().collect::<Vec<_>>();
+
+    messages.sort_unstable_by(|(a, _), (b, _)| {
+        a.parse::<u128>().unwrap().cmp(&b.parse::<u128>().unwrap())
+    });
+
+    let messages = messages
+        .into_iter()
+        .map(|(_, v)| v)
+        .fold(String::new(), |acc, v| acc + &format!("<li>{}</li>", v));
 
     // Render the template with the messages.
     let html = include_str!("../static/index.html").replace("{messages}", &messages);
@@ -46,7 +51,7 @@ fn home(_: Request, db: Arc<JasonDB>) -> Response {
 }
 
 /// The handler for the API endpoint to add a message to the database.
-fn post_message(request: Request, db: Arc<JasonDB>) -> Response {
+fn post_message(request: Request, db: Arc<AppState>) -> Response {
     // If the request is not a POST request, return a 405 Method Not Allowed response.
     if request.method != Method::Post {
         return Response::new(StatusCode::MethodNotAllowed, "405 Method Not Allowed");
@@ -56,20 +61,12 @@ fn post_message(request: Request, db: Arc<JasonDB>) -> Response {
     if let Some(body) = &request.content {
         let message = String::from_utf8(body.clone()).unwrap();
 
-        // Use the `push!` macro of JasonDB to add the message to the `messages` collection of the database.
-        push!(db.write(), "messages", message);
+        // Add the message to the database with the current time as the key.
+        let mut db = db.lock().unwrap();
+        let key = UNIX_EPOCH.elapsed().unwrap().as_millis();
+        db.set(key.to_string(), message).unwrap();
     }
 
     // Return a 200 OK response.
     Response::new(StatusCode::OK, b"OK")
-}
-
-/// Create a new database, automatically starting the background thread to synchronize the database to disk.
-fn new_db(_: Box<dyn Error>) -> JasonDB {
-    // Create the database and the `messages` collection.
-    let mut db = Database::new("database.jdb");
-    db.create_collection("messages").unwrap();
-
-    // Initialise the JasonDB instance with the pre-existing database.
-    JasonDB::init(db, "database.jdb")
 }
