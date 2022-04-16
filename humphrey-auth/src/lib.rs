@@ -1,10 +1,17 @@
 //! Web applications commonly need a way of authenticating users. This crate provides an easy and secure way to do this, integrating with Humphrey using the `AuthApp` trait and allowing complete control over the database users are stored in. Humphrey Auth does not come with a database, but the `AuthDatabase` trait is implemented for `Vec<User>` to get started. For a production use, you should use a proper database and implement the `AuthDatabase` trait for it.
 //!
+//! If a JSON representation of users is useful for your database, you can enable the `json` feature which provides JSON serialization and deserialization for `User` and `Session` using the Humphrey JSON crate.
+//!
 //! Learn more about Humphrey Auth [here](https://humphrey.whenderson.dev/auth/index.html).
 
 #![warn(missing_docs)]
 
+#[cfg(feature = "humphrey")]
 pub mod app;
+
+#[cfg(feature = "json")]
+mod json;
+
 pub mod config;
 pub mod database;
 pub mod error;
