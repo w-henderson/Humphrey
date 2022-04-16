@@ -3,6 +3,7 @@ mod database;
 use database::WrappedDatabase;
 
 use humphrey::handlers::serve_dir;
+use humphrey::http::cookie::SetCookie;
 use humphrey::http::headers::HeaderType;
 use humphrey::http::method::Method;
 use humphrey::http::{Request, Response, StatusCode};
@@ -17,6 +18,7 @@ use jasondb::{Database, JasonDB};
 
 use std::error::Error;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
 
 struct AppState {
     db: WrappedDatabase,
@@ -37,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Set up the authentication provider.
     let config = AuthConfig::default()
         .with_default_lifetime(30) // sessions expire after 30 seconds
-        .with_pepper("hunter42"); // pepper is used when hashing passwords, this should be kept very safe
+        .with_pepper("hunter2"); // pepper is used when hashing passwords, this should be kept very safe
     let provider = AuthProvider::new(database.clone()).with_config(config);
 
     // Set up the app's state.
@@ -98,9 +100,10 @@ fn login(request: Request, state: Arc<AppState>) -> Response {
                 // If the session was created, return a 200 response with the token.
 
                 return Response::empty(StatusCode::OK)
-                    .with_header(
-                        HeaderType::SetCookie,
-                        format!("HumphreyToken={}; Path=/; MaxAge=3600", token),
+                    .with_cookie(
+                        SetCookie::new("HumphreyToken", token)
+                            .with_path("/")
+                            .with_max_age(Duration::from_secs(3600)),
                     )
                     .with_bytes(b"OK");
             } else {
@@ -173,9 +176,10 @@ fn sign_out(_: Request, state: Arc<AppState>, uid: String) -> Response {
     Response::empty(StatusCode::Found)
         .with_bytes("OK")
         .with_header(HeaderType::Location, "/")
-        .with_header(
-            HeaderType::SetCookie,
-            "HumphreyToken=deleted; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+        .with_cookie(
+            SetCookie::new("HumphreyToken", "deleted")
+                .with_path("/")
+                .with_expires("Thu, 01 Jan 1970 00:00:00 GMT"),
         )
 }
 
@@ -196,9 +200,10 @@ fn delete_account(_: Request, state: Arc<AppState>, uid: String) -> Response {
     Response::empty(StatusCode::Found)
         .with_bytes("OK")
         .with_header(HeaderType::Location, "/")
-        .with_header(
-            HeaderType::SetCookie,
-            "HumphreyToken=deleted; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+        .with_cookie(
+            SetCookie::new("HumphreyToken", "deleted")
+                .with_path("/")
+                .with_expires("Thu, 01 Jan 1970 00:00:00 GMT"),
         )
 }
 

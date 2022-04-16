@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+use crate::http::cookie::SetCookie;
 use crate::http::headers::{HeaderType, Headers};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
@@ -6,6 +7,7 @@ use crate::tests::mock_stream::MockStream;
 
 use std::collections::{BTreeMap, VecDeque};
 use std::iter::FromIterator;
+use std::time::Duration;
 
 #[test]
 fn test_response() {
@@ -15,20 +17,36 @@ fn test_response() {
         .with_header(HeaderType::ContentLanguage, "en-GB")
         .with_header(HeaderType::Date, "Thu, 1 Jan 1970 00:00:00 GMT"); // this would never be manually set in prod, but is obviously required for testing
 
-    assert!(response
-        .get_headers()
-        .get(&HeaderType::ContentType)
-        .is_some());
-
     assert_eq!(
-        response
-            .get_headers()
-            .get(&HeaderType::ContentType)
-            .unwrap(),
-        "text/html"
+        response.get_headers().get(&HeaderType::ContentType),
+        Some("text/html")
     );
 
     let expected_bytes: Vec<u8> = b"HTTP/1.1 200 OK\r\nDate: Thu, 1 Jan 1970 00:00:00 GMT\r\nContent-Language: en-GB\r\nContent-Type: text/html\r\n\r\n<body>test</body>\r\n".to_vec();
+    let bytes: Vec<u8> = response.into();
+
+    assert_eq!(bytes, expected_bytes);
+}
+
+#[test]
+fn test_cookie_response() {
+    let response = Response::empty(StatusCode::OK)
+        .with_bytes(b"Hello, world!")
+        .with_cookie(
+            SetCookie::new("X-Example-Cookie", "example-value")
+                .with_path("/")
+                .with_max_age(Duration::from_secs(3600))
+                .with_secure(true),
+        );
+
+    assert_eq!(
+        response.get_headers().get(&HeaderType::SetCookie),
+        Some("X-Example-Cookie=example-value; Max-Age=3600; Path=/; Secure")
+    );
+
+    let expected_bytes: Vec<u8> =
+        b"HTTP/1.1 200 OK\r\nSet-Cookie: X-Example-Cookie=example-value; Max-Age=3600; Path=/; Secure\r\n\r\nHello, world!\r\n"
+            .to_vec();
     let bytes: Vec<u8> = response.into();
 
     assert_eq!(bytes, expected_bytes);

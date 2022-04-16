@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_imports)]
 use crate::http::address::Address;
+use crate::http::cookie::Cookie;
 use crate::http::headers::{Header, HeaderType, Headers};
 use crate::http::method::Method;
 use crate::http::Request;
@@ -16,8 +17,6 @@ fn test_request_from_stream() {
     let mut stream = MockStream::with_data(VecDeque::from_iter(test_data.iter().cloned()));
     let request = Request::from_stream(&mut stream, "1.2.3.4:5678".parse().unwrap());
 
-    assert!(request.is_ok());
-
     let request = request.unwrap();
     let expected_uri: String = "/testpath".into();
     let expected_query: String = "foo=bar".into();
@@ -31,6 +30,21 @@ fn test_request_from_stream() {
     let mut expected_headers: Headers = Headers::new();
     expected_headers.add(HeaderType::Host, "localhost");
     assert_eq!(request.headers, expected_headers);
+}
+
+#[test]
+fn test_cookie_request() {
+    let test_data = b"GET / HTTP/1.1\r\nHost: localhost\r\nCookie: foo=bar; baz=qux\r\n\r\n";
+    let mut stream = MockStream::with_data(VecDeque::from_iter(test_data.iter().cloned()));
+    let request = Request::from_stream(&mut stream, "1.2.3.4:5678".parse().unwrap()).unwrap();
+
+    let mut expected_cookies = vec![Cookie::new("foo", "bar"), Cookie::new("baz", "qux")];
+
+    assert_eq!(request.get_cookies(), expected_cookies);
+
+    assert_eq!(request.get_cookie("baz"), expected_cookies.pop());
+    assert_eq!(request.get_cookie("foo"), expected_cookies.pop());
+    assert_eq!(request.get_cookie("sus"), None);
 }
 
 #[test]
@@ -61,8 +75,6 @@ fn test_proxied_request_from_stream() {
         b"GET /testpath HTTP/1.1\r\nHost: localhost\r\nX-Forwarded-For: 9.10.11.12,13.14.15.16\r\n\r\n";
     let mut stream = MockStream::with_data(VecDeque::from_iter(test_data.iter().cloned()));
     let request = Request::from_stream(&mut stream, "1.2.3.4:5678".parse().unwrap());
-
-    assert!(request.is_ok());
 
     let request = request.unwrap();
     let expected_uri: String = "/testpath".into();

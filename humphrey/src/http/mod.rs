@@ -1,6 +1,7 @@
 //! Contains the Humphrey HTTP implementation.
 
 pub mod address;
+pub mod cookie;
 pub mod date;
 pub mod headers;
 pub mod method;

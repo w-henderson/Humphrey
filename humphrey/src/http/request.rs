@@ -1,6 +1,7 @@
 //! Provides functionality for handling HTTP requests.
 
 use crate::http::address::Address;
+use crate::http::cookie::Cookie;
 use crate::http::headers::{HeaderType, Headers};
 use crate::http::method::Method;
 use crate::stream::Stream;
@@ -97,6 +98,29 @@ impl Request {
         stream.set_timeout(None).map_err(|_| RequestError::Stream)?;
 
         Self::from_stream_inner(stream, address, first_buf[0])
+    }
+
+    /// Get the cookies from the request.
+    pub fn get_cookies(&self) -> Vec<Cookie> {
+        self.headers
+            .get(HeaderType::Cookie)
+            .map(|cookies| {
+                cookies
+                    .split(';')
+                    .filter_map(|cookie| {
+                        let (k, v) = cookie.split_once('=')?;
+                        Some(Cookie::new(k.trim(), v.trim()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Attempts to get a specific cookie from the request.
+    pub fn get_cookie(&self, name: impl AsRef<str>) -> Option<Cookie> {
+        self.get_cookies()
+            .into_iter()
+            .find(|cookie| cookie.name == name.as_ref())
     }
 
     /// Attempts to read and parse one HTTP request from the given reader.

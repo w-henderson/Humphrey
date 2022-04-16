@@ -1,6 +1,7 @@
 //! Provides an HTTP client implementation for Humphrey.
 
 use crate::http::address::Address;
+use crate::http::cookie::Cookie;
 use crate::http::headers::{HeaderLike, HeaderType, Headers};
 use crate::http::method::Method;
 use crate::http::{Request, Response, StatusCode};
@@ -53,6 +54,7 @@ impl Client {
             protocol: url.protocol,
             request,
             follow_redirects: false,
+            cookies: Vec::new(),
         })
     }
 
@@ -79,6 +81,7 @@ impl Client {
             protocol: url.protocol,
             request,
             follow_redirects: false,
+            cookies: Vec::new(),
         })
     }
 
@@ -105,6 +108,7 @@ impl Client {
             protocol: url.protocol,
             request,
             follow_redirects: false,
+            cookies: Vec::new(),
         })
     }
 
@@ -127,6 +131,7 @@ impl Client {
             protocol: url.protocol,
             request,
             follow_redirects: false,
+            cookies: Vec::new(),
         })
     }
 
@@ -251,12 +256,19 @@ pub struct ClientRequest<'a> {
     address: SocketAddr,
     request: Request,
     follow_redirects: bool,
+    cookies: Vec<Cookie>,
 }
 
 impl<'a> ClientRequest<'a> {
     /// Adds a header to the request.
     pub fn with_header(mut self, header: impl HeaderLike, value: impl AsRef<str>) -> Self {
         self.request.headers.add(header, value);
+        self
+    }
+
+    /// Adds a cookie to the request.
+    pub fn with_cookie(mut self, cookie: Cookie) -> Self {
+        self.cookies.push(cookie);
         self
     }
 
@@ -268,6 +280,10 @@ impl<'a> ClientRequest<'a> {
 
     /// Sends the request.
     pub fn send(mut self) -> Result<Response, Box<dyn Error>> {
+        if let Some(header) = Cookie::to_header(&self.cookies) {
+            self.request.headers.push(header);
+        }
+
         let response = match self.protocol {
             Protocol::Http => self.client.request(self.address, self.request.clone()),
             Protocol::Https => self.client.request_tls(self.address, self.request.clone()),
