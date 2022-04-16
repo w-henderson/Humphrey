@@ -1,6 +1,8 @@
 mod database;
+mod user;
 
 use database::WrappedDatabase;
+use user::UserInfo;
 
 use humphrey::handlers::serve_dir;
 use humphrey::http::cookie::SetCookie;
@@ -13,15 +15,15 @@ use humphrey_auth::app::{AuthApp, AuthState};
 use humphrey_auth::config::AuthConfig;
 use humphrey_auth::AuthProvider;
 
-use jasondb::prelude::*;
-use jasondb::{Database, JasonDB};
+use jasondb::query;
+use jasondb::Database;
 
 use std::error::Error;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
 struct AppState {
-    db: WrappedDatabase,
+    db: Mutex<Database<UserInfo>>,
     auth: Mutex<AuthProvider<WrappedDatabase>>,
 }
 
@@ -32,19 +34,22 @@ impl AuthState<WrappedDatabase> for AppState {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Use JasonDB to create a database in memory, wrapping it so we can implement `AuthDatabase` on it in `database.rs`.
-    let database = JasonDB::open("database.jdb").unwrap_or_else(new_db);
-    let database = WrappedDatabase::new(database);
+    // Use JasonDB to create or open a database, wrapping it so we can implement `AuthDatabase` on it in `database.rs`.
+    let auth_db = Database::new("auth_db.jdb")?.with_index("session.token")?;
+    let auth_db = WrappedDatabase::new(auth_db);
 
     // Set up the authentication provider.
     let config = AuthConfig::default()
         .with_default_lifetime(30) // sessions expire after 30 seconds
-        .with_pepper("hunter2"); // pepper is used when hashing passwords, this should be kept very safe
-    let provider = AuthProvider::new(database.clone()).with_config(config);
+        .with_pepper("hunter42"); // pepper is used when hashing passwords, this should be kept very safe
+    let provider = AuthProvider::new(auth_db).with_config(config);
+
+    // Create a database to store user information.
+    let database = Database::new("users_db.jdb")?.with_index("name")?;
 
     // Set up the app's state.
     let state = AppState {
-        db: database,
+        db: Mutex::new(database),
         auth: Mutex::new(provider),
     };
 
@@ -78,13 +83,12 @@ fn login(request: Request, state: Arc<AppState>) -> Response {
 
     // Get the UID of the user with the given username from the database.
     let uid = {
-        let db = state.db.0.read();
-        let users = db.collection("users").unwrap();
-        users
-            .list()
-            .iter()
-            .find(|doc| doc.json == username)
-            .map(|doc| doc.id.clone())
+        let mut db = state.db.lock().unwrap();
+
+        db.query(query!(name == username))
+            .ok()
+            .and_then(|i| i.flatten().next())
+            .map(|(_, user)| user.uid)
     };
 
     if let Some(uid) = uid {
@@ -137,9 +141,9 @@ fn signup(request: Request, state: Arc<AppState>) -> Response {
 
     // Check whether a user with the given username already exists.
     let existing_user = {
-        let db = state.db.0.write();
-        let users = db.collection("users").unwrap();
-        users.list().iter().any(|doc| doc.json == username)
+        let mut db = state.db.lock().unwrap();
+
+        db.query(query!(name == username)).unwrap().count() > 0
     };
 
     if !existing_user {
@@ -152,11 +156,17 @@ fn signup(request: Request, state: Arc<AppState>) -> Response {
         };
 
         // Add the user to the database.
-        // It is important to note that the user's ID and password are already in the auth section of the database,
-        //   but we need to add the user's ID and username into the users section of the database.
-        let mut db = state.db.0.write();
-        let users = db.collection_mut("users").unwrap();
-        users.set(uid, username);
+        // It is important to note that the user's ID and password are already in the auth database,
+        //   but we need to add the user's ID and username into the users database.
+        let mut db = state.db.lock().unwrap();
+        db.set(
+            &uid,
+            UserInfo {
+                uid: uid.to_string(),
+                name: username.to_string(),
+            },
+        )
+        .unwrap();
 
         // Return a successful response.
         return Response::new(StatusCode::OK, b"OK");
@@ -187,9 +197,8 @@ fn sign_out(_: Request, state: Arc<AppState>, uid: String) -> Response {
 fn delete_account(_: Request, state: Arc<AppState>, uid: String) -> Response {
     // Remove the user from the users section of the database.
     {
-        let mut db = state.db.0.write();
-        let users = db.collection_mut("users").unwrap();
-        users.remove(&uid);
+        let mut db = state.db.lock().unwrap();
+        db.delete(&uid).unwrap();
     }
 
     // Use the auth provider to remove the user from the auth section of the database.
@@ -210,25 +219,14 @@ fn delete_account(_: Request, state: Arc<AppState>, uid: String) -> Response {
 /// Profile page handler.
 fn profile(_: Request, state: Arc<AppState>, uid: String) -> Response {
     // Use the database to get the username of the authenticated user.
-    let db = state.db.0.read();
-    let user = document!(&*db, &format!("users/{}", uid));
+    let mut db = state.db.lock().unwrap();
+    let user = db.get(uid).unwrap();
 
     // Format the HTML template with the username.
-    let html = include_str!("../static/profile.html").replace("{username}", &user.json);
+    let html = include_str!("../static/profile.html").replace("{username}", &user.name);
 
     // Return the response.
     Response::empty(StatusCode::OK)
         .with_header(HeaderType::ContentType, "text/html")
         .with_bytes(html)
-}
-
-/// Create a new database, automatically starting the background thread to synchronize the database to disk.
-fn new_db(_: Box<dyn Error>) -> JasonDB {
-    // Create the database and the `messages` collection.
-    let mut db = Database::new("database.jdb");
-    db.create_collection("auth").unwrap();
-    db.create_collection("users").unwrap();
-
-    // Initialise the JasonDB instance with the pre-existing database.
-    JasonDB::init(db, "database.jdb")
 }

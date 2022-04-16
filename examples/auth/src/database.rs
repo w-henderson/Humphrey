@@ -3,40 +3,35 @@ use humphrey_auth::error::AuthError;
 use humphrey_auth::session::Session;
 use humphrey_auth::user::User;
 
-use std::sync::Arc;
+use std::sync::Mutex;
 
-use jasondb::database::Document;
-use jasondb::JasonDB;
+use jasondb::query;
+use jasondb::Database;
 
-#[derive(Clone)]
-pub struct WrappedDatabase(pub Arc<JasonDB>);
+pub struct WrappedDatabase(pub Mutex<Database<User>>);
 
 impl WrappedDatabase {
-    pub fn new(db: JasonDB) -> Self {
-        Self(Arc::new(db))
+    pub fn new(db: Database<User>) -> Self {
+        Self(Mutex::new(db))
     }
 }
 
 impl AuthDatabaseTrait for WrappedDatabase {
     fn get_user_by_uid(&self, uid: impl AsRef<str>) -> Option<User> {
-        let db = self.0.read();
-        let auth = db.collection("auth").unwrap();
-        let user = auth.get(uid);
+        let mut db = self.0.lock().ok()?;
 
-        user.map(deserialize_user)
+        db.get(uid).ok()
     }
 
     fn get_user_by_token(&self, token: impl AsRef<str>) -> Option<User> {
-        let db = self.0.read();
-        let auth = db.collection("auth").unwrap();
-        let user = auth.list().iter().find(|user| {
-            let user = deserialize_user(user);
-            user.session
-                .map(|s| s.token == token.as_ref())
-                .unwrap_or(false)
-        });
+        let mut db = self.0.lock().ok()?;
+        let token = token.as_ref();
 
-        user.map(deserialize_user)
+        db.query(query!(session.token == token))
+            .ok()?
+            .next()?
+            .ok()
+            .map(|(_, user)| user)
     }
 
     fn get_session_by_token(&self, token: impl AsRef<str>) -> Option<Session> {
@@ -45,14 +40,10 @@ impl AuthDatabaseTrait for WrappedDatabase {
     }
 
     fn update_user(&mut self, user: User) -> Result<(), AuthError> {
-        let mut db = self.0.write();
-        let auth = db.collection_mut("auth").unwrap();
+        let mut db = self.0.lock().map_err(|_| AuthError::GenericError)?;
+        let uid = user.uid.clone();
 
-        if auth.set(user.uid.as_str(), serialize_user(user.clone())) {
-            Ok(())
-        } else {
-            Err(AuthError::GenericError)
-        }
+        db.set(uid, user).map_err(|_| AuthError::GenericError)
     }
 
     fn add_user(&mut self, user: User) -> Result<(), AuthError> {
@@ -60,47 +51,8 @@ impl AuthDatabaseTrait for WrappedDatabase {
     }
 
     fn remove_user(&mut self, uid: impl AsRef<str>) -> Result<(), AuthError> {
-        let mut db = self.0.write();
-        let auth = db.collection_mut("auth").unwrap();
+        let mut db = self.0.lock().map_err(|_| AuthError::GenericError)?;
 
-        if auth.remove(uid.as_ref()) {
-            Ok(())
-        } else {
-            Err(AuthError::GenericError)
-        }
-    }
-}
-
-fn serialize_user(user: User) -> String {
-    if let Some(session) = user.session {
-        format!(
-            "{};{};{};{}",
-            user.uid, user.password_hash, session.token, session.expiry
-        )
-    } else {
-        format!("{};{}", user.uid, user.password_hash)
-    }
-}
-
-fn deserialize_user(document: &Document) -> User {
-    let mut split = document.json.split(';');
-    let uid = split.next().unwrap();
-    let hash = split.next().unwrap();
-
-    let session = if let Some(token) = split.next() {
-        let expiry: u64 = split.next().unwrap().parse().unwrap();
-
-        Some(Session {
-            token: token.to_string(),
-            expiry,
-        })
-    } else {
-        None
-    };
-
-    User {
-        uid: uid.to_string(),
-        password_hash: hash.to_string(),
-        session,
+        db.delete(uid).map_err(|_| AuthError::GenericError)
     }
 }

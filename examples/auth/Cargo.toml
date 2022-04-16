@@ -3,11 +3,10 @@ name = "auth"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-humphrey = { path = "../../humphrey" }
-humphrey_auth = { path = "../../humphrey-auth" }
-jasondb = { version = "0.1.2", default-features = false }
+humphrey = "^0.6.0"
+humphrey_auth = { version = "^0.1.4", features = ["humphrey", "json"] }
+humphrey_json = "^0.1.1"
+jasondb = "^0.2.2"
 
 [workspace]
