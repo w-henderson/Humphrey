@@ -34,6 +34,23 @@ pub struct SetCookie {
     pub secure: bool,
     /// Whether the cookie is HTTP-only.
     pub http_only: bool,
+    /// The SameSite configuration of the cookie.
+    pub same_site: Option<SameSite>,
+}
+
+/// Represents the SameSite value of the cookie.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SameSite {
+    /// Cookies will only be sent in a first-party context and not be sent along with requests
+    ///   initiated by third party websites.
+    Strict,
+    /// Cookies are not sent on normal cross-site subrequests (for example to load images or frames
+    ///   into a third party site), but are sent when a user is navigating to the origin site
+    ///   (i.e., when following a link).
+    Lax,
+    /// Cookies will be sent in all contexts, i.e. in responses to both first-party and cross-origin requests.
+    /// If SameSite=None is set, the cookie Secure attribute must also be set (or the cookie will be blocked).
+    None,
 }
 
 impl Cookie {
@@ -78,6 +95,7 @@ impl SetCookie {
             path: None,
             secure: false,
             http_only: false,
+            same_site: None,
         }
     }
 
@@ -118,6 +136,12 @@ impl SetCookie {
         self.http_only = http_only;
         self
     }
+
+    /// Set the SameSite configuration of the cookie.
+    pub fn with_same_site(mut self, same_site: SameSite) -> Self {
+        self.same_site = Some(same_site);
+        self
+    }
 }
 
 impl From<SetCookie> for Header {
@@ -138,6 +162,18 @@ impl From<SetCookie> for Header {
 
         if let Some(path) = cookie.path {
             value = format!("{}; Path={}", value, path);
+        }
+
+        if let Some(same_site) = cookie.same_site {
+            value = format!(
+                "{}; SameSite={}",
+                value,
+                match same_site {
+                    SameSite::Strict => "Strict",
+                    SameSite::Lax => "Lax",
+                    SameSite::None => "None",
+                }
+            );
         }
 
         if cookie.secure {
