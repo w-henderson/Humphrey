@@ -5,7 +5,7 @@ use database::WrappedDatabase;
 use user::UserInfo;
 
 use humphrey::handlers::serve_dir;
-use humphrey::http::cookie::SetCookie;
+use humphrey::http::cookie::{SameSite, SetCookie};
 use humphrey::http::headers::HeaderType;
 use humphrey::http::method::Method;
 use humphrey::http::{Request, Response, StatusCode};
@@ -107,7 +107,8 @@ fn login(request: Request, state: Arc<AppState>) -> Response {
                     .with_cookie(
                         SetCookie::new("HumphreyToken", token)
                             .with_path("/")
-                            .with_max_age(Duration::from_secs(3600)),
+                            .with_max_age(Duration::from_secs(3600))
+                            .with_same_site(SameSite::Strict),
                     )
                     .with_bytes(b"OK");
             } else {
