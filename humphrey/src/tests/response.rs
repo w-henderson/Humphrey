@@ -1,5 +1,5 @@
 #![allow(unused_imports)]
-use crate::http::cookie::SetCookie;
+use crate::http::cookie::{SameSite, SetCookie};
 use crate::http::headers::{HeaderType, Headers};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
@@ -37,15 +37,24 @@ fn test_cookie_response() {
                 .with_path("/")
                 .with_max_age(Duration::from_secs(3600))
                 .with_secure(true),
+        )
+        .with_cookie(
+            SetCookie::new("X-Example-Token", "example-token")
+                .with_domain("example.com")
+                .with_same_site(SameSite::Strict)
+                .with_secure(true),
         );
 
     assert_eq!(
-        response.get_headers().get(&HeaderType::SetCookie),
-        Some("X-Example-Cookie=example-value; Max-Age=3600; Path=/; Secure")
+        response.get_headers().get_all(&HeaderType::SetCookie),
+        vec![
+            "X-Example-Cookie=example-value; Max-Age=3600; Path=/; Secure",
+            "X-Example-Token=example-token; Domain=example.com; SameSite=Strict; Secure"
+        ]
     );
 
     let expected_bytes: Vec<u8> =
-        b"HTTP/1.1 200 OK\r\nSet-Cookie: X-Example-Cookie=example-value; Max-Age=3600; Path=/; Secure\r\n\r\nHello, world!\r\n"
+        b"HTTP/1.1 200 OK\r\nSet-Cookie: X-Example-Cookie=example-value; Max-Age=3600; Path=/; Secure\r\nSet-Cookie: X-Example-Token=example-token; Domain=example.com; SameSite=Strict; Secure\r\n\r\nHello, world!\r\n"
             .to_vec();
     let bytes: Vec<u8> = response.into();
 
