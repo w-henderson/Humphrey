@@ -406,13 +406,15 @@ where
                 match message {
                     OutgoingMessage::Message(addr, message) => {
                         if let Some(stream) = self.streams.get_mut(&addr) {
-                            stream.send(message).unwrap();
+                            // Ignore errors with sending for now, and deal with them in the next iteration.
+                            stream.send(message).ok();
                         }
                     }
                     OutgoingMessage::Broadcast(message) => {
                         let frame = message.to_frame();
                         for stream in self.streams.values_mut() {
-                            stream.send_raw(&frame).unwrap();
+                            // Ignore errors with sending for now, and deal with them in the next iteration.
+                            stream.send_raw(&frame).ok();
                         }
                     }
                 }
@@ -450,14 +452,12 @@ impl AsyncStream {
         assert!(self.connected);
         self.sender
             .send(OutgoingMessage::Message(self.addr, message))
-            .unwrap();
+            .ok();
     }
 
     /// Broadcast a message to all connected clients.
     pub fn broadcast(&self, message: Message) {
-        self.sender
-            .send(OutgoingMessage::Broadcast(message))
-            .unwrap();
+        self.sender.send(OutgoingMessage::Broadcast(message)).ok();
     }
 
     /// Get the address of the stream.
@@ -469,13 +469,11 @@ impl AsyncStream {
 impl AsyncSender {
     /// Send a message to the client identified by the socket address.
     pub fn send(&self, address: SocketAddr, message: Message) {
-        self.0
-            .send(OutgoingMessage::Message(address, message))
-            .unwrap()
+        self.0.send(OutgoingMessage::Message(address, message)).ok();
     }
 
     /// Broadcast a message to all connected clients.
     pub fn broadcast(&self, message: Message) {
-        self.0.send(OutgoingMessage::Broadcast(message)).unwrap();
+        self.0.send(OutgoingMessage::Broadcast(message)).ok();
     }
 }

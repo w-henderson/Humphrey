@@ -97,10 +97,7 @@ pub fn async_websocket_handler<S>(
 ) -> impl Fn(Request, Stream, Arc<S>) {
     move |request: Request, mut stream: Stream, _: Arc<S>| {
         if handshake(request, &mut stream).is_ok() {
-            hook.lock()
-                .unwrap()
-                .send(WebsocketStream::new(stream))
-                .unwrap();
+            hook.lock().unwrap().send(WebsocketStream::new(stream)).ok();
         }
     }
 }
