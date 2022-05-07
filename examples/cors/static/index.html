@@ -13,16 +13,22 @@
     This should be served from a different origin to the Humphrey app.
   </p>
 
-  <button onclick="simple()">Send simple cross-origin request</button>
-  <button onclick="preflighted()">Send preflighted cross-origin request</button>
+  <button onclick="simple('http://localhost/')">Send simple cross-origin request to http://localhost (should fail)</button><br>
+  <button onclick="preflighted('http://localhost/')">Send preflighted cross-origin request to http://localhost (should fail)</button><br>
+  <button onclick="simple('http://localhost/cors')">Send simple cross-origin request to http://localhost/cors (should succeed)</button><br>
+  <button onclick="preflighted('http://localhost/cors')">Send preflighted cross-origin request to http://localhost/cors (should succeed)</button><br>
+  <button onclick="simple('http://cors.localhost/')">Send simple cross-origin request to http://cors.localhost (should succeed)</button><br>
+  <button onclick="preflighted('http://cors.localhost/')">Send preflighted cross-origin request to http://cors.localhost (should succeed)</button><br>
+  <button onclick="simple('http://cors.localhost/cors')">Send simple cross-origin request to http://cors.localhost/cors (should succeed)</button><br>
+  <button onclick="preflighted('http://cors.localhost/cors')">Send preflighted cross-origin request to http://cors.localhost/cors (should succeed)</button>
 
   <script>
-    function simple() {
-      fetch("http://localhost/").then(() => alert("Success"), e => alert(`Failure: ${e}`));
+    function simple(url) {
+      fetch(url).then(() => alert("Success"), e => alert(`Failure: ${e}`));
     }
 
-    function preflighted() {
-      fetch("http://localhost/", {
+    function preflighted(url) {
+      fetch(url, {
         method: "POST",
         headers: {
           "X-Custom-Header": "Custom value"
