@@ -2,15 +2,17 @@
 
 #![allow(clippy::new_without_default)]
 
+use crate::http::cors::Cors;
 use crate::http::date::DateTime;
 use crate::http::headers::HeaderType;
+use crate::http::method::Method;
 use crate::http::request::{Request, RequestError};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
 use crate::krauss::wildcard_match;
 use crate::monitor::event::{Event, EventType};
 use crate::monitor::MonitorConfig;
-use crate::route::{Route, SubApp};
+use crate::route::{Route, RouteHandler, SubApp};
 use crate::stream::Stream;
 use crate::thread::pool::ThreadPool;
 
@@ -436,6 +438,24 @@ where
         self
     }
 
+    /// Sets the CORS configuration for the app.
+    ///
+    /// This overrides the CORS configuration for existing and future individual routes.
+    ///
+    /// To simply allow every origin, method and header, use `Cors::wildcard()`.
+    pub fn with_cors(mut self, cors: Cors) -> Self {
+        self.default_subapp = self.default_subapp.with_cors(cors);
+        self
+    }
+
+    /// Sets the CORS configuration for the specified route.
+    ///
+    /// To simply allow every origin, method and header, use `Cors::wildcard()`.
+    pub fn with_cors_config(mut self, route: &str, cors: Cors) -> Self {
+        self.default_subapp = self.default_subapp.with_cors_config(route, cors);
+        self
+    }
+
     /// Sets whether HTTPS should be forced on all connections. Defaults to false.
     ///
     /// If this is set to true, a background thread will be spawned when `run_tls` is called to send
@@ -516,6 +536,7 @@ where
 /// Handles a connection with a client.
 /// The connection will be opened upon the first request and closed as soon as a request is
 ///   recieved without the `Connection: Keep-Alive` header.
+#[allow(clippy::too_many_arguments)]
 fn client_handler<State>(
     mut stream: Stream,
     subapps: Arc<Vec<SubApp<State>>>,
@@ -567,8 +588,43 @@ fn client_handler<State>(
 
         // Generate the response based on the handlers
         let response = match &request {
+            Ok(request) if request.method == Method::Options => {
+                let handler = get_handler(request, &subapps, &default_subapp);
+
+                match handler {
+                    Some(handler) => {
+                        let mut response = Response::empty(StatusCode::NoContent)
+                            .with_header(HeaderType::Date, DateTime::now().to_string())
+                            .with_header(HeaderType::Server, "Humphrey")
+                            .with_header(
+                                HeaderType::Connection,
+                                match keep_alive {
+                                    true => "Keep-Alive",
+                                    false => "Close",
+                                },
+                            );
+
+                        handler.cors.set_headers(&mut response.headers);
+
+                        response
+                    }
+                    None => error_handler(StatusCode::NotFound),
+                }
+            }
             Ok(request) => {
-                let mut response = call_handler(request, &subapps, &default_subapp, state.clone());
+                let handler = get_handler(request, &subapps, &default_subapp);
+
+                let mut response = match handler {
+                    Some(handler) => {
+                        let mut response: Response =
+                            (handler.handler)(request.clone(), state.clone());
+
+                        handler.cors.set_headers(&mut response.headers);
+
+                        response
+                    }
+                    None => error_handler(StatusCode::NotFound),
+                };
 
                 // Automatically generate required headers
                 match response.headers.get_mut(HeaderType::Connection) {
@@ -677,13 +733,12 @@ fn client_handler<State>(
     monitor.send(Event::new(EventType::ConnectionClosed).with_peer(addr));
 }
 
-/// Calls the correct handler for the given request.
-pub(crate) fn call_handler<State>(
-    request: &Request,
-    subapps: &[SubApp<State>],
-    default_subapp: &SubApp<State>,
-    state: Arc<State>,
-) -> Response {
+/// Gets the correct handler for the given request.
+pub(crate) fn get_handler<'a, State>(
+    request: &'a Request,
+    subapps: &'a [SubApp<State>],
+    default_subapp: &'a SubApp<State>,
+) -> Option<&'a RouteHandler<State>> {
     // Iterate over the sub-apps and find the one which matches the host
     if let Some(host) = request.headers.get(&HeaderType::Host) {
         if let Some(subapp) = subapps
@@ -691,29 +746,27 @@ pub(crate) fn call_handler<State>(
             .find(|subapp| wildcard_match(&subapp.host, host))
         {
             // If the sub-app has a handler for this route, call it
-            if let Some(response) = subapp
+            if let Some(handler) = subapp
                 .routes // Get the routes of the sub-app
                 .iter() // Iterate over the routes
-                .find(|route| route.route.route_matches(&request.uri)) // Find the route that matches
-                .map(|handler| (handler.handler)(request.clone(), state.clone()))
+                .find(|route| route.route.route_matches(&request.uri))
+            // Find the route that matches
             {
-                return response;
+                return Some(handler);
             }
         }
     }
 
     // If no sub-app was found, try to use the handler on the default sub-app
-    if let Some(response) = default_subapp
+    if let Some(handler) = default_subapp
         .routes
         .iter()
         .find(|route| route.route.route_matches(&request.uri))
-        .map(|handler| (handler.handler)(request.clone(), state))
     {
-        return response;
+        return Some(handler);
     }
 
-    // Otherwise return an error
-    error_handler(StatusCode::NotFound)
+    None
 }
 
 /// Calls the correct WebSocket handler for the given request.

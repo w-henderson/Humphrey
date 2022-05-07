@@ -2,6 +2,7 @@
 
 pub mod address;
 pub mod cookie;
+pub mod cors;
 pub mod date;
 pub mod headers;
 pub mod method;

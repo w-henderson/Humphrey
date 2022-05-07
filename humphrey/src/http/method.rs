@@ -15,6 +15,8 @@ pub enum Method {
     Put,
     /// The `DELETE` method.
     Delete,
+    /// The `OPTIONS` method.
+    Options,
 }
 
 impl Method {
@@ -31,6 +33,7 @@ impl Method {
             "POST" => Ok(Self::Post),
             "PUT" => Ok(Self::Put),
             "DELETE" => Ok(Self::Delete),
+            "OPTIONS" => Ok(Self::Options),
             _ => Err(RequestError::Request),
         }
     }
@@ -46,6 +49,7 @@ impl Display for Method {
                 Method::Post => "POST",
                 Method::Put => "PUT",
                 Method::Delete => "DELETE",
+                Method::Options => "OPTIONS",
             }
         )
     }
