@@ -9,6 +9,12 @@ enum Wildcardable<T> {
     Value(T),
 }
 
+/// Represents a CORS configuration.
+///
+/// Cross-origin resource sharing (CORS) is a mechanism that allows a server to indicate any origins other than
+///   its own from which a browser should permit loading resources.
+///
+/// Learn more about CORS at the [MDN docs](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS).
 #[derive(Clone, Default)]
 pub struct Cors {
     allowed_origins: Wildcardable<Vec<String>>,
@@ -17,10 +23,19 @@ pub struct Cors {
 }
 
 impl Cors {
+    /// Creates a new CORS configuration with no allowed origins.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Creates a new CORS configuration with every origin, header and method allowed.
+    ///
+    /// This corresponds to the following headers:
+    /// ```text
+    /// Access-Control-Allow-Origin: *
+    /// Access-Control-Allow-Headers: *
+    /// Access-Control-Allow-Methods: * (although this is implied)
+    /// ```
     pub fn wildcard() -> Self {
         Self {
             allowed_origins: Wildcardable::Wildcard,
@@ -29,21 +44,25 @@ impl Cors {
         }
     }
 
+    /// Sets the allowed origins to "*", allowing all origins.
     pub fn with_wildcard_origin(mut self) -> Self {
         self.allowed_origins = Wildcardable::Wildcard;
         self
     }
 
+    /// Sets the allowed methods to "*", allowing all methods.
     pub fn with_wildcard_methods(mut self) -> Self {
         self.allowed_methods = Wildcardable::Wildcard;
         self
     }
 
+    /// Sets the allowed headers to "*", allowing all headers.
     pub fn with_wildcard_headers(mut self) -> Self {
         self.allowed_headers = Wildcardable::Wildcard;
         self
     }
 
+    /// Adds the allowed origin.
     pub fn with_origin(mut self, origin: &str) -> Self {
         match self.allowed_origins {
             Wildcardable::Wildcard => (),
@@ -52,6 +71,7 @@ impl Cors {
         self
     }
 
+    /// Adds the allowed method.
     pub fn with_method(mut self, method: Method) -> Self {
         match self.allowed_methods {
             Wildcardable::Wildcard => (),
@@ -60,6 +80,7 @@ impl Cors {
         self
     }
 
+    /// Adds the allowed header.
     pub fn with_header(mut self, header: impl HeaderLike) -> Self {
         match self.allowed_headers {
             Wildcardable::Wildcard => (),
@@ -68,6 +89,7 @@ impl Cors {
         self
     }
 
+    /// Sets the appropriate headers for the CORS configuration.
     pub(crate) fn set_headers(&self, headers: &mut Headers) {
         match self.allowed_origins {
             Wildcardable::Wildcard => {

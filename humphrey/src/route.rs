@@ -118,6 +118,11 @@ impl<State> SubApp<State> {
         self
     }
 
+    /// Sets the CORS configuration for the sub-app.
+    ///
+    /// This overrides the CORS configuration for existing and future individual routes.
+    ///
+    /// To simply allow every origin, method and header, use `Cors::wildcard()`.
     pub fn with_cors(mut self, cors: Cors) -> Self {
         self.cors = Some(cors.clone());
 
@@ -128,6 +133,9 @@ impl<State> SubApp<State> {
         self
     }
 
+    /// Sets the CORS configuration for a given route.
+    ///
+    /// To simply allow every origin, method and header, use `Cors::wildcard()`.
     pub fn with_cors_config(mut self, route: &str, cors: Cors) -> Self {
         self.routes.iter_mut().for_each(|r| {
             if r.route == route {

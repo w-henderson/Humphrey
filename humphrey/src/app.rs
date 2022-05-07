@@ -438,15 +438,19 @@ where
         self
     }
 
-    /// Specifies whether to allow cross-origin requests.
+    /// Sets the CORS configuration for the app.
     ///
-    /// See the [MDN docs](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) for more information.
-    /// If in doubt, you probably want to leave this off for security purposes.
+    /// This overrides the CORS configuration for existing and future individual routes.
+    ///
+    /// To simply allow every origin, method and header, use `Cors::wildcard()`.
     pub fn with_cors(mut self, cors: Cors) -> Self {
         self.default_subapp = self.default_subapp.with_cors(cors);
         self
     }
 
+    /// Sets the CORS configuration for the specified route.
+    ///
+    /// To simply allow every origin, method and header, use `Cors::wildcard()`.
     pub fn with_cors_config(mut self, route: &str, cors: Cors) -> Self {
         self.default_subapp = self.default_subapp.with_cors_config(route, cors);
         self
