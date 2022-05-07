@@ -91,41 +91,47 @@ impl Cors {
 
     /// Sets the appropriate headers for the CORS configuration.
     pub(crate) fn set_headers(&self, headers: &mut Headers) {
-        match self.allowed_origins {
-            Wildcardable::Wildcard => {
-                headers.add(HeaderType::AccessControlAllowOrigin, "*");
+        if headers.get(HeaderType::AccessControlAllowOrigin).is_none() {
+            match self.allowed_origins {
+                Wildcardable::Wildcard => {
+                    headers.add(HeaderType::AccessControlAllowOrigin, "*");
+                }
+                Wildcardable::Value(ref origins) if !origins.is_empty() => {
+                    headers.add(HeaderType::AccessControlAllowOrigin, &origins.join(", "));
+                }
+                _ => (),
             }
-            Wildcardable::Value(ref origins) if !origins.is_empty() => {
-                headers.add(HeaderType::AccessControlAllowOrigin, &origins.join(", "));
-            }
-            _ => (),
         }
 
-        match self.allowed_methods {
-            Wildcardable::Value(ref methods) if !methods.is_empty() => {
-                headers.add(
-                    HeaderType::AccessControlAllowMethods,
-                    &methods
-                        .iter()
-                        .map(|m| m.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                );
+        if headers.get(HeaderType::AccessControlAllowMethods).is_none() {
+            match self.allowed_methods {
+                Wildcardable::Value(ref methods) if !methods.is_empty() => {
+                    headers.add(
+                        HeaderType::AccessControlAllowMethods,
+                        &methods
+                            .iter()
+                            .map(|m| m.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    );
+                }
+                _ => (),
             }
-            _ => (),
         }
 
-        match self.allowed_headers {
-            Wildcardable::Wildcard => {
-                headers.add(HeaderType::AccessControlAllowHeaders, "*");
+        if headers.get(HeaderType::AccessControlAllowHeaders).is_none() {
+            match self.allowed_headers {
+                Wildcardable::Wildcard => {
+                    headers.add(HeaderType::AccessControlAllowHeaders, "*");
+                }
+                Wildcardable::Value(ref allowed_headers) if !allowed_headers.is_empty() => {
+                    headers.add(
+                        HeaderType::AccessControlAllowHeaders,
+                        &allowed_headers.join(", "),
+                    );
+                }
+                _ => (),
             }
-            Wildcardable::Value(ref allowed_headers) if !allowed_headers.is_empty() => {
-                headers.add(
-                    HeaderType::AccessControlAllowHeaders,
-                    &allowed_headers.join(", "),
-                );
-            }
-            _ => (),
         }
     }
 }
