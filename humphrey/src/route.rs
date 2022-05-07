@@ -3,6 +3,7 @@
 use crate::app::{
     PathAwareRequestHandler, RequestHandler, StatelessRequestHandler, WebsocketHandler,
 };
+use crate::http::cors::Cors;
 use crate::krauss;
 use crate::percent::PercentDecode;
 
@@ -17,6 +18,9 @@ pub struct SubApp<State> {
     pub routes: Vec<RouteHandler<State>>,
     /// The routes to process WebSocket requests for and their handlers.
     pub websocket_routes: Vec<WebsocketRouteHandler<State>>,
+    /// The CORS configuration for this subapp.
+    /// If not specified, it is down to the individual routes to specify CORS configuration.
+    pub cors: Option<Cors>,
 }
 
 /// Encapsulates a route and its handler.
@@ -25,6 +29,8 @@ pub struct RouteHandler<State> {
     pub route: String,
     /// The handler to run when the route is matched.
     pub handler: Box<dyn RequestHandler<State>>,
+    /// The CORS configuration for the route.
+    pub cors: Cors,
 }
 
 /// Encapsulates a route and its WebSocket handler.
@@ -41,6 +47,7 @@ impl<State> Default for SubApp<State> {
             host: "*".to_string(),
             routes: Vec::new(),
             websocket_routes: Vec::new(),
+            cors: None,
         }
     }
 }
@@ -60,6 +67,7 @@ impl<State> SubApp<State> {
         self.routes.push(RouteHandler {
             route: route.to_string(),
             handler: Box::new(handler),
+            cors: self.cors.as_ref().map_or(Cors::default(), |c| c.clone()),
         });
         self
     }
@@ -76,6 +84,7 @@ impl<State> SubApp<State> {
         self.routes.push(RouteHandler {
             route: route.to_string(),
             handler: Box::new(move |request, _| handler(request)),
+            cors: self.cors.as_ref().map_or(Cors::default(), |c| c.clone()),
         });
         self
     }
@@ -90,6 +99,7 @@ impl<State> SubApp<State> {
         self.routes.push(RouteHandler {
             route: route.to_string(),
             handler: Box::new(move |request, state| handler(request, state, route)),
+            cors: self.cors.as_ref().map_or(Cors::default(), |c| c.clone()),
         });
         self
     }
@@ -105,6 +115,26 @@ impl<State> SubApp<State> {
             route: route.to_string(),
             handler: Box::new(handler),
         });
+        self
+    }
+
+    pub fn with_cors(mut self, cors: Cors) -> Self {
+        self.cors = Some(cors.clone());
+
+        self.routes.iter_mut().for_each(|route| {
+            route.cors = cors.clone();
+        });
+
+        self
+    }
+
+    pub fn with_cors_config(mut self, route: &str, cors: Cors) -> Self {
+        self.routes.iter_mut().for_each(|r| {
+            if r.route == route {
+                r.cors = cors.clone();
+            }
+        });
+
         self
     }
 }

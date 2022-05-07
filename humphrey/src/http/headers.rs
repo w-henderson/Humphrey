@@ -195,6 +195,8 @@ pub enum HeaderType {
     AccessControlAllowOrigin,
     /// Indicates whether certain headers can be set.
     AccessControlAllowHeaders,
+    /// Indicates whether certain methods can be used.
+    AccessControlAllowMethods,
     /// Contains the time in seconds that the object has been cached.
     Age,
     /// The set of methods supported by the resource.
@@ -272,6 +274,7 @@ impl From<&str> for HeaderType {
             "warning" => Self::Warning,
             "access-control-allow-origin" => Self::AccessControlAllowOrigin,
             "access-control-allow-headers" => Self::AccessControlAllowHeaders,
+            "access-control-allow-methods" => Self::AccessControlAllowMethods,
             "age" => Self::Age,
             "allow" => Self::Allow,
             "content-disposition" => Self::ContentDisposition,
@@ -324,6 +327,7 @@ impl ToString for HeaderType {
             HeaderType::Warning => "Warning",
             HeaderType::AccessControlAllowOrigin => "Access-Control-Allow-Origin",
             HeaderType::AccessControlAllowHeaders => "Access-Control-Allow-Headers",
+            HeaderType::AccessControlAllowMethods => "Access-Control-Allow-Methods",
             HeaderType::Age => "Age",
             HeaderType::Allow => "Allow",
             HeaderType::ContentDisposition => "Content-Disposition",
@@ -358,6 +362,7 @@ impl HeaderType {
         match self {
             HeaderType::AccessControlAllowOrigin => HeaderCategory::Other,
             HeaderType::AccessControlAllowHeaders => HeaderCategory::Other,
+            HeaderType::AccessControlAllowMethods => HeaderCategory::Other,
             HeaderType::Age => HeaderCategory::Response,
             HeaderType::Allow => HeaderCategory::Entity,
             HeaderType::CacheControl => HeaderCategory::General,
