@@ -70,6 +70,13 @@ jobs:
           command: check
           args: --manifest-path examples/client/Cargo.toml
 
+      - name: Check CORS example
+        if: always()
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/cors/Cargo.toml
+
       - name: Check database example
         if: always()
         uses: actions-rs/cargo@v1
