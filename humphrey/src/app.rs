@@ -4,6 +4,7 @@
 
 use crate::http::date::DateTime;
 use crate::http::headers::HeaderType;
+use crate::http::method::Method;
 use crate::http::request::{Request, RequestError};
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
@@ -40,6 +41,7 @@ where
     connection_handler: ConnectionHandler<State>,
     connection_condition: ConnectionCondition<State>,
     connection_timeout: Option<Duration>,
+    cors: bool,
     #[cfg(feature = "tls")]
     tls_config: Option<Arc<ServerConfig>>,
     #[cfg(feature = "tls")]
@@ -56,6 +58,7 @@ pub type ConnectionHandler<State> = fn(
     Arc<State>,
     MonitorConfig,
     Option<Duration>,
+    bool,
 );
 
 /// Represents a function able to calculate whether a connection will be accepted.
@@ -157,6 +160,7 @@ where
             connection_handler: client_handler,
             connection_condition: |_, _| true,
             connection_timeout: None,
+            cors: false,
             #[cfg(feature = "tls")]
             tls_config: None,
             #[cfg(feature = "tls")]
@@ -176,6 +180,7 @@ where
             connection_handler: client_handler,
             connection_condition: |_, _| true,
             connection_timeout: None,
+            cors: false,
             #[cfg(feature = "tls")]
             tls_config: None,
             #[cfg(feature = "tls")]
@@ -211,6 +216,7 @@ where
                         let cloned_error_handler = error_handler.clone();
                         let cloned_handler = self.connection_handler;
                         let cloned_timeout = self.connection_timeout;
+                        let cloned_cors = self.cors;
 
                         cloned_monitor.send(
                             Event::new(EventType::ConnectionSuccess)
@@ -232,6 +238,7 @@ where
                                 cloned_state,
                                 cloned_monitor,
                                 cloned_timeout,
+                                cloned_cors,
                             )
                         });
                     } else {
@@ -293,6 +300,7 @@ where
                         let cloned_handler = self.connection_handler;
                         let cloned_timeout = self.connection_timeout;
                         let cloned_monitor = self.monitor.clone();
+                        let cloned_cors = self.cors;
                         let cloned_config = self
                             .tls_config
                             .as_ref()
@@ -323,6 +331,7 @@ where
                                 cloned_state,
                                 cloned_monitor,
                                 cloned_timeout,
+                                cloned_cors,
                             )
                         });
                     } else {
@@ -436,6 +445,15 @@ where
         self
     }
 
+    /// Specifies whether to allow cross-origin requests.
+    ///
+    /// See the [MDN docs](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) for more information.
+    /// If in doubt, you probably want to leave this off for security purposes.
+    pub fn with_cors(mut self, cors: bool) -> Self {
+        self.cors = cors;
+        self
+    }
+
     /// Sets whether HTTPS should be forced on all connections. Defaults to false.
     ///
     /// If this is set to true, a background thread will be spawned when `run_tls` is called to send
@@ -516,6 +534,7 @@ where
 /// Handles a connection with a client.
 /// The connection will be opened upon the first request and closed as soon as a request is
 ///   recieved without the `Connection: Keep-Alive` header.
+#[allow(clippy::too_many_arguments)]
 fn client_handler<State>(
     mut stream: Stream,
     subapps: Arc<Vec<SubApp<State>>>,
@@ -524,6 +543,7 @@ fn client_handler<State>(
     state: Arc<State>,
     monitor: MonitorConfig,
     timeout: Option<Duration>,
+    cors: bool,
 ) {
     let addr = if let Ok(addr) = stream.peer_addr() {
         addr
@@ -567,6 +587,29 @@ fn client_handler<State>(
 
         // Generate the response based on the handlers
         let response = match &request {
+            Ok(request) if request.method == Method::Options => {
+                let mut response = Response::empty(StatusCode::NoContent)
+                    .with_header(HeaderType::Date, DateTime::now().to_string())
+                    .with_header(HeaderType::Server, "Humphrey")
+                    .with_header(
+                        HeaderType::Connection,
+                        match keep_alive {
+                            true => "Keep-Alive",
+                            false => "Close",
+                        },
+                    );
+
+                if cors {
+                    response
+                        .headers
+                        .add(HeaderType::AccessControlAllowOrigin, "*");
+                    response
+                        .headers
+                        .add(HeaderType::AccessControlAllowHeaders, "*");
+                }
+
+                response
+            }
             Ok(request) => {
                 let mut response = call_handler(request, &subapps, &default_subapp, state.clone());
 
@@ -604,6 +647,20 @@ fn client_handler<State>(
                         response
                             .headers
                             .add(HeaderType::ContentLength, response.body.len().to_string());
+                    }
+                }
+
+                if cors && request.headers.get(HeaderType::Origin).is_some() {
+                    match response
+                        .headers
+                        .get_mut(HeaderType::AccessControlAllowOrigin)
+                    {
+                        Some(_) => (),
+                        None => {
+                            response
+                                .headers
+                                .add(HeaderType::AccessControlAllowOrigin, "*");
+                        }
                     }
                 }
 

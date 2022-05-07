@@ -150,6 +150,8 @@ pub enum HeaderType {
     AcceptLanguage,
     /// Indicates the method that will be used for the actual request when performing an OPTIONS request.
     AccessControlRequestMethod,
+    /// Indicates the headers that will be used for the actual request when performing an OPTIONS request.
+    AccessControlRequestHeaders,
     /// Provides credentials for HTTP authentication.
     Authorization,
     /// Indicates how the cache should behave.
@@ -191,6 +193,8 @@ pub enum HeaderType {
 
     /// Indicates whether the response can be shared with other origins.
     AccessControlAllowOrigin,
+    /// Indicates whether certain headers can be set.
+    AccessControlAllowHeaders,
     /// Contains the time in seconds that the object has been cached.
     Age,
     /// The set of methods supported by the resource.
@@ -246,6 +250,7 @@ impl From<&str> for HeaderType {
             "accept-encoding" => Self::AcceptEncoding,
             "accept-language" => Self::AcceptLanguage,
             "access-control-request-method" => Self::AccessControlRequestMethod,
+            "access-control-request-headers" => Self::AccessControlRequestHeaders,
             "authorization" => Self::Authorization,
             "cache-control" => Self::CacheControl,
             "connection" => Self::Connection,
@@ -266,6 +271,7 @@ impl From<&str> for HeaderType {
             "via" => Self::Via,
             "warning" => Self::Warning,
             "access-control-allow-origin" => Self::AccessControlAllowOrigin,
+            "access-control-allow-headers" => Self::AccessControlAllowHeaders,
             "age" => Self::Age,
             "allow" => Self::Allow,
             "content-disposition" => Self::ContentDisposition,
@@ -296,6 +302,7 @@ impl ToString for HeaderType {
             HeaderType::AcceptEncoding => "Accept-Encoding",
             HeaderType::AcceptLanguage => "Accept-Language",
             HeaderType::AccessControlRequestMethod => "Access-Control-Request-Method",
+            HeaderType::AccessControlRequestHeaders => "Access-Control-Request-Headers",
             HeaderType::Authorization => "Authorization",
             HeaderType::CacheControl => "Cache-Control",
             HeaderType::Connection => "Connection",
@@ -316,6 +323,7 @@ impl ToString for HeaderType {
             HeaderType::Via => "Via",
             HeaderType::Warning => "Warning",
             HeaderType::AccessControlAllowOrigin => "Access-Control-Allow-Origin",
+            HeaderType::AccessControlAllowHeaders => "Access-Control-Allow-Headers",
             HeaderType::Age => "Age",
             HeaderType::Allow => "Allow",
             HeaderType::ContentDisposition => "Content-Disposition",
@@ -349,6 +357,7 @@ impl HeaderType {
     fn category(&self) -> HeaderCategory {
         match self {
             HeaderType::AccessControlAllowOrigin => HeaderCategory::Other,
+            HeaderType::AccessControlAllowHeaders => HeaderCategory::Other,
             HeaderType::Age => HeaderCategory::Response,
             HeaderType::Allow => HeaderCategory::Entity,
             HeaderType::CacheControl => HeaderCategory::General,
@@ -372,12 +381,12 @@ impl HeaderType {
             HeaderType::Upgrade => HeaderCategory::General,
             HeaderType::Via => HeaderCategory::General,
             HeaderType::Warning => HeaderCategory::General,
-            HeaderType::Custom(_) => HeaderCategory::Other,
             HeaderType::Accept => HeaderCategory::Entity,
             HeaderType::AcceptCharset => HeaderCategory::Entity,
             HeaderType::AcceptEncoding => HeaderCategory::Entity,
             HeaderType::AcceptLanguage => HeaderCategory::Entity,
             HeaderType::AccessControlRequestMethod => HeaderCategory::Other,
+            HeaderType::AccessControlRequestHeaders => HeaderCategory::Other,
             HeaderType::Authorization => HeaderCategory::General,
             HeaderType::Cookie => HeaderCategory::General,
             HeaderType::Expect => HeaderCategory::Entity,
@@ -387,6 +396,7 @@ impl HeaderType {
             HeaderType::Origin => HeaderCategory::General,
             HeaderType::Referer => HeaderCategory::General,
             HeaderType::UserAgent => HeaderCategory::General,
+            HeaderType::Custom(_) => HeaderCategory::Other,
         }
     }
 }
