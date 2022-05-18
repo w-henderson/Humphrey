@@ -9,10 +9,10 @@ Asynchronous WebSocket applications call user-specified handler functions when a
 
 This section of the guide will cover the following topics. We'll create the same example application in each of the two ways, so you can compare them by reading this section chronologically.
 
-- [Synchronous WebSocket](websocket/sync/index.md)
+- [Synchronous WebSocket](sync/index.md)
   1. [Creating and running a basic WebSocket server](sync/getting-started.md)
   2. [Broadcasting messages to all connected clients](sync/broadcasting-messages.md)
-- [Asynchronous WebSocket](websocket/async/index.md)
+- [Asynchronous WebSocket](async/index.md)
   1. [Creating and running a basic WebSocket server](async/getting-started.md)
   2. [Broadcasting messages to all connected clients](async/broadcasting-messages.md)
   3. [Using with an existing Humphrey App](async/linking.md)
