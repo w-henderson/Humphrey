@@ -1,12 +1,12 @@
 //! Provides an abstraction over WebSocket frames called `Message`.
 
-use humphrey::stream::Stream;
-
 use crate::error::WebsocketError;
 use crate::frame::{Frame, Opcode};
 use crate::restion::Restion;
+use crate::WebsocketStream;
 
-use std::io::{Read, Write};
+use std::io::Write;
+use std::time::Instant;
 
 /// Represents a WebSocket message.
 #[derive(Debug, Clone)]
@@ -44,22 +44,26 @@ impl Message {
     /// Attemps to read a message from the given stream.
     ///
     /// Silently responds to pings with pongs, as specified in [RFC 6455 Section 5.5.2](https://datatracker.ietf.org/doc/html/rfc6455#section-5.5.2).
-    pub fn from_stream<T>(mut stream: T) -> Result<Self, WebsocketError>
-    where
-        T: Read + Write,
-    {
+    pub fn from_stream(stream: &mut WebsocketStream) -> Result<Self, WebsocketError> {
         let mut frames: Vec<Frame> = Vec::new();
 
         // Keep reading frames until we get the finish frame
         while frames.last().map(|f| !f.fin).unwrap_or(true) {
-            let frame = Frame::from_stream(&mut stream)?;
+            let frame = Frame::from_stream(&mut stream.stream)?;
 
             // If this is a ping, respond with a pong
             if frame.opcode == Opcode::Ping {
                 let pong = Frame::new(Opcode::Pong, frame.payload);
                 stream
+                    .stream
                     .write_all(pong.as_ref())
                     .map_err(|_| WebsocketError::WriteError)?;
+                continue;
+            }
+
+            // If this is a pong, store the time
+            if frame.opcode == Opcode::Pong {
+                stream.last_pong = Instant::now();
                 continue;
             }
 
@@ -67,6 +71,7 @@ impl Message {
             if frame.opcode == Opcode::Close {
                 let close = Frame::new(Opcode::Close, frame.payload);
                 stream
+                    .stream
                     .write_all(close.as_ref())
                     .map_err(|_| WebsocketError::WriteError)?;
                 return Err(WebsocketError::ConnectionClosed);
@@ -93,16 +98,16 @@ impl Message {
     /// Attemps to read a message from the given stream without blocking.
     ///
     /// Silently responds to pings with pongs, as specified in [RFC 6455 Section 5.5.2](https://datatracker.ietf.org/doc/html/rfc6455#section-5.5.2).
-    pub fn from_stream_nonblocking(mut stream: &mut Stream) -> Restion<Self, WebsocketError> {
+    pub fn from_stream_nonblocking(stream: &mut WebsocketStream) -> Restion<Self, WebsocketError> {
         let mut frames: Vec<Frame> = Vec::new();
         let mut is_first_frame = true;
 
         // Keep reading frames until we get the finish frame
         while frames.last().map(|f| !f.fin).unwrap_or(true) {
             let frame = if is_first_frame {
-                Frame::from_stream_nonblocking(stream)
+                Frame::from_stream_nonblocking(&mut stream.stream)
             } else {
-                Frame::from_stream(&mut stream).into()
+                Frame::from_stream(&mut stream.stream).into()
             };
 
             match frame {
@@ -110,16 +115,22 @@ impl Message {
                     // If this is a ping, respond with a pong
                     if frame.opcode == Opcode::Ping {
                         let pong = Frame::new(Opcode::Pong, frame.payload);
-                        if stream.write_all(pong.as_ref()).is_err() {
+                        if stream.stream.write_all(pong.as_ref()).is_err() {
                             return Restion::Err(WebsocketError::WriteError);
                         }
+                        continue;
+                    }
+
+                    // If this is a pong, store the time
+                    if frame.opcode == Opcode::Pong {
+                        stream.last_pong = Instant::now();
                         continue;
                     }
 
                     // If this closes the connection, return the error
                     if frame.opcode == Opcode::Close {
                         let close = Frame::new(Opcode::Close, frame.payload);
-                        if stream.write_all(close.as_ref()).is_err() {
+                        if stream.stream.write_all(close.as_ref()).is_err() {
                             return Restion::Err(WebsocketError::WriteError);
                         }
                         return Restion::Err(WebsocketError::ConnectionClosed);

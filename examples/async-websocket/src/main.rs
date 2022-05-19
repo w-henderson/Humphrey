@@ -1,5 +1,6 @@
 use humphrey_ws::async_app::{AsyncSender, AsyncStream, AsyncWebsocketApp};
 use humphrey_ws::message::Message;
+use humphrey_ws::ping::Heartbeat;
 
 use std::io::BufRead;
 use std::sync::Arc;
@@ -8,7 +9,9 @@ use std::thread::spawn;
 fn main() {
     // Create a new async WebSocket app with no state, and register some handlers.
     let websocket_app: AsyncWebsocketApp<()> = AsyncWebsocketApp::new()
+        .with_heartbeat(Heartbeat::default())
         .with_connect_handler(connect_handler)
+        .with_disconnect_handler(disconnect_handler)
         .with_message_handler(message_handler);
 
     // Get a sender from the app so we can send messages without waiting for events.
@@ -32,8 +35,20 @@ fn user_input(sender: AsyncSender) {
 
 /// Handle connections by broadcasting their arrival.
 fn connect_handler(stream: AsyncStream, _: Arc<()>) {
-    let message = Message::new(format!("Welcome, {}!", stream.peer_addr()));
+    let text = format!("Welcome, {}!", stream.peer_addr());
+    let message = Message::new(text.clone());
     stream.broadcast(message);
+
+    println!("{}", text);
+}
+
+/// Handle disconnections by broadcasting their departure.
+fn disconnect_handler(stream: AsyncStream, _: Arc<()>) {
+    let text = format!("{} has disconnected.", stream.peer_addr());
+    let message = Message::new(text.clone());
+    stream.broadcast(message);
+
+    println!("{}", text);
 }
 
 /// Echo messages back to the client that sent them.

@@ -3,6 +3,7 @@
 use std::fmt::Debug;
 
 /// A combination of `Result` and `Option`, used to represent the result of non-blocking operations.
+#[derive(Debug)]
 pub enum Restion<T, E> {
     /// A successful result, equivalent to `Option::Some` and `Result::Ok`.
     Ok(T),

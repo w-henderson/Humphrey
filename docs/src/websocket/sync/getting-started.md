@@ -18,7 +18,6 @@ To add a WebSocket route to your Humphrey app, use the `with_websocket_route` me
 Let's create a new `App` struct and add a route to match any path.
 
 ```rs
-use humphrey::stream::Stream;
 use humphrey::App;
 
 use humphrey_ws::stream::WebsocketStream;
@@ -33,7 +32,7 @@ fn main() {
     app.run("0.0.0.0:80").unwrap();
 }
 
-fn my_handler(mut stream: WebsocketStream<Stream>, _: Arc<()>) {
+fn my_handler(mut stream: WebsocketStream, _: Arc<()>) {
     println!("Connection from {:?}", stream.inner().peer_addr().unwrap());
 
     // TODO: Implement handler
@@ -61,7 +60,7 @@ Let's change our code so it continually listens for messages, and prints them to
 ```rs
 // --snip--
 
-fn my_handler(mut stream: WebsocketStream<Stream>, _: Arc<()>) {
+fn my_handler(mut stream: WebsocketStream, _: Arc<()>) {
     let address = stream.inner().peer_addr().unwrap();
 
     println!("{:?}: <connected>", address);
@@ -105,7 +104,7 @@ use humphrey_ws::message::Message;
 
 // --snip--
 
-fn my_handler(mut stream: WebsocketStream<Stream>, _: Arc<()>) {
+fn my_handler(mut stream: WebsocketStream, _: Arc<()>) {
     let address = stream.inner().peer_addr().unwrap();
 
     println!("{:?}: <connected>", address);

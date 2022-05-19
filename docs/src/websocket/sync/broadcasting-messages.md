@@ -18,7 +18,6 @@ You'll notice that the `bus` dependency is specified with a GitHub address. This
 Let's copy the code we used at the start of the last chapter to create a new WebSocket-enabled application:
 
 ```rs
-use humphrey::stream::Stream;
 use humphrey::App;
 
 use humphrey_ws::stream::WebsocketStream;
@@ -33,7 +32,7 @@ fn main() {
     app.run("0.0.0.0:80").unwrap();
 }
 
-fn my_handler(mut stream: WebsocketStream<Stream>, _: Arc<()>) {
+fn my_handler(mut stream: WebsocketStream, _: Arc<()>) {
     // TODO: Implement handler
 }
 ```
@@ -60,7 +59,7 @@ fn main() {
     app.run("0.0.0.0:80").unwrap();
 }
 
-fn my_handler(mut stream: WebsocketStream<Stream>, read_handle: Arc<AppState>) {
+fn my_handler(mut stream: WebsocketStream, read_handle: Arc<AppState>) {
     // TODO: Implement handler
 }
 ```
@@ -82,7 +81,7 @@ use std::time::Duration;
 
 // --snip--
 
-fn my_handler(mut stream: WebsocketStream<Stream>, read_handle: Arc<AppState>) {
+fn my_handler(mut stream: WebsocketStream, read_handle: Arc<AppState>) {
     let mut rx = { read_handle.lock().unwrap().add_rx() };
 
     loop {
@@ -144,7 +143,6 @@ Let's open up three terminal windows, and run the server on one of them. In the 
 The full source code for this example should look like this:
 
 ```rs
-use humphrey::stream::Stream;
 use humphrey::App;
 
 use humphrey_ws::message::Message;
@@ -182,7 +180,7 @@ fn main_thread(mut bus: Bus<String>) {
     }
 }
 
-fn my_handler(mut stream: WebsocketStream<Stream>, read_handle: Arc<AppState>) {
+fn my_handler(mut stream: WebsocketStream, read_handle: Arc<AppState>) {
     let mut rx = { read_handle.lock().unwrap().add_rx() };
 
     loop {

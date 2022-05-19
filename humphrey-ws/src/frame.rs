@@ -192,6 +192,7 @@ impl From<Frame> for Vec<u8> {
 
         // Add the payload and return
         buf.extend_from_slice(&f.payload);
+
         buf
     }
 }

@@ -15,8 +15,8 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 /// Represents a function able to handle WebSocket streams.
-pub trait WebsocketHandler<S>: Fn(WebsocketStream<Stream>, Arc<S>) + Send + Sync {}
-impl<T, S> WebsocketHandler<S> for T where T: Fn(WebsocketStream<Stream>, Arc<S>) + Send + Sync {}
+pub trait WebsocketHandler<S>: Fn(WebsocketStream, Arc<S>) + Send + Sync {}
+impl<T, S> WebsocketHandler<S> for T where T: Fn(WebsocketStream, Arc<S>) + Send + Sync {}
 
 /// Provides WebSocket handshake functionality.
 /// Supply a `WebsocketHandler` to handle the subsequent messages.
@@ -24,7 +24,6 @@ impl<T, S> WebsocketHandler<S> for T where T: Fn(WebsocketStream<Stream>, Arc<S>
 /// ## Example
 /// ```
 /// use humphrey::App;
-/// use humphrey::stream::Stream;
 /// use humphrey_ws::message::Message;
 /// use humphrey_ws::stream::WebsocketStream;
 /// use humphrey_ws::websocket_handler;
@@ -38,7 +37,7 @@ impl<T, S> WebsocketHandler<S> for T where T: Fn(WebsocketStream<Stream>, Arc<S>
 ///     app.run("0.0.0.0:80").unwrap();
 /// }
 ///
-/// fn my_handler(mut stream: WebsocketStream<Stream>, _: Arc<()>) {
+/// fn my_handler(mut stream: WebsocketStream, _: Arc<()>) {
 ///     stream.send(Message::new("Hello, World!")).unwrap();
 /// }
 /// ```
@@ -93,7 +92,7 @@ where
 /// }
 /// ```
 pub fn async_websocket_handler<S>(
-    hook: Arc<Mutex<Sender<WebsocketStream<Stream>>>>,
+    hook: Arc<Mutex<Sender<WebsocketStream>>>,
 ) -> impl Fn(Request, Stream, Arc<S>) {
     move |request: Request, mut stream: Stream, _: Arc<S>| {
         if handshake(request, &mut stream).is_ok() {

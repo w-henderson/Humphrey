@@ -91,6 +91,24 @@ fn test_continuation_frame() {
 }
 
 #[test]
+fn test_standalone_frame() {
+    let mut stream = MockStream::with_data(STANDALONE_FRAME_BYTES.to_vec());
+    let frame = Frame::from_stream(&mut stream).unwrap();
+
+    let expected_frame = Frame {
+        fin: true,
+        rsv: [false; 3],
+        opcode: Opcode::Text,
+        mask: true,
+        masking_key: [0x69; 4],
+        length: 5,
+        payload: b"hello".to_vec(),
+    };
+
+    assert_eq!(frame, expected_frame);
+}
+
+#[test]
 fn test_medium_frame() {
     let mut bytes = Vec::with_capacity(264);
     bytes.extend(MEDIUM_FRAME_BYTES);
