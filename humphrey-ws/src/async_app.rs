@@ -4,10 +4,10 @@
 
 use crate::handler::async_websocket_handler;
 use crate::message::Message;
+use crate::ping::Heartbeat;
 use crate::restion::Restion;
 use crate::stream::WebsocketStream;
 
-use humphrey::stream::Stream;
 use humphrey::thread::pool::ThreadPool;
 use humphrey::App;
 
@@ -16,7 +16,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::{sleep, spawn};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Represents an asynchronous WebSocket app.
 pub struct AsyncWebsocketApp<State>
@@ -37,10 +37,12 @@ where
     thread_pool: ThreadPool,
     /// The amount of time between polling.
     poll_interval: Option<Duration>,
+    /// Ping configuration.
+    heartbeat: Option<Heartbeat>,
     /// A hashmap with the addresses as the keys and the actual streams as the values.
-    streams: HashMap<SocketAddr, WebsocketStream<Stream>>,
+    streams: HashMap<SocketAddr, WebsocketStream>,
     /// A receiver which is sent new streams to add to the hashmap.
-    incoming_streams: Receiver<WebsocketStream<Stream>>,
+    incoming_streams: Receiver<WebsocketStream>,
     /// A receiver which receives messages from handler threads to forward to clients.
     outgoing_messages: Receiver<OutgoingMessage>,
     /// A sender which is used by handler threads to send messages to clients.
@@ -85,7 +87,7 @@ pub enum HumphreyLink {
     /// The app uses its own internal Humphrey application.
     Internal(Box<App>, SocketAddr),
     /// The app is linked to an external Humphrey application and receives connections through a channel.
-    External(Arc<Mutex<Sender<WebsocketStream<Stream>>>>),
+    External(Arc<Mutex<Sender<WebsocketStream>>>),
 }
 
 /// Represents a function able to handle a WebSocket event (a connection or disconnection).
@@ -142,6 +144,7 @@ where
             ),
             state: Default::default(),
             poll_interval: Some(Duration::from_millis(10)),
+            heartbeat: None,
             thread_pool: ThreadPool::new(32),
             streams: Default::default(),
             incoming_streams,
@@ -178,6 +181,7 @@ where
             ),
             state: Arc::new(state),
             poll_interval: Some(Duration::from_millis(10)),
+            heartbeat: None,
             thread_pool: ThreadPool::new(handler_threads),
             streams: Default::default(),
             incoming_streams,
@@ -207,6 +211,7 @@ where
             humphrey_link: HumphreyLink::External(connect_hook),
             state: Default::default(),
             poll_interval: Some(Duration::from_millis(10)),
+            heartbeat: None,
             thread_pool: ThreadPool::new(32),
             streams: Default::default(),
             incoming_streams,
@@ -236,6 +241,7 @@ where
             humphrey_link: HumphreyLink::External(connect_hook),
             state: Arc::new(state),
             poll_interval: Some(Duration::from_millis(10)),
+            heartbeat: None,
             thread_pool: ThreadPool::new(handler_threads),
             streams: Default::default(),
             incoming_streams,
@@ -251,7 +257,7 @@ where
     /// This is used by Humphrey Core to send new streams to the app.
     ///
     /// If the app is uses an internal Humphrey application, this will return `None`.
-    pub fn connect_hook(&self) -> Option<Arc<Mutex<Sender<WebsocketStream<Stream>>>>> {
+    pub fn connect_hook(&self) -> Option<Arc<Mutex<Sender<WebsocketStream>>>> {
         match &self.humphrey_link {
             HumphreyLink::External(connect_hook) => Some(connect_hook.clone()),
             _ => None,
@@ -330,6 +336,11 @@ where
         self
     }
 
+    pub fn with_heartbeat(mut self, heartbeat: Heartbeat) -> Self {
+        self.heartbeat = Some(heartbeat);
+        self
+    }
+
     /// Start the application on the main thread.
     pub fn run(mut self) {
         // Ensure that the underlying Humphrey application is running if it is internal.
@@ -343,10 +354,27 @@ where
         let disconnect_handler = self.on_disconnect.map(Arc::new);
         let message_handler = self.on_message.map(Arc::new);
 
+        let mut last_ping = Instant::now();
+
         loop {
             let keys: Vec<SocketAddr> = self.streams.keys().copied().collect();
 
-            // Check for messages on each stream.
+            // Calculate whether a ping should be sent this iteration.
+            let will_ping = self
+                .heartbeat
+                .as_ref()
+                .map(|config| {
+                    let will_ping = last_ping.elapsed() >= config.interval;
+
+                    if will_ping {
+                        last_ping = Instant::now();
+                    }
+
+                    will_ping
+                })
+                .unwrap_or(false);
+
+            // Check for messages and status on each stream.
             for addr in keys {
                 'inner: loop {
                     let stream = self.streams.get_mut(&addr).unwrap();
@@ -379,6 +407,31 @@ where
                             break 'inner;
                         }
                         Restion::None => break 'inner,
+                    }
+                }
+
+                if let Some(stream) = self.streams.get_mut(&addr) {
+                    // If the stream has timed out without sending a close frame, process it as a disconnection.
+                    if let Some(ping) = &self.heartbeat {
+                        if stream.last_pong.elapsed() >= ping.timeout {
+                            if let Some(handler) = &disconnect_handler {
+                                let async_stream =
+                                    AsyncStream::disconnected(addr, self.message_sender.clone());
+                                let cloned_state = self.state.clone();
+                                let cloned_handler = handler.clone();
+
+                                self.thread_pool
+                                    .execute(move || (cloned_handler)(async_stream, cloned_state));
+                            }
+
+                            self.streams.remove(&addr);
+                            continue;
+                        }
+                    }
+
+                    // If a ping is due, send one.
+                    if will_ping {
+                        stream.ping().ok();
                     }
                 }
             }

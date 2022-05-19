@@ -9,6 +9,7 @@ use crate::restion::Restion;
 
 use std::io::{Read, Write};
 use std::net::SocketAddr;
+use std::time::Instant;
 
 /// Represents a WebSocket stream.
 ///
@@ -16,33 +17,40 @@ use std::net::SocketAddr;
 ///
 /// The stream also implements the `Read` and `Write` traits to help with compatibility with
 ///   other crates. These simply wrap and unwrap the bytes in WebSocket frames.
-pub struct WebsocketStream<T>
-where
-    T: Read + Write,
-{
-    stream: T,
-    closed: bool,
+pub struct WebsocketStream {
+    pub(crate) stream: Stream,
+    pub(crate) closed: bool,
+    pub(crate) last_pong: Instant,
 }
 
-impl<T> WebsocketStream<T>
-where
-    T: Read + Write,
-{
-    /// Creates a new `WebsocketStream` wrapping an underlying stream, usually `TcpStream`.
+impl WebsocketStream {
+    /// Creates a new `WebsocketStream` wrapping an underlying Humphrey stream.
     ///
     /// When the `WebsocketStream` is dropped, a close frame will be sent to the client.
-    pub fn new(stream: T) -> Self {
+    pub fn new(stream: Stream) -> Self {
         Self {
             stream,
             closed: false,
+            last_pong: Instant::now(),
         }
     }
 
     /// Blocks until a message is received from the client.
     pub fn recv(&mut self) -> Result<Message, WebsocketError> {
-        let message = Message::from_stream(&mut self.stream);
+        let message = Message::from_stream(self);
 
         if let Err(WebsocketError::ConnectionClosed) = message {
+            self.closed = true;
+        }
+
+        message
+    }
+
+    /// Attempts to receive a message from the stream without blocking.
+    pub fn recv_nonblocking(&mut self) -> Restion<Message, WebsocketError> {
+        let message = Message::from_stream_nonblocking(self);
+
+        if let Restion::Err(WebsocketError::ConnectionClosed) = message {
             self.closed = true;
         }
 
@@ -52,6 +60,12 @@ where
     /// Sends a message to the client.
     pub fn send(&mut self, message: Message) -> Result<(), WebsocketError> {
         self.send_raw(message.to_frame())
+    }
+
+    /// Sends a ping to the client.
+    pub fn ping(&mut self) -> Result<(), WebsocketError> {
+        let bytes: Vec<u8> = Frame::new(Opcode::Ping, Vec::new()).into();
+        self.send_raw(bytes)
     }
 
     /// Sends a raw frame to the client.
@@ -64,34 +78,18 @@ where
             .map_err(|_| WebsocketError::WriteError)
     }
 
-    /// Returns a mutable reference to the underlying stream.
-    pub fn inner(&mut self) -> &mut T {
-        &mut self.stream
-    }
-}
-
-impl WebsocketStream<Stream> {
-    /// Attempts to receive a message from the stream without blocking.
-    pub fn recv_nonblocking(&mut self) -> Restion<Message, WebsocketError> {
-        let message = Message::from_stream_nonblocking(&mut self.stream);
-
-        if let Restion::Err(WebsocketError::ConnectionClosed) = message {
-            self.closed = true;
-        }
-
-        message
-    }
-
     /// Attempts to get the peer address of this stream.
     pub fn peer_addr(&self) -> Result<SocketAddr, std::io::Error> {
         self.stream.peer_addr()
     }
+
+    /// Returns a mutable reference to the underlying stream.
+    pub fn inner(&mut self) -> &mut Stream {
+        &mut self.stream
+    }
 }
 
-impl<T> Read for WebsocketStream<T>
-where
-    T: Read + Write,
-{
+impl Read for WebsocketStream {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         if let Ok(message) = self.recv() {
             let bytes = message.bytes();
@@ -114,10 +112,7 @@ where
     }
 }
 
-impl<T> Write for WebsocketStream<T>
-where
-    T: Read + Write,
-{
+impl Write for WebsocketStream {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let message = Message::new(buf);
 
@@ -136,10 +131,7 @@ where
     }
 }
 
-impl<T> Drop for WebsocketStream<T>
-where
-    T: Read + Write,
-{
+impl Drop for WebsocketStream {
     fn drop(&mut self) {
         if !self.closed {
             self.stream

@@ -10,6 +10,7 @@ pub mod async_app;
 pub mod error;
 pub mod handler;
 pub mod message;
+pub mod ping;
 pub mod stream;
 
 pub use handler::async_websocket_handler;
