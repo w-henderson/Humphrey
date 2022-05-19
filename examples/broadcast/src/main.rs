@@ -1,4 +1,3 @@
-use humphrey::stream::Stream;
 use humphrey::{handlers, App};
 
 use humphrey_ws::error::WebsocketError;
@@ -57,7 +56,7 @@ fn main_thread(mut bus: Bus<String>) {
 }
 
 // Handle WebSocket connections.
-fn broadcast_handler(mut stream: WebsocketStream<Stream>, read_handle: Arc<AppState>) {
+fn broadcast_handler(mut stream: WebsocketStream, read_handle: Arc<AppState>) {
     // Get the address of the client.
     let addr = stream.inner().peer_addr().unwrap().ip().to_string();
 
