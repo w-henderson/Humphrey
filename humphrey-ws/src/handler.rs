@@ -24,7 +24,6 @@ impl<T, S> WebsocketHandler<S> for T where T: Fn(WebsocketStream, Arc<S>) + Send
 /// ## Example
 /// ```
 /// use humphrey::App;
-/// use humphrey::stream::Stream;
 /// use humphrey_ws::message::Message;
 /// use humphrey_ws::stream::WebsocketStream;
 /// use humphrey_ws::websocket_handler;
@@ -38,7 +37,7 @@ impl<T, S> WebsocketHandler<S> for T where T: Fn(WebsocketStream, Arc<S>) + Send
 ///     app.run("0.0.0.0:80").unwrap();
 /// }
 ///
-/// fn my_handler(mut stream: WebsocketStream<Stream>, _: Arc<()>) {
+/// fn my_handler(mut stream: WebsocketStream, _: Arc<()>) {
 ///     stream.send(Message::new("Hello, World!")).unwrap();
 /// }
 /// ```

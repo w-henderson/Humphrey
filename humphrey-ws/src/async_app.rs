@@ -336,6 +336,12 @@ where
         self
     }
 
+    /// Sets the heartbeat configuration for the async app.
+    ///
+    /// By default, this is off, meaning the app will not send heartbeats. If your application needs to detect
+    ///   disconnections which occur suddenly, as in without sending a "close" frame, you should set this up.
+    ///   It is particularly useful for detecting disconnections caused by network issues, which would not be ordinarily
+    ///   detected by the client.
     pub fn with_heartbeat(mut self, heartbeat: Heartbeat) -> Self {
         self.heartbeat = Some(heartbeat);
         self
