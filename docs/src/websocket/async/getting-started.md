@@ -100,5 +100,33 @@ Message received!
 127.0.0.1:50189: Client disconnected
 ```
 
+## Detecting Unexpected Disconnections
+Generally, when a client disconnects, they gracefully close the connection by sending a "close" frame to the server. However, if the client disconnects suddenly, such as in the case of a loss of network connectivity, not only will the WebSocket connection not be closed, but the underlying TCP stream won't be either. This means that the disconnect handler will not be called, which could cause issues in your application.
+
+Fortunately, Humphrey WebSocket provides a way around this by way of heartbeats. A heartbeat consists of a ping and a pong, the former being sent from the server to the client, and vice versa. An asynchronous WebSocket application can be configured to send a ping every `interval` seconds, and the client will automatically respond with a pong. If no pongs are received in `timeout` seconds, the connection will be closed and the disconnect handler correctly called.
+
+To do this in our example, we'll simply need to make a small change when we first create our app. We'll be using 5 seconds for our ping interval and 10 seconds for our timeout.
+
+```rs
+use humphrey_ws::async_app::{AsyncStream, AsyncWebsocketApp};
+use humphrey_ws::message::Message;
+use humphrey_ws::ping::Heartbeat;
+
+use std::sync::Arc;
+use std::time::Duration;
+
+fn main() {
+    let websocket_app: AsyncWebsocketApp<()> = AsyncWebsocketApp::new()
+        .with_heartbeat(Heartbeat::new(Duration::from_secs(5), Duration::from_secs(10)))
+        .with_connect_handler(connect_handler)
+        .with_disconnect_handler(disconnect_handler)
+        .with_message_handler(message_handler);
+
+    websocket_app.run();
+}
+
+// --snip--
+```
+
 ## Conclusion
 In this chapter, we've learnt about sending and receiving WebSocket messages asynchronously. Next, we'll learn how to broadcast messages to all connected clients, and compare this to how we did it synchronously.
