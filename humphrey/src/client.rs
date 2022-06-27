@@ -2,7 +2,7 @@
 
 use crate::http::address::Address;
 use crate::http::cookie::Cookie;
-use crate::http::headers::{HeaderLike, HeaderType, Headers};
+use crate::http::headers::{Header, HeaderLike, HeaderType, Headers};
 use crate::http::method::Method;
 use crate::http::{Request, Response, StatusCode};
 
@@ -65,7 +65,9 @@ impl Client {
         data: Vec<u8>,
     ) -> Result<ClientRequest, Box<dyn Error>> {
         let url = Self::parse_url(url).ok_or("Invalid URL")?;
-        let request = Request {
+        let content_length = Header::new("Content-Length", data.len().to_string());
+
+        let mut request = Request {
             method: Method::Post,
             uri: url.path,
             headers: url.host_headers,
@@ -74,6 +76,8 @@ impl Client {
             content: Some(data),
             address: Address::new(url.host).unwrap(),
         };
+
+        request.headers.push(content_length);
 
         Ok(ClientRequest {
             address: url.host,
@@ -92,7 +96,9 @@ impl Client {
         data: Vec<u8>,
     ) -> Result<ClientRequest, Box<dyn Error>> {
         let url = Self::parse_url(url).ok_or("Invalid URL")?;
-        let request = Request {
+        let content_length = Header::new("Content-Length", data.len().to_string());
+
+        let mut request = Request {
             method: Method::Put,
             uri: url.path,
             headers: url.host_headers,
@@ -101,6 +107,8 @@ impl Client {
             content: Some(data),
             address: Address::new(url.host).unwrap(),
         };
+
+        request.headers.push(content_length);
 
         Ok(ClientRequest {
             address: url.host,
@@ -331,6 +339,11 @@ impl<'a> ClientRequest<'a> {
         } else {
             response
         }
+    }
+
+    /// Extracts the raw inner request.
+    pub fn into_inner(self) -> Request {
+        self.request
     }
 }
 

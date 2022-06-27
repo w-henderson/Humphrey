@@ -56,3 +56,25 @@ fn test_url_parser() {
         assert_eq!(url.host_headers, expected_url.host_headers);
     }
 }
+
+#[test]
+fn test_content_length() {
+    let mut client = Client::new();
+
+    let post_request = client
+        .post("http://127.0.0.1/post", b"Hello, world!".to_vec())
+        .unwrap()
+        .into_inner();
+    let put_request = client
+        .put("http://127.0.0.1/put", b"Hello, world!".to_vec())
+        .unwrap()
+        .into_inner();
+    let empty_request = client
+        .post("http://127.0.0.1/post", Vec::new())
+        .unwrap()
+        .into_inner();
+
+    assert_eq!(post_request.headers.get("Content-Length"), Some("13"));
+    assert_eq!(put_request.headers.get("Content-Length"), Some("13"));
+    assert_eq!(empty_request.headers.get("Content-Length"), Some("0"));
+}
