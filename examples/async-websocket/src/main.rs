@@ -3,12 +3,18 @@ use humphrey_ws::message::Message;
 use humphrey_ws::ping::Heartbeat;
 
 use std::io::BufRead;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread::spawn;
 
+#[derive(Default)]
+struct StreamState {
+    messages_received: AtomicUsize,
+}
+
 fn main() {
-    // Create a new async WebSocket app with no state, and register some handlers.
-    let websocket_app: AsyncWebsocketApp<()> = AsyncWebsocketApp::new()
+    // Create a new async WebSocket app with no global state and a specified stream state, and register some handlers.
+    let websocket_app: AsyncWebsocketApp<(), StreamState> = AsyncWebsocketApp::new()
         .with_heartbeat(Heartbeat::default())
         .with_connect_handler(connect_handler)
         .with_disconnect_handler(disconnect_handler)
@@ -34,7 +40,7 @@ fn user_input(sender: AsyncSender) {
 }
 
 /// Handle connections by broadcasting their arrival.
-fn connect_handler(stream: AsyncStream, _: Arc<()>) {
+fn connect_handler(stream: AsyncStream<StreamState>, _: Arc<()>) {
     let text = format!("Welcome, {}!", stream.peer_addr());
     let message = Message::new(text.clone());
     stream.broadcast(message);
@@ -43,7 +49,7 @@ fn connect_handler(stream: AsyncStream, _: Arc<()>) {
 }
 
 /// Handle disconnections by broadcasting their departure.
-fn disconnect_handler(stream: AsyncStream, _: Arc<()>) {
+fn disconnect_handler(stream: AsyncStream<StreamState>, _: Arc<()>) {
     let text = format!("{} has disconnected.", stream.peer_addr());
     let message = Message::new(text.clone());
     stream.broadcast(message);
@@ -51,7 +57,19 @@ fn disconnect_handler(stream: AsyncStream, _: Arc<()>) {
     println!("{}", text);
 }
 
-/// Echo messages back to the client that sent them.
-fn message_handler(stream: AsyncStream, message: Message, _: Arc<()>) {
-    stream.send(message);
+/// Echo messages back to the client that sent them, along with their message number.
+fn message_handler(stream: AsyncStream<StreamState>, message: Message, _: Arc<()>) {
+    let message_number = stream
+        .state
+        .messages_received
+        .fetch_add(1, Ordering::SeqCst)
+        + 1;
+
+    let text = format!(
+        "{} (message number {})",
+        message.text().unwrap(),
+        message_number
+    );
+
+    stream.send(Message::new(text));
 }
