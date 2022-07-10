@@ -19,9 +19,10 @@ use std::thread::{sleep, spawn};
 use std::time::{Duration, Instant};
 
 /// Represents an asynchronous WebSocket app.
-pub struct AsyncWebsocketApp<State>
+pub struct AsyncWebsocketApp<State, StreamState = ()>
 where
     State: Send + Sync + 'static,
+    StreamState: Send + Sync + Default + 'static,
 {
     /// Represents the link to a Humphrey application.
     ///
@@ -40,7 +41,7 @@ where
     /// Ping configuration.
     heartbeat: Option<Heartbeat>,
     /// A hashmap with the addresses as the keys and the actual streams as the values.
-    streams: HashMap<SocketAddr, WebsocketStream>,
+    streams: HashMap<SocketAddr, StatefulWebsocketStream<StreamState>>,
     /// A receiver which is sent new streams to add to the hashmap.
     incoming_streams: Receiver<WebsocketStream>,
     /// A receiver which receives messages from handler threads to forward to clients.
@@ -48,20 +49,36 @@ where
     /// A sender which is used by handler threads to send messages to clients.
     message_sender: Sender<OutgoingMessage>,
     /// The event handler called when a new client connects.
-    on_connect: Option<Box<dyn EventHandler<State>>>,
+    on_connect: Option<Box<dyn EventHandler<State, StreamState>>>,
     /// The event handler called when a client disconnects.
-    on_disconnect: Option<Box<dyn EventHandler<State>>>,
+    on_disconnect: Option<Box<dyn EventHandler<State, StreamState>>>,
     /// The event handler called when a client sends a message.
-    on_message: Option<Box<dyn MessageHandler<State>>>,
+    on_message: Option<Box<dyn MessageHandler<State, StreamState>>>,
+}
+
+/// Represents a stateful WebSocket stream.
+///
+/// Encapsulates both the `WebsocketStream` and its state, which must be `Send + Sync + Default + 'static`.
+pub struct StatefulWebsocketStream<StreamState = ()>
+where
+    StreamState: Send + Sync + Default + 'static,
+{
+    inner: WebsocketStream,
+    state: Arc<StreamState>,
 }
 
 /// Represents an asynchronous WebSocket stream.
 ///
 /// This is what is passed to the handler in place of the actual stream. It is able to send
 ///   messages back to the stream using the sender and the stream is identified by its address.
-pub struct AsyncStream {
+pub struct AsyncStream<StreamState = ()>
+where
+    StreamState: Send + Sync + Default + 'static,
+{
     addr: SocketAddr,
     sender: Sender<OutgoingMessage>,
+    /// The state of the stream.
+    pub state: Arc<StreamState>,
     connected: bool,
 }
 
@@ -102,8 +119,14 @@ pub enum HumphreyLink {
 ///     stream.send(Message::new("Hello, World!"));
 /// }
 /// ```
-pub trait EventHandler<S>: Fn(AsyncStream, Arc<S>) + Send + Sync + 'static {}
-impl<T, S> EventHandler<S> for T where T: Fn(AsyncStream, Arc<S>) + Send + Sync + 'static {}
+pub trait EventHandler<S, S2: Send + Sync + Default + 'static>:
+    Fn(AsyncStream<S2>, Arc<S>) + Send + Sync + 'static
+{
+}
+impl<T, S, S2: Send + Sync + Default + 'static> EventHandler<S, S2> for T where
+    T: Fn(AsyncStream<S2>, Arc<S>) + Send + Sync + 'static
+{
+}
 
 /// Represents a function able to handle a message event.
 /// It is passed the stream which sent the message, the message and the app's state.
@@ -117,12 +140,19 @@ impl<T, S> EventHandler<S> for T where T: Fn(AsyncStream, Arc<S>) + Send + Sync 
 ///    stream.send(Message::new("Message received."));
 /// }
 /// ```
-pub trait MessageHandler<S>: Fn(AsyncStream, Message, Arc<S>) + Send + Sync + 'static {}
-impl<T, S> MessageHandler<S> for T where T: Fn(AsyncStream, Message, Arc<S>) + Send + Sync + 'static {}
+pub trait MessageHandler<S, S2: Send + Sync + Default + 'static>:
+    Fn(AsyncStream<S2>, Message, Arc<S>) + Send + Sync + 'static
+{
+}
+impl<T, S, S2: Send + Sync + Default + 'static> MessageHandler<S, S2> for T where
+    T: Fn(AsyncStream<S2>, Message, Arc<S>) + Send + Sync + 'static
+{
+}
 
-impl<State> AsyncWebsocketApp<State>
+impl<State, StreamState> AsyncWebsocketApp<State, StreamState>
 where
     State: Send + Sync + 'static,
+    StreamState: Send + Sync + Default + 'static,
 {
     /// Creates a new asynchronous WebSocket app.
     pub fn new() -> Self
@@ -275,37 +305,43 @@ where
     }
 
     /// Set the event handler called when a new client connects.
-    pub fn on_connect(&mut self, handler: impl EventHandler<State>) {
+    pub fn on_connect(&mut self, handler: impl EventHandler<State, StreamState>) {
         self.on_connect = Some(Box::new(handler));
     }
 
     /// Set the event handler called when a client disconnects.
-    pub fn on_disconnect(&mut self, handler: impl EventHandler<State>) {
+    pub fn on_disconnect(&mut self, handler: impl EventHandler<State, StreamState>) {
         self.on_disconnect = Some(Box::new(handler));
     }
 
     /// Set the message handler called when a client sends a message.
-    pub fn on_message(&mut self, handler: impl MessageHandler<State>) {
+    pub fn on_message(&mut self, handler: impl MessageHandler<State, StreamState>) {
         self.on_message = Some(Box::new(handler));
     }
 
     /// Set the event handler called when a new client connects.
     /// Returns itself for use in a builder pattern.
-    pub fn with_connect_handler(mut self, handler: impl EventHandler<State>) -> Self {
+    pub fn with_connect_handler(mut self, handler: impl EventHandler<State, StreamState>) -> Self {
         self.on_connect(handler);
         self
     }
 
     /// Set the event handler called when a client disconnects.
     /// Returns itself for use in a builder pattern.
-    pub fn with_disconnect_handler(mut self, handler: impl EventHandler<State>) -> Self {
+    pub fn with_disconnect_handler(
+        mut self,
+        handler: impl EventHandler<State, StreamState>,
+    ) -> Self {
         self.on_disconnect(handler);
         self
     }
 
     /// Set the message handler called when a client sends a message.
     /// Returns itself for use in a builder pattern.
-    pub fn with_message_handler(mut self, handler: impl MessageHandler<State>) -> Self {
+    pub fn with_message_handler(
+        mut self,
+        handler: impl MessageHandler<State, StreamState>,
+    ) -> Self {
         self.on_message(handler);
         self
     }
@@ -385,11 +421,15 @@ where
                 'inner: loop {
                     let stream = self.streams.get_mut(&addr).unwrap();
 
-                    match stream.recv_nonblocking() {
+                    match stream.inner.recv_nonblocking() {
                         Restion::Ok(message) => {
                             if let Some(handler) = &message_handler {
-                                let async_stream =
-                                    AsyncStream::new(addr, self.message_sender.clone());
+                                let async_stream = AsyncStream::new(
+                                    addr,
+                                    self.message_sender.clone(),
+                                    stream.state.clone(),
+                                );
+
                                 let cloned_state = self.state.clone();
                                 let cloned_handler = handler.clone();
 
@@ -400,8 +440,12 @@ where
                         }
                         Restion::Err(_) => {
                             if let Some(handler) = &disconnect_handler {
-                                let async_stream =
-                                    AsyncStream::disconnected(addr, self.message_sender.clone());
+                                let async_stream = AsyncStream::disconnected(
+                                    addr,
+                                    self.message_sender.clone(),
+                                    stream.state.clone(),
+                                );
+
                                 let cloned_state = self.state.clone();
                                 let cloned_handler = handler.clone();
 
@@ -419,10 +463,14 @@ where
                 if let Some(stream) = self.streams.get_mut(&addr) {
                     // If the stream has timed out without sending a close frame, process it as a disconnection.
                     if let Some(ping) = &self.heartbeat {
-                        if stream.last_pong.elapsed() >= ping.timeout {
+                        if stream.inner.last_pong.elapsed() >= ping.timeout {
                             if let Some(handler) = &disconnect_handler {
-                                let async_stream =
-                                    AsyncStream::disconnected(addr, self.message_sender.clone());
+                                let async_stream = AsyncStream::disconnected(
+                                    addr,
+                                    self.message_sender.clone(),
+                                    stream.state.clone(),
+                                );
+
                                 let cloned_state = self.state.clone();
                                 let cloned_handler = handler.clone();
 
@@ -437,7 +485,7 @@ where
 
                     // If a ping is due, send one.
                     if will_ping {
-                        stream.ping().ok();
+                        stream.inner.ping().ok();
                     }
                 }
             }
@@ -448,8 +496,11 @@ where
                 .try_iter()
                 .filter_map(|s| s.peer_addr().map(|a| (a, s)).ok())
             {
+                let stream_state = Arc::new(StreamState::default());
+
                 if let Some(handler) = &connect_handler {
-                    let async_stream = AsyncStream::new(addr, self.message_sender.clone());
+                    let async_stream =
+                        AsyncStream::new(addr, self.message_sender.clone(), stream_state.clone());
                     let cloned_state = self.state.clone();
                     let cloned_handler = handler.clone();
 
@@ -458,7 +509,13 @@ where
                     });
                 }
 
-                self.streams.insert(addr, stream);
+                self.streams.insert(
+                    addr,
+                    StatefulWebsocketStream {
+                        inner: stream,
+                        state: stream_state,
+                    },
+                );
             }
 
             for message in self.outgoing_messages.try_iter() {
@@ -466,14 +523,14 @@ where
                     OutgoingMessage::Message(addr, message) => {
                         if let Some(stream) = self.streams.get_mut(&addr) {
                             // Ignore errors with sending for now, and deal with them in the next iteration.
-                            stream.send(message).ok();
+                            stream.inner.send(message).ok();
                         }
                     }
                     OutgoingMessage::Broadcast(message) => {
                         let frame = message.to_frame();
                         for stream in self.streams.values_mut() {
                             // Ignore errors with sending for now, and deal with them in the next iteration.
-                            stream.send_raw(&frame).ok();
+                            stream.inner.send_raw(&frame).ok();
                         }
                     }
                 }
@@ -486,22 +543,31 @@ where
     }
 }
 
-impl AsyncStream {
+impl<StreamState> AsyncStream<StreamState>
+where
+    StreamState: Send + Sync + Default + 'static,
+{
     /// Create a new asynchronous stream.
-    pub fn new(addr: SocketAddr, sender: Sender<OutgoingMessage>) -> Self {
+    pub fn new(addr: SocketAddr, sender: Sender<OutgoingMessage>, state: Arc<StreamState>) -> Self {
         Self {
             addr,
             sender,
+            state,
             connected: true,
         }
     }
 
     /// Create a new disconnected asynchronous stream.
     /// This is used for getting the address of a disconnected stream.
-    pub fn disconnected(addr: SocketAddr, sender: Sender<OutgoingMessage>) -> Self {
+    pub fn disconnected(
+        addr: SocketAddr,
+        sender: Sender<OutgoingMessage>,
+        state: Arc<StreamState>,
+    ) -> Self {
         Self {
             addr,
             sender,
+            state,
             connected: false,
         }
     }
