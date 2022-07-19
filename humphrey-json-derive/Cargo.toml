@@ -1,0 +1,20 @@
+[package]
+name = "humphrey_json_derive"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+homepage = "https://github.com/w-henderson/Humphrey"
+repository = "https://github.com/w-henderson/Humphrey"
+readme = "README.md"
+description = "Derive macros for the Humphrey JSON crate."
+keywords = ["json", "macro"]
+categories = ["encoding", "parsing"]
+
+[lib]
+proc-macro = true
+doctest = false
+
+[dependencies]
+syn = "^1.0"
+quote = "^1.0"
+proc-macro2 = "^1.0"
