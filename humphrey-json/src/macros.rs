@@ -41,6 +41,11 @@ macro_rules! json {
             $( ($k.to_string(), json!($v)) ),*
         ])
     };
+    ({ $( $k:tt : $v:tt, )* }) => {
+        $crate::Value::Object(vec![
+            $( ($k.to_string(), json!($v)) ),*
+        ])
+    };
     ($v:tt) => {
         $crate::Value::from($v)
     };

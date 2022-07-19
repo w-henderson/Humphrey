@@ -18,6 +18,9 @@ pub mod macros;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "derive")]
+extern crate self as humphrey_json;
+
 /// Brings useful traits and macros into scope.
 ///
 /// ```
@@ -27,7 +30,13 @@ pub mod prelude {
     pub use crate::json;
     pub use crate::json_map;
     pub use crate::traits::*;
+
+    #[cfg(feature = "derive")]
+    pub use humphrey_json_derive::*;
 }
+
+#[cfg(feature = "derive")]
+pub use humphrey_json_derive::*;
 
 pub use value::Value;
 
