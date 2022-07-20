@@ -46,16 +46,10 @@ pub use value::Value;
 /// ```
 /// use humphrey_json::prelude::*;
 ///
-/// #[derive(Debug)]
+/// #[derive(FromJson, IntoJson, Debug)]
 /// struct User {
 ///     name: String,
 ///     country: String,
-/// }
-///
-/// json_map! {
-///     User,
-///     name => "name",
-///     country => "country"
 /// }
 ///
 /// fn main() {
@@ -90,15 +84,10 @@ where
 /// ```
 /// use humphrey_json::prelude::*;
 ///
+/// #[derive(FromJson, IntoJson)]
 /// struct User {
 ///     name: String,
 ///     country: String,
-/// }
-///
-/// json_map! {
-///     User,
-///     name => "name",
-///     country => "country"
 /// }
 ///
 /// fn main() {
