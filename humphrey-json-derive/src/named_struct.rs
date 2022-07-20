@@ -1,7 +1,10 @@
+//! Provides functions for deriving the traits on named structs.
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{DataStruct, DeriveInput, Ident};
 
+/// Derives the `FromJson` trait for a named struct.
 pub fn from_json_named_struct(ast: DeriveInput, r#struct: &DataStruct) -> TokenStream {
     let idents: Vec<Ident> = r#struct
         .fields
@@ -33,6 +36,7 @@ pub fn from_json_named_struct(ast: DeriveInput, r#struct: &DataStruct) -> TokenS
     TokenStream::from(tokens)
 }
 
+/// Derives the `IntoJson` trait for a named struct.
 pub fn into_json_named_struct(ast: DeriveInput, r#struct: &DataStruct) -> TokenStream {
     let idents: Vec<Ident> = r#struct
         .fields

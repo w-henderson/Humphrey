@@ -1,7 +1,10 @@
+//! Provides functions for deriving the traits on enums.
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{DataEnum, DeriveInput, Ident};
 
+/// Derives the `FromJson` trait for an enum.
 pub fn from_json_enum(ast: DeriveInput, r#enum: &DataEnum) -> TokenStream {
     let variants: Vec<Ident> = r#enum
         .variants
@@ -33,6 +36,7 @@ pub fn from_json_enum(ast: DeriveInput, r#enum: &DataEnum) -> TokenStream {
     TokenStream::from(tokens)
 }
 
+/// Derives the `IntoJson` trait for an enum.
 pub fn into_json_enum(ast: DeriveInput, r#enum: &DataEnum) -> TokenStream {
     let variants: Vec<Ident> = r#enum
         .variants

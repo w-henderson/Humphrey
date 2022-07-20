@@ -1,7 +1,10 @@
+//! Provides functions for deriving the traits on tuple structs.
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{DataStruct, DeriveInput, Index};
 
+/// Derives the `FromJson` trait for a tuple struct.
 pub fn from_json_tuple_struct(ast: DeriveInput, r#struct: &DataStruct) -> TokenStream {
     let field_count = r#struct.fields.len();
     let field_iter = 0..field_count;
@@ -28,6 +31,7 @@ pub fn from_json_tuple_struct(ast: DeriveInput, r#struct: &DataStruct) -> TokenS
     TokenStream::from(tokens)
 }
 
+/// Derives the `IntoJson` trait for a tuple struct.
 pub fn into_json_tuple_struct(ast: DeriveInput, r#struct: &DataStruct) -> TokenStream {
     let field_count = r#struct.fields.len();
     let field_iter = (0..field_count).into_iter().map(Index::from);

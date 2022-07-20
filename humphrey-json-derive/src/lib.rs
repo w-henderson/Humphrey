@@ -1,3 +1,10 @@
+//! Provides the derive macros for Humphrey JSON.
+//!
+//! These macros should only be used from the Humphrey JSON crate itself, never directly from this crate. You can read about their uses in the [Humphrey JSON documentation](https://humphrey.whenderson.dev/json/data-structures.html).
+
+#![warn(missing_docs)]
+#![warn(clippy::missing_docs_in_private_items)]
+
 extern crate proc_macro;
 
 mod enum_type;
@@ -9,6 +16,9 @@ use proc_macro::TokenStream;
 use syn::spanned::Spanned;
 use syn::{parse_macro_input, Data, DeriveInput, Error};
 
+/// Derives the `FromJson` trait for a type.
+///
+/// This macro can be used on named structs, tuple structs, and enums. It is not currently supported for enums with data variants.
 #[proc_macro_derive(FromJson)]
 pub fn derive_from_json(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -58,6 +68,9 @@ pub fn derive_from_json(input: TokenStream) -> TokenStream {
     }
 }
 
+/// Derives the `IntoJson` trait for a type.
+///
+/// This macro can be used on named structs, tuple structs, and enums. It is not currently supported for enums with data variants.
 #[proc_macro_derive(IntoJson)]
 pub fn derive_into_json(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
