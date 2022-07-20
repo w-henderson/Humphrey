@@ -104,6 +104,49 @@ fn nested_structs_from_json() {
 }
 
 #[test]
+fn renamed_struct_from_json() {
+    #[derive(FromJson, PartialEq, Debug)]
+    struct Test {
+        a: String,
+        b: bool,
+        #[rename = "d"]
+        c: Option<i32>,
+    }
+
+    let test_1 = Test {
+        a: "some value".to_string(),
+        b: false,
+        c: Some(123),
+    };
+
+    let test_2 = Test {
+        a: "some other value".to_string(),
+        b: true,
+        c: None,
+    };
+
+    assert_eq!(
+        Test::from_json(&json!({
+            "a": "some value",
+            "b": false,
+            "d": 123
+        }))
+        .unwrap(),
+        test_1
+    );
+
+    assert_eq!(
+        Test::from_json(&json!({
+            "a": "some other value",
+            "b": true,
+            "d": null
+        }))
+        .unwrap(),
+        test_2
+    );
+}
+
+#[test]
 fn tuple_struct_from_json() {
     #[derive(FromJson, PartialEq, Debug)]
     struct TupleStruct(String, i32);
@@ -137,4 +180,34 @@ fn enum_from_json() {
     assert_eq!(Enum::from_json(&json!("VariantC")).unwrap(), Enum::VariantC);
 
     assert!(Enum::from_json(&json!("VariantD")).is_err());
+}
+
+#[test]
+fn renamed_enum_from_json() {
+    #[derive(FromJson, PartialEq, Debug)]
+    enum Enum {
+        #[rename = "variant_a"]
+        VariantA,
+        #[rename = "variant_b"]
+        VariantB,
+        #[rename = "variant_c"]
+        VariantC,
+    }
+
+    assert_eq!(
+        Enum::from_json(&json!("variant_a")).unwrap(),
+        Enum::VariantA
+    );
+    assert_eq!(
+        Enum::from_json(&json!("variant_b")).unwrap(),
+        Enum::VariantB
+    );
+    assert_eq!(
+        Enum::from_json(&json!("variant_c")).unwrap(),
+        Enum::VariantC
+    );
+
+    assert!(Enum::from_json(&json!("VariantA")).is_err());
+    assert!(Enum::from_json(&json!("VariantB")).is_err());
+    assert!(Enum::from_json(&json!("VariantC")).is_err());
 }
