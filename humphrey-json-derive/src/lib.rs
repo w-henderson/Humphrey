@@ -1,98 +1,108 @@
 extern crate proc_macro;
 
+mod enum_type;
+mod named_struct;
+mod tuple_struct;
+
 use proc_macro::TokenStream;
 
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Data, DeriveInput, Error, Ident};
-
-use quote::quote;
+use syn::{parse_macro_input, Data, DeriveInput, Error};
 
 #[proc_macro_derive(FromJson)]
 pub fn derive_from_json(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
 
-    let idents: Vec<Ident> = match ast.data {
-        Data::Struct(r#struct) => r#struct
-            .fields
-            .iter()
-            .map(|field| field.ident.clone().unwrap())
-            .collect(),
-        _ => {
-            return Error::new(
-                ast.span(),
-                "`FromJson` can currently only be derived for structs",
-            )
-            .to_compile_error()
-            .into()
-        }
-    };
-
-    let fields: Vec<String> = idents
-        .clone()
-        .into_iter()
-        .map(|ident| ident.to_string())
-        .collect();
-
-    let name = &ast.ident;
-    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
-
-    let tokens = quote! {
-        impl #impl_generics ::humphrey_json::traits::FromJson for #name #ty_generics #where_clause {
-            fn from_json(value: &::humphrey_json::Value) -> Result<Self, ::humphrey_json::error::ParseError> {
-                Ok(Self {
-                    #(
-                        #idents: ::humphrey_json::traits::FromJson::from_json(value.get(#fields).unwrap_or(&::humphrey_json::Value::Null))?,
-                    )*
-                })
+    match &ast.data.clone() {
+        Data::Struct(r#struct) => {
+            if r#struct
+                .fields
+                .iter()
+                .map(|field| field.ident.clone())
+                .all(|ident| ident.is_some())
+                && !r#struct.fields.is_empty()
+            {
+                named_struct::from_json_named_struct(ast, r#struct)
+            } else if !r#struct.fields.is_empty() {
+                tuple_struct::from_json_tuple_struct(ast, r#struct)
+            } else {
+                Error::new(ast.span(), "`FromJson` cannot be derived for empty structs")
+                    .to_compile_error()
+                    .into()
             }
         }
-    };
 
-    TokenStream::from(tokens)
+        Data::Enum(r#enum) => {
+            if !r#enum
+                .variants
+                .iter()
+                .any(|variant| !variant.fields.is_empty())
+            {
+                enum_type::from_json_enum(ast, r#enum)
+            } else {
+                Error::new(
+                    ast.span(),
+                    "`FromJson` cannot be derived for enums with data variants",
+                )
+                .to_compile_error()
+                .into()
+            }
+        }
+
+        _ => Error::new(
+            ast.span(),
+            "`FromJson` can only be derived for non-empty structs and enums",
+        )
+        .to_compile_error()
+        .into(),
+    }
 }
 
 #[proc_macro_derive(IntoJson)]
 pub fn derive_into_json(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
 
-    let idents: Vec<Ident> = match ast.data {
-        Data::Struct(r#struct) => r#struct
-            .fields
-            .iter()
-            .map(|field| field.ident.clone().unwrap())
-            .collect(),
-        _ => {
-            return Error::new(
-                ast.span(),
-                "`IntoJson` can currently only be derived for structs",
-            )
-            .to_compile_error()
-            .into()
-        }
-    };
-
-    let fields: Vec<String> = idents
-        .clone()
-        .into_iter()
-        .map(|ident| ident.to_string())
-        .collect();
-
-    let name = &ast.ident;
-    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
-
-    let tokens = quote! {
-        impl #impl_generics ::humphrey_json::traits::IntoJson for #name #ty_generics #where_clause {
-            fn to_json(&self) -> ::humphrey_json::Value {
-                use ::humphrey_json::json;
-
-                json!({
-                    #(
-                        #fields: (::humphrey_json::traits::IntoJson::to_json(&self.#idents)),
-                    )*
-                })
+    match &ast.data.clone() {
+        Data::Struct(r#struct) => {
+            if r#struct
+                .fields
+                .iter()
+                .map(|field| field.ident.clone())
+                .all(|ident| ident.is_some())
+                && !r#struct.fields.is_empty()
+            {
+                named_struct::into_json_named_struct(ast, r#struct)
+            } else if !r#struct.fields.is_empty() {
+                tuple_struct::into_json_tuple_struct(ast, r#struct)
+            } else {
+                Error::new(ast.span(), "`IntoJson` cannot be derived for empty structs")
+                    .to_compile_error()
+                    .into()
             }
         }
-    };
 
-    TokenStream::from(tokens)
+        Data::Enum(r#enum) => {
+            if !r#enum
+                .variants
+                .iter()
+                .any(|variant| !variant.fields.is_empty())
+            {
+                enum_type::into_json_enum(ast, r#enum)
+            } else {
+                Error::new(
+                    ast.span(),
+                    "`IntoJson` cannot be derived for enums with data variants",
+                )
+                .to_compile_error()
+                .into()
+            }
+        }
+
+        _ => Error::new(
+            ast.span(),
+            "`IntoJson` can only be derived for non-empty structs and enums",
+        )
+        .to_compile_error()
+        .into(),
+    }
 }

@@ -102,3 +102,33 @@ fn nested_structs_into_json() {
         })
     );
 }
+
+#[test]
+fn tuple_struct_into_json() {
+    #[derive(IntoJson)]
+    struct TupleStruct(String, i32);
+
+    assert_eq!(
+        TupleStruct("some value".to_string(), 123).to_json(),
+        json!(["some value", 123])
+    );
+
+    assert_eq!(
+        TupleStruct("some other value".to_string(), 456).to_json(),
+        json!(["some other value", 456])
+    );
+}
+
+#[test]
+fn enum_into_json() {
+    #[derive(IntoJson)]
+    enum Enum {
+        VariantA,
+        VariantB,
+        VariantC,
+    }
+
+    assert_eq!(Enum::VariantA.to_json(), json!("VariantA"));
+    assert_eq!(Enum::VariantB.to_json(), json!("VariantB"));
+    assert_eq!(Enum::VariantC.to_json(), json!("VariantC"));
+}

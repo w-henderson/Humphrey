@@ -102,3 +102,39 @@ fn nested_structs_from_json() {
         }
     );
 }
+
+#[test]
+fn tuple_struct_from_json() {
+    #[derive(FromJson, PartialEq, Debug)]
+    struct TupleStruct(String, i32);
+
+    assert_eq!(
+        TupleStruct::from_json(&json!(["some value", 123])).unwrap(),
+        TupleStruct("some value".to_string(), 123)
+    );
+
+    assert_eq!(
+        TupleStruct::from_json(&json!(["some other value", 456])).unwrap(),
+        TupleStruct("some other value".to_string(), 456)
+    );
+
+    assert!(TupleStruct::from_json(&json!(["some value"])).is_err());
+    assert!(TupleStruct::from_json(&json!([123, "some value"])).is_err());
+    assert!(TupleStruct::from_json(&json!(["some value", 123, 456])).is_err());
+}
+
+#[test]
+fn enum_from_json() {
+    #[derive(FromJson, PartialEq, Debug)]
+    enum Enum {
+        VariantA,
+        VariantB,
+        VariantC,
+    }
+
+    assert_eq!(Enum::from_json(&json!("VariantA")).unwrap(), Enum::VariantA);
+    assert_eq!(Enum::from_json(&json!("VariantB")).unwrap(), Enum::VariantB);
+    assert_eq!(Enum::from_json(&json!("VariantC")).unwrap(), Enum::VariantC);
+
+    assert!(Enum::from_json(&json!("VariantD")).is_err());
+}
