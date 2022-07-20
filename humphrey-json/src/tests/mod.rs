@@ -1,3 +1,4 @@
+pub mod derive;
 pub mod indexing;
 pub mod json_map;
 pub mod macros;

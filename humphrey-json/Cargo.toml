@@ -1,6 +1,6 @@
 [package]
 name = "humphrey_json"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 homepage = "https://github.com/w-henderson/Humphrey"
@@ -10,5 +10,12 @@ description = "A JSON library for the Humphrey ecosystem."
 keywords = ["json"]
 categories = ["encoding", "parsing"]
 
+[dependencies]
+humphrey_json_derive = { version = "^0.1.0", path = "../humphrey-json-derive", optional = true }
+
 [lib]
 doctest = false
+
+[features]
+derive = ["humphrey_json_derive"]
+default = ["derive"]

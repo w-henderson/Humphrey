@@ -18,6 +18,9 @@ pub mod macros;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "derive")]
+extern crate self as humphrey_json;
+
 /// Brings useful traits and macros into scope.
 ///
 /// ```
@@ -27,7 +30,13 @@ pub mod prelude {
     pub use crate::json;
     pub use crate::json_map;
     pub use crate::traits::*;
+
+    #[cfg(feature = "derive")]
+    pub use humphrey_json_derive::*;
 }
+
+#[cfg(feature = "derive")]
+pub use humphrey_json_derive::*;
 
 pub use value::Value;
 
@@ -37,16 +46,10 @@ pub use value::Value;
 /// ```
 /// use humphrey_json::prelude::*;
 ///
-/// #[derive(Debug)]
+/// #[derive(FromJson, IntoJson, Debug)]
 /// struct User {
 ///     name: String,
 ///     country: String,
-/// }
-///
-/// json_map! {
-///     User,
-///     name => "name",
-///     country => "country"
 /// }
 ///
 /// fn main() {
@@ -81,15 +84,10 @@ where
 /// ```
 /// use humphrey_json::prelude::*;
 ///
+/// #[derive(FromJson, IntoJson)]
 /// struct User {
 ///     name: String,
 ///     country: String,
-/// }
-///
-/// json_map! {
-///     User,
-///     name => "name",
-///     country => "country"
 /// }
 ///
 /// fn main() {

@@ -12,6 +12,6 @@
 
 <hr><br>
 
-Humphrey JSON is a simple JSON library for Rust, and provides a number of features for working with JSON data. In accordance with Humphrey's principles, it has no dependencies. It allows for JSON data to be manipulated with or without types, and provides a similar API to Serde.
+Humphrey JSON is a simple JSON library for Rust, and provides a number of features for working with JSON data. In accordance with Humphrey's principles, it has no required dependencies. It allows for JSON data to be manipulated with or without types, and provides a similar API to Serde.
 
 Learn more about Humphrey JSON [here](https://humphrey.whenderson.dev/json/index.html).

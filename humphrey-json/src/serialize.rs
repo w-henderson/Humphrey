@@ -2,6 +2,8 @@
 
 use crate::Value;
 
+use std::fmt::Write;
+
 impl Value {
     /// Serialize a JSON value into a string.
     pub fn serialize(&self) -> String {
@@ -34,13 +36,13 @@ fn string_to_string(s: &str) -> String {
             0x20..=0x21 | 0x23..=0x5b | 0x5d..=0x10ffff => string.push(c),
             b => {
                 if b < 0x10000 {
-                    string.push_str(&format!("\\u{:04x}", b))
+                    write!(string, "\\u{:04x}", b).ok();
                 } else {
                     let mut buf: [u16; 2] = [0; 2];
                     let utf16 = c.encode_utf16(&mut buf);
 
                     for x in utf16 {
-                        string.push_str(&format!("\\u{:04x}", x))
+                        write!(string, "\\u{:04x}", x).ok();
                     }
                 }
             }

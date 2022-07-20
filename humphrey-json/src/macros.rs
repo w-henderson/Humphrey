@@ -30,13 +30,13 @@ macro_rules! json {
     (null) => {
         $crate::Value::Null
     };
-    ([ $( $el:tt ),* ]) => {
+    ([ $( $el:tt ),* $(,)? ]) => {
         $crate::Value::Array(vec![ $( json!($el) ),* ])
     };
     ({}) => {
         $crate::Value::Object(Vec::new())
     };
-    ({ $( $k:tt : $v:tt ),* }) => {
+    ({ $( $k:tt : $v:tt ),* $(,)? }) => {
         $crate::Value::Object(vec![
             $( ($k.to_string(), json!($v)) ),*
         ])
