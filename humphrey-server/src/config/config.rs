@@ -57,7 +57,7 @@ pub struct HostConfig {
 }
 
 /// Represents the type of a route.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum RouteType {
     /// Serve a single file.
     File,
@@ -67,6 +67,8 @@ pub enum RouteType {
     Proxy,
     /// Redirect clients to another server.
     Redirect,
+    /// Proxies WebSocket requests to this route to another server.
+    ExclusiveWebSocket,
 }
 
 /// Represents configuration for a specific route.
@@ -506,6 +508,14 @@ fn parse_route(
             });
         } else if !conf.contains_key("websocket") {
             return Err("Invalid route configuration, every route must contain either the `file`, `directory`, `proxy` or `redirect` field, unless it defines a WebSocket proxy with the `websocket` field");
+        } else {
+            routes.push(RouteConfig {
+                route_type: RouteType::ExclusiveWebSocket,
+                matches: wild.to_string(),
+                path: None,
+                load_balancer: None,
+                websocket_proxy,
+            });
         }
     }
 
