@@ -2,15 +2,19 @@ use humphrey_json::error::ParseError;
 use humphrey_json::prelude::*;
 use humphrey_json::Value;
 
+#[derive(FromJson, IntoJson)]
 pub struct ClientMessage {
     pub kind: ClientMessageKind,
     pub message: String,
 }
 
+#[derive(FromJson, IntoJson)]
 pub struct ServerMessage {
     pub kind: ServerMessageKind,
     pub message: Option<String>,
+    #[rename = "senderId"]
     pub sender_id: usize,
+    #[rename = "senderName"]
     pub sender_name: Option<String>,
 }
 
@@ -29,20 +33,6 @@ pub enum ServerMessageKind {
     Join,
     Chat,
     Leave,
-}
-
-json_map! {
-    ClientMessage,
-    kind => "kind",
-    message => "message"
-}
-
-json_map! {
-    ServerMessage,
-    kind => "kind",
-    message => "message",
-    sender_id => "senderId",
-    sender_name => "senderName"
 }
 
 impl FromJson for ClientMessageKind {

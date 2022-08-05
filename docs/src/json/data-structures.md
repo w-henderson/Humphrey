@@ -28,6 +28,26 @@ enum MyEnum {
 }
 ```
 
+Finally, the macros also provide a `rename` attribute, which can be used to rename the fields of a struct or the variants of an enum in the JSON data.
+
+```rs
+#[derive(FromJson, IntoJson)]
+struct RenamedFields {
+    #[rename = "dateOfBirth"]
+    date_of_birth: String,
+}
+
+#[derive(FromJson, IntoJson)]
+enum RenamedVariants {
+    #[rename = "y"]
+    Yes,
+    #[rename = "n"]
+    No,
+    #[rename = "?"]
+    Maybe,
+}
+```
+
 ## The `json_map!` Macro
 The `json_map!` macro is used as follows. The fields on the left represent the fields of the struct, and there must be an entry for each field in the struct. The strings on the right represent the names of the fields in the JSON data. It automatically generates a `FromJson` and `IntoJson` implementation for the struct.
 

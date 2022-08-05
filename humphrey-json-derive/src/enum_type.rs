@@ -2,17 +2,40 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{DataEnum, DeriveInput, Ident};
+use syn::{DataEnum, DeriveInput, Ident, Lit, Meta, Variant};
 
 /// Derives the `FromJson` trait for an enum.
 pub fn from_json_enum(ast: DeriveInput, r#enum: &DataEnum) -> TokenStream {
-    let variants: Vec<Ident> = r#enum
-        .variants
+    let variants: Vec<Variant> = r#enum.variants.iter().cloned().collect();
+
+    let idents: Vec<Ident> = variants
         .iter()
         .map(|variant| variant.ident.clone())
         .collect();
 
-    let variant_names: Vec<String> = variants.iter().map(|variant| variant.to_string()).collect();
+    let names: Vec<String> = variants
+        .iter()
+        .map(|variant| {
+            if variant.attrs.is_empty() {
+                variant.ident.to_string()
+            } else {
+                let attr = variant
+                    .attrs
+                    .iter()
+                    .find(|attr| attr.path.is_ident("rename"))
+                    .expect("Unknown attribute");
+                let meta = attr.parse_meta().unwrap();
+
+                match meta {
+                    Meta::NameValue(name_value) => match name_value.lit {
+                        Lit::Str(s) => s.value(),
+                        _ => panic!("Attribute format incorrect"),
+                    },
+                    _ => panic!("Attribute format incorrect"),
+                }
+            }
+        })
+        .collect();
 
     let name = &ast.ident;
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
@@ -23,7 +46,7 @@ pub fn from_json_enum(ast: DeriveInput, r#enum: &DataEnum) -> TokenStream {
                 match value.as_str() {
                     Some(string) => match string {
                         #(
-                            #variant_names => Ok(Self::#variants),
+                            #names => Ok(Self::#idents),
                         )*
                         _ => Err(::humphrey_json::error::ParseError::TypeError),
                     },
@@ -38,13 +61,36 @@ pub fn from_json_enum(ast: DeriveInput, r#enum: &DataEnum) -> TokenStream {
 
 /// Derives the `IntoJson` trait for an enum.
 pub fn into_json_enum(ast: DeriveInput, r#enum: &DataEnum) -> TokenStream {
-    let variants: Vec<Ident> = r#enum
-        .variants
+    let variants: Vec<Variant> = r#enum.variants.iter().cloned().collect();
+
+    let idents: Vec<Ident> = variants
         .iter()
         .map(|variant| variant.ident.clone())
         .collect();
 
-    let variant_names: Vec<String> = variants.iter().map(|variant| variant.to_string()).collect();
+    let names: Vec<String> = variants
+        .iter()
+        .map(|variant| {
+            if variant.attrs.is_empty() {
+                variant.ident.to_string()
+            } else {
+                let attr = variant
+                    .attrs
+                    .iter()
+                    .find(|attr| attr.path.is_ident("rename"))
+                    .expect("Unknown attribute");
+                let meta = attr.parse_meta().unwrap();
+
+                match meta {
+                    Meta::NameValue(name_value) => match name_value.lit {
+                        Lit::Str(s) => s.value(),
+                        _ => panic!("Attribute format incorrect"),
+                    },
+                    _ => panic!("Attribute format incorrect"),
+                }
+            }
+        })
+        .collect();
 
     let name = &ast.ident;
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
@@ -56,7 +102,7 @@ pub fn into_json_enum(ast: DeriveInput, r#enum: &DataEnum) -> TokenStream {
 
                 match self {
                     #(
-                        Self::#variants => json!(#variant_names),
+                        Self::#idents => json!(#names),
                     )*
                 }
             }

@@ -19,7 +19,7 @@ use syn::{parse_macro_input, Data, DeriveInput, Error};
 /// Derives the `FromJson` trait for a type.
 ///
 /// This macro can be used on named structs, tuple structs, and enums. It is not currently supported for enums with data variants.
-#[proc_macro_derive(FromJson)]
+#[proc_macro_derive(FromJson, attributes(rename))]
 pub fn derive_from_json(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
 
@@ -71,7 +71,7 @@ pub fn derive_from_json(input: TokenStream) -> TokenStream {
 /// Derives the `IntoJson` trait for a type.
 ///
 /// This macro can be used on named structs, tuple structs, and enums. It is not currently supported for enums with data variants.
-#[proc_macro_derive(IntoJson)]
+#[proc_macro_derive(IntoJson, attributes(rename))]
 pub fn derive_into_json(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
 
