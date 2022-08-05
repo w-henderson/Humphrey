@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 humphrey = { path = "../../humphrey" }
 humphrey_server = { path = "../../humphrey-server", features = ["plugins"] }
+humphrey_ws = { path = "../../humphrey-ws" }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
