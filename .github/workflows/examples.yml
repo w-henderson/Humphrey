@@ -4,6 +4,7 @@ on:
     - "humphrey/**"
     - "humphrey-auth/**"
     - "humphrey-json/**"
+    - "humphrey-json-derive/**"
     - "humphrey-server/**"
     - "humphrey-ws/**"
     - "examples/**"
