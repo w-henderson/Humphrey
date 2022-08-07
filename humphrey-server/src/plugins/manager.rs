@@ -108,9 +108,9 @@ impl PluginManager {
     }
 
     /// Calls the `on_response` function on every plugin.
-    pub fn on_response(&self, response: &mut Response, state: Arc<AppState>) {
+    pub fn on_response(&self, response: &mut Response, state: Arc<AppState>, route: &RouteConfig) {
         for plugin in &self.plugins {
-            plugin.on_response(response, state.clone());
+            plugin.on_response(response, state.clone(), route);
         }
     }
 

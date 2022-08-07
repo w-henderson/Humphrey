@@ -197,7 +197,7 @@ fn request_handler(
         .unwrap_or_else(|| inner_request_handler(request, state.clone(), host, route)); // If no plugin overrides the response, generate it in the normal way
 
     // Pass the response to plugins before it is sent to the client
-    plugins.on_response(&mut response, state.clone());
+    plugins.on_response(&mut response, state.clone(), route_config);
 
     response
 }

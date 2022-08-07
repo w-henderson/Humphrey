@@ -63,7 +63,7 @@ pub trait Plugin: Any + Send + Sync + Debug {
 
     /// Called when a response has been generated but not yet sent.
     /// May modify the response in-place.
-    fn on_response(&self, response: &mut Response, state: Arc<AppState>) {}
+    fn on_response(&self, response: &mut Response, state: Arc<AppState>, route: &RouteConfig) {}
 
     /// Called when the plugin is about to be unloaded.
     /// Any clean-up should be done here.
