@@ -1,0 +1,18 @@
+[package]
+name = "hot-reload"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+humphrey = { path = "../../humphrey" }
+humphrey_server = { path = "../../humphrey-server", features = ["plugins"] }
+humphrey_ws = { path = "../../humphrey-ws" }
+notify = "4.0.17"
+
+[build-dependencies]
+minify-js = "0.1.5"
+
+[lib]
+crate-type = ["cdylib"]
+
+[workspace]
