@@ -37,32 +37,44 @@ if (typeof __HUMPHREY_INIT === "undefined" || __HUMPHREY_INIT !== true) {
 
     // Update any `src` attributes that point to the changed URL.
     const srcElements = Array.from(document.querySelectorAll("[src]"));
-    const sources = srcElements.map(e => e.src);
+    const sources = srcElements.map(e => e.getAttribute("src"));
     const indexes = sources.reduce((previous, current, index) => {
-      if (current === data) return [...previous, index];
+      if (removeHash(current) === data || removeHash(current) === removeSlash(data)) return [...previous, index];
       return previous;
     }, []);
 
     for (let index of indexes) {
-      const source = sources[index];
-      const srcUrl = new URL(source.src);
-      srcUrl.hash = new Date().getTime();
-      source.src = srcUrl;
+      const source = removeHash(sources[index]);
+      const element = srcElements[index];
+
+      const newElement = document.createElement(element.tagName);
+      newElement.innerHTML = element.innerHTML;
+      for (let attr of element.attributes) {
+        if (attr.name === "src") continue;
+        newElement.setAttribute(attr.name, attr.value);
+      }
+
+      newElement.setAttribute("src", `${source}#${new Date().getTime()}`);
+      element.parentNode.insertBefore(newElement, element);
+      element.remove();
+
+      console.log(`[Humphrey Hot Reload] Reloading ${source}`);
     }
 
     // Update any CSS `<link>` tags that point to the changed URL.
     const cssElements = Array.from(document.querySelectorAll("link[href]"));
-    const cssSources = cssElements.map(e => e.href);
+    const cssSources = cssElements.map(e => e.getAttribute("href"));
     const cssIndexes = cssSources.reduce((previous, current, index) => {
-      if (current === data) return [...previous, index];
+      if (removeHash(current) === data || removeHash(current) === removeSlash(data)) return [...previous, index];
       return previous;
     }, []);
 
     for (let index of cssIndexes) {
-      const source = cssSources[index];
-      const srcUrl = new URL(source.href);
-      srcUrl.hash = new Date().getTime();
-      source.href = srcUrl;
+      const element = cssElements[index];
+      const source = removeHash(cssSources[index]);
+      element.setAttribute("href", `${source}#${new Date().getTime()}`);
+
+      console.log(`[Humphrey Hot Reload] Reloading ${source}`);
     }
   };
 }
@@ -75,4 +87,13 @@ async function reloadPage() {
       document.write(text);
       document.close();
     });
+}
+
+function removeHash(s) {
+  return s.split('#')[0];
+}
+
+function removeSlash(s) {
+  if (s.startsWith('/')) return s.substring(1);
+  return s;
 }
