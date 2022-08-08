@@ -77,11 +77,17 @@ impl Plugin for HotReloadPlugin {
     }
 
     fn on_response(&self, response: &mut Response, _: Arc<AppState>, route: &RouteConfig) {
-        if response.status_code == StatusCode::OK
-            && response.headers.get("Content-Type") == Some("text/html")
-        {
+        let content_type = response.headers.get("Content-Type");
+
+        if response.status_code == StatusCode::OK && content_type == Some("text/html") {
             injector::inject_variables(response, route, &self.ws_route);
             injector::inject_js(response, INJECTED_JS);
+        } else if content_type
+            .map(|s| s.starts_with("image/") || s == "text/javascript" || s == "text/css")
+            .unwrap_or(false)
+        {
+            response.headers.remove("Cache-Control");
+            response.headers.add("Cache-Control", "no-store");
         }
     }
 }

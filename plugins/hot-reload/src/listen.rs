@@ -51,8 +51,6 @@ pub fn init(
         loop {
             let event = rx.recv().unwrap();
 
-            println!("event! {:?}", event);
-
             if event.path.is_none() || event.op.is_err() || event.op.unwrap() != Op::WRITE {
                 continue;
             }
@@ -66,10 +64,19 @@ pub fn init(
                     let url = route.url_prefix.clone()
                         + path.strip_prefix(&route.path).unwrap().to_str().unwrap();
 
-                    println!("change! {}", &url);
+                    state.logger.debug(format!("Hot Reload: Reloading {}", url));
 
-                    for stream in &mut *streams {
-                        stream.send(Message::new(url.clone())).unwrap();
+                    let mut to_remove = Vec::with_capacity(streams.len());
+
+                    #[allow(clippy::significant_drop_in_scrutinee)]
+                    for (i, stream) in streams.iter_mut().enumerate() {
+                        if stream.send(Message::new(url.clone())).is_err() {
+                            to_remove.push(i);
+                        }
+                    }
+
+                    for i in to_remove.iter().rev() {
+                        streams.swap_remove(*i);
                     }
                 }
             }

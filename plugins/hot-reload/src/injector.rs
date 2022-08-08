@@ -20,9 +20,11 @@ pub fn inject_variables(response: &mut Response, route: &RouteConfig, ws_route: 
             index..index,
             format!(
                 r#"<script>
-                    const __HUMPHREY_ROUTE_PATH = "{}";
-                    const __HUMPHREY_ROUTE_URL_PREFIX = "{}";
-                    const __HUMPHREY_WS_ROUTE = "{}";
+                    if (typeof __HUMPHREY_INIT === "undefined" || __HUMPHREY_INIT !== true) {{
+                        var __HUMPHREY_ROUTE_PATH = "{}";
+                        var __HUMPHREY_ROUTE_URL_PREFIX = "{}";
+                        var __HUMPHREY_WS_ROUTE = "{}"
+                    }}
                 </script>"#,
                 route.path.as_ref().unwrap(),
                 get_url_prefix(&route.matches).unwrap(),
