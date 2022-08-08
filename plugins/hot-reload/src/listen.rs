@@ -61,8 +61,9 @@ pub fn init(
 
             for route in &watched_routes {
                 if path.starts_with(&route.path) {
-                    let url = route.url_prefix.clone()
-                        + path.strip_prefix(&route.path).unwrap().to_str().unwrap();
+                    let url = (route.url_prefix.clone()
+                        + path.strip_prefix(&route.path).unwrap().to_str().unwrap())
+                    .replace('\\', "/");
 
                     state.logger.debug(format!("Hot Reload: Reloading {}", url));
 
