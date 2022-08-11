@@ -6,6 +6,7 @@ use crate::config::RouteConfig;
 use crate::plugins::plugin::{Plugin, PluginLoadResult};
 use crate::server::server::AppState;
 use humphrey::http::{Request, Response};
+use humphrey::stream::Stream;
 
 use libloading::Library;
 use std::collections::HashMap;
@@ -84,10 +85,32 @@ impl PluginManager {
         None
     }
 
-    /// Calls the `on_response` function on every plugin.
-    pub fn on_response(&self, response: &mut Response, state: Arc<AppState>) {
+    /// Calls the `on_websocket_request` function on every plugin.
+    /// If a plugin handles the stream, the function immediately returns.
+    pub fn on_websocket_request(
+        &self,
+        request: &mut Request,
+        mut stream: Stream,
+        state: Arc<AppState>,
+        route: Option<&RouteConfig>,
+    ) -> Option<Stream> {
         for plugin in &self.plugins {
-            plugin.on_response(response, state.clone());
+            if let Some(returned_stream) =
+                plugin.on_websocket_request(request, stream, state.clone(), route)
+            {
+                stream = returned_stream;
+            } else {
+                return None;
+            }
+        }
+
+        Some(stream)
+    }
+
+    /// Calls the `on_response` function on every plugin.
+    pub fn on_response(&self, response: &mut Response, state: Arc<AppState>, route: &RouteConfig) {
+        for plugin in &self.plugins {
+            plugin.on_response(response, state.clone(), route);
         }
     }
 

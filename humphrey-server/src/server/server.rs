@@ -1,6 +1,6 @@
 //! Provides the core server functionality and manages the underlying Humphrey app.
 
-use humphrey::http::{Request, Response};
+use humphrey::http::{Request, Response, StatusCode};
 use humphrey::monitor::event::ToEventMask;
 use humphrey::monitor::MonitorConfig;
 use humphrey::stream::Stream;
@@ -71,16 +71,18 @@ pub fn main(config: Config) {
     let monitor_state = app.get_state();
     spawn(move || monitor_thread(monitor_rx, monitor_state));
 
-    for route in init_app_routes(&state.config.default_host, 0).routes {
+    let top_level_routes = init_app_routes(&state.config.default_host, 0);
+
+    for route in top_level_routes.routes {
         app = app.with_route(&route.route, route.handler);
+    }
+
+    for websocket_route in top_level_routes.websocket_routes {
+        app = app.with_websocket_route(&websocket_route.route, websocket_route.handler);
     }
 
     for (host_index, host) in state.config.hosts.iter().enumerate() {
         app = app.with_host(&host.matches, init_app_routes(host, host_index + 1));
-    }
-
-    if let Some(proxy) = state.config.default_websocket_proxy.as_ref() {
-        app = app.with_websocket_route("/*", websocket_handler(proxy.to_string()));
     }
 
     #[cfg(feature = "tls")]
@@ -95,6 +97,11 @@ pub fn main(config: Config) {
                 state.config.port,
             ));
         }
+    }
+
+    #[cfg(feature = "plugins")]
+    {
+        app = app.with_websocket_route("/*", catch_all_websocket_route);
     }
 
     let addr = format!("{}:{}", state.config.address, state.config.port);
@@ -145,9 +152,10 @@ fn init_app_routes(host: &HostConfig, host_index: usize) -> SubApp<AppState> {
             request_handler(request, state, host_index, route_index)
         });
 
-        if let Some(proxy) = route.websocket_proxy.as_ref() {
-            subapp =
-                subapp.with_websocket_route(&route.matches, websocket_handler(proxy.to_string()));
+        if route.websocket_proxy.is_some() {
+            subapp = subapp.with_websocket_route(&route.matches, move |request, stream, state| {
+                websocket_handler(request, stream, state, host_index, route_index)
+            });
         }
     }
 
@@ -189,7 +197,7 @@ fn request_handler(
         .unwrap_or_else(|| inner_request_handler(request, state.clone(), host, route)); // If no plugin overrides the response, generate it in the normal way
 
     // Pass the response to plugins before it is sent to the client
-    plugins.on_response(&mut response, state.clone());
+    plugins.on_response(&mut response, state.clone(), route_config);
 
     response
 }
@@ -225,13 +233,62 @@ fn inner_request_handler(
         RouteType::Redirect => {
             redirect_handler(request, state.clone(), route.path.as_ref().unwrap())
         }
+        RouteType::ExclusiveWebSocket => Response::new(
+            StatusCode::NotFound,
+            "This route only accepts WebSocket requests",
+        ),
     }
 }
 
-fn websocket_handler(target: String) -> impl Fn(Request, Stream, Arc<AppState>) {
-    move |request: Request, source: Stream, state: Arc<AppState>| {
-        proxy_websocket(request, source, &target, state).ok();
+#[cfg(not(feature = "plugins"))]
+fn websocket_handler(
+    request: Request,
+    stream: Stream,
+    state: Arc<AppState>,
+    host: usize,
+    route: usize,
+) {
+    inner_websocket_handler(request, stream, state, host, route)
+}
+
+#[cfg(feature = "plugins")]
+fn websocket_handler(
+    mut request: Request,
+    stream: Stream,
+    state: Arc<AppState>,
+    host: usize,
+    route: usize,
+) {
+    let plugins = state.plugin_manager.read().unwrap();
+
+    let route_config = state.config.get_route(host, route);
+
+    if let Some(stream) =
+        plugins.on_websocket_request(&mut request, stream, state.clone(), Some(route_config))
+    {
+        inner_websocket_handler(request, stream, state.clone(), host, route)
     }
+}
+
+fn inner_websocket_handler(
+    request: Request,
+    stream: Stream,
+    state: Arc<AppState>,
+    host: usize,
+    route: usize,
+) {
+    let route = state.config.get_route(host, route);
+
+    if let Some(target) = route.websocket_proxy.as_ref() {
+        proxy_websocket(request, stream, &target.clone(), state).ok();
+    }
+}
+
+#[cfg(feature = "plugins")]
+fn catch_all_websocket_route(mut request: Request, stream: Stream, state: Arc<AppState>) {
+    let plugins = state.plugin_manager.read().unwrap();
+
+    plugins.on_websocket_request(&mut request, stream, state.clone(), None);
 }
 
 fn proxy_websocket(
@@ -300,6 +357,8 @@ fn load_plugins(config: &Config, state: Arc<AppState>) -> Result<usize, ()> {
     for plugin in &config.plugins {
         unsafe {
             let app_state = state.clone();
+
+            #[allow(clippy::significant_drop_in_scrutinee)]
             match manager.load_plugin(&plugin.library, &plugin.config, app_state) {
                 PluginLoadResult::Ok(name) => {
                     state.logger.info(&format!("Initialised plugin {}", name));

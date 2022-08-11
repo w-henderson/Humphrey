@@ -8,6 +8,7 @@
 use crate::config::RouteConfig;
 use crate::server::server::AppState;
 use humphrey::http::{Request, Response};
+use humphrey::stream::Stream;
 
 use std::any::Any;
 use std::collections::HashMap;
@@ -46,9 +47,23 @@ pub trait Plugin: Any + Send + Sync + Debug {
         None
     }
 
+    /// Called when a WebSocket request is received but before it is processed. May modify the request in-place.
+    /// Unlike `on_request`, this method should return `None` if the WebSocket request is being handled by the plugin, and should return the stream back to Humphrey if the request is not being handled by the plugin.
+    ///
+    /// **Important:** If the plugin returns `Some(stream)`, it must not modify or close the stream.
+    fn on_websocket_request(
+        &self,
+        request: &mut Request,
+        stream: Stream,
+        state: Arc<AppState>,
+        route: Option<&RouteConfig>,
+    ) -> Option<Stream> {
+        Some(stream)
+    }
+
     /// Called when a response has been generated but not yet sent.
     /// May modify the response in-place.
-    fn on_response(&self, response: &mut Response, state: Arc<AppState>) {}
+    fn on_response(&self, response: &mut Response, state: Arc<AppState>, route: &RouteConfig) {}
 
     /// Called when the plugin is about to be unloaded.
     /// Any clean-up should be done here.
