@@ -13,6 +13,7 @@
   - [Configuration](server/configuration.md)
   - [Using PHP](server/using-php.md)
   - [Using HTTPS](server/https.md)
+  - [Using Hot Reload](server/hot-reload.md)
   - [Creating a Plugin](server/creating-a-plugin.md)
 - [Humphrey WebSocket](websocket/index.md)
   - [Synchronous](websocket/sync/index.md)
