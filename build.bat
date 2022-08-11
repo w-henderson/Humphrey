@@ -6,6 +6,8 @@
 :: - Linux with all features (TLS and plugins)
 :: - PHP plugin for Windows
 :: - PHP plugin for Linux
+:: - Hot Reload plugin for Windows
+:: - Hot Reload plugin for Linux
 ::
 :: Requires Rust to be installed both normally and in WSL.
 
@@ -54,6 +56,20 @@ wsl $HOME/.cargo/bin/cargo build --release -q
 robocopy target/release ../../dist libphp.so > nul
 cd ../../dist
 rename libphp.so php_plugin_linux.so
+
+echo Building Hot Reload plugin for Windows...
+cd ../plugins/hot-reload
+cargo build --release -q
+robocopy target/release ../../dist hot_reload.dll > nul
+cd ../../dist
+rename hot_reload.dll hot_reload_plugin_windows.dll
+
+echo Building Hot Reload plugin for Linux...
+cd ../plugins/hot-reload
+wsl $HOME/.cargo/bin/cargo build --release -q
+robocopy target/release ../../dist libhot_reload.so > nul
+cd ../../dist
+rename libhot_reload.so hot_reload_plugin_linux.so
 
 cd ..
 
