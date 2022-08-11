@@ -74,7 +74,7 @@ impl Plugin for ExamplePlugin {
         Some(stream)
     }
 
-    fn on_response(&self, response: &mut Response, state: Arc<AppState>) {
+    fn on_response(&self, response: &mut Response, state: Arc<AppState>, _: &RouteConfig) {
         // Insert a header to the response
         response.headers.add("X-Example-Plugin", "true");
 
