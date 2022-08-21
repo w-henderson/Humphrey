@@ -1,5 +1,5 @@
 # Broadcasting Messages
-Many WebSocket applications broadcast messages to many clients at once, so in this chapter we'll learn how to do this asynchronousuly. Previously, we had to use an external dependency `bus`, but using the asynchronous approach, this is no longer necessary.
+Many WebSocket applications broadcast messages to many clients at once, so in this chapter we'll learn how to do this asynchronously. Previously, we had to use an external dependency `bus`, but using the asynchronous approach, this is no longer necessary.
 
 The example we build in this chapter will simply echo messages back to the client as well as broadcasting any messages typed into the server console to all connected clients. Furthermore, we'll broadcast a message whenever a client connects too.
 
