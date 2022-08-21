@@ -64,7 +64,7 @@ impl Frame {
         }
     }
 
-    /// Attemps to read a frame from the given stream, blocking until the frame is read.
+    /// Attempts to read a frame from the given stream, blocking until the frame is read.
     pub fn from_stream<T>(mut stream: T) -> Result<Self, WebsocketError>
     where
         T: Read,
@@ -77,7 +77,7 @@ impl Frame {
         Self::from_stream_inner(stream, buf)
     }
 
-    /// Attemps to read a frame from the given stream, immediately returning instead of blocking if there is no frame to read.
+    /// Attempts to read a frame from the given stream, immediately returning instead of blocking if there is no frame to read.
     pub fn from_stream_nonblocking(stream: &mut Stream) -> Restion<Self, WebsocketError> {
         // Set the stream to nonblocking to read the header
         if stream.set_nonblocking().is_err() {
