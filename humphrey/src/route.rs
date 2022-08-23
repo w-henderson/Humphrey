@@ -169,8 +169,8 @@ pub enum LocatedPath {
     File(PathBuf),
 }
 
-/// Attemps to find a given path.
-/// If the path itself is not found, attemps to find index files within it.
+/// Attempts to find a given path.
+/// If the path itself is not found, attempts to find index files within it.
 /// If these are not found, returns `None`.
 pub fn try_find_path(
     directory: &str,

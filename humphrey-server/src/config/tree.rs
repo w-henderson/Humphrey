@@ -138,7 +138,7 @@ impl ConfigNode {
 pub fn parse_conf(conf: &str, filename: &str) -> Result<ConfigNode, ConfigError> {
     let mut lines = TracebackIterator::from(conf.lines());
 
-    // Attemps to find the start of the configuration
+    // Attempts to find the start of the configuration
     let mut line_content = "";
     while line_content != "server {" {
         if let Some(line) = lines.next() {

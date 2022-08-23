@@ -16,7 +16,7 @@ pub trait AuthDatabase {
     fn get_user_by_uid(&self, uid: impl AsRef<str>) -> Option<User>;
     /// Returns the user who owns the given token, or `None` if not found.
     fn get_user_by_token(&self, token: impl AsRef<str>) -> Option<User>;
-    /// Returns the session identifed by the given token, or `None` if not found.
+    /// Returns the session identified by the given token, or `None` if not found.
     fn get_session_by_token(&self, token: impl AsRef<str>) -> Option<Session>;
 
     /// Update the user in the database.

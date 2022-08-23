@@ -509,7 +509,7 @@ where
     ///
     /// ## Deprecated
     /// This function is deprecated and will be removed in a future version.
-    /// Please use `with_websocket_route` intead.
+    /// Please use `with_websocket_route` instead.
     #[deprecated(since = "0.3.0", note = "Please use `with_websocket_route` instead")]
     pub fn with_websocket_handler<T>(mut self, handler: T) -> Self
     where
@@ -535,7 +535,7 @@ where
 
 /// Handles a connection with a client.
 /// The connection will be opened upon the first request and closed as soon as a request is
-///   recieved without the `Connection: Keep-Alive` header.
+///   received without the `Connection: Keep-Alive` header.
 #[allow(clippy::too_many_arguments)]
 fn client_handler<State>(
     mut stream: Stream,

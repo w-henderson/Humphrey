@@ -17,5 +17,5 @@ fn main() {
     let mut output = Vec::with_capacity(js.len());
     minify(js, &mut output).expect("Failed to minify JavaScript");
 
-    write(out_dir + "/inject.js", output).expect("Failed to write minifed JavaScript to file");
+    write(out_dir + "/inject.js", output).expect("Failed to write minified JavaScript to file");
 }

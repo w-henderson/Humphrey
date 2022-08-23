@@ -139,7 +139,7 @@ impl Response {
         String::from_utf8(self.body.clone()).ok()
     }
 
-    /// Attemps to read and parse one HTTP response from the given stream.
+    /// Attempts to read and parse one HTTP response from the given stream.
     ///
     /// Converts chunked transfer encoding into a regular body.
     pub fn from_stream<T>(stream: &mut T) -> Result<Self, ResponseError>

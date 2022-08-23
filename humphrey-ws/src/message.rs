@@ -41,7 +41,7 @@ impl Message {
         }
     }
 
-    /// Attemps to read a message from the given stream.
+    /// Attempts to read a message from the given stream.
     ///
     /// Silently responds to pings with pongs, as specified in [RFC 6455 Section 5.5.2](https://datatracker.ietf.org/doc/html/rfc6455#section-5.5.2).
     pub fn from_stream(stream: &mut WebsocketStream) -> Result<Self, WebsocketError> {
@@ -95,7 +95,7 @@ impl Message {
         })
     }
 
-    /// Attemps to read a message from the given stream without blocking.
+    /// Attempts to read a message from the given stream without blocking.
     ///
     /// Silently responds to pings with pongs, as specified in [RFC 6455 Section 5.5.2](https://datatracker.ietf.org/doc/html/rfc6455#section-5.5.2).
     pub fn from_stream_nonblocking(stream: &mut WebsocketStream) -> Restion<Self, WebsocketError> {
