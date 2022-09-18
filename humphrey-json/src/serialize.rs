@@ -12,8 +12,24 @@ impl Value {
             Value::Bool(b) => b.to_string(),
             Value::Number(n) => n.to_string(),
             Value::String(s) => string_to_string(s),
-            Value::Array(a) => array_to_string(a),
-            Value::Object(o) => object_to_string(o),
+            Value::Array(a) => array_to_string(a, None),
+            Value::Object(o) => object_to_string(o, None),
+        }
+    }
+
+    /// Serialize a JSON value into a string, with indentation.
+    pub fn serialize_pretty(&self) -> String {
+        self.serialize_pretty_indent(0)
+    }
+
+    fn serialize_pretty_indent(&self, indent: usize) -> String {
+        match self {
+            Value::Null => "null".to_string(),
+            Value::Bool(b) => b.to_string(),
+            Value::Number(n) => n.to_string(),
+            Value::String(s) => string_to_string(s),
+            Value::Array(a) => array_to_string(a, Some(indent)),
+            Value::Object(o) => object_to_string(o, Some(indent)),
         }
     }
 }
@@ -54,18 +70,39 @@ fn string_to_string(s: &str) -> String {
     string
 }
 
-fn array_to_string(array: &[Value]) -> String {
-    let mut inner = array.iter().map(|v| v.serialize()).fold(
-        {
-            let mut s = String::with_capacity(256);
-            s.push('[');
-            s
-        },
-        |acc, s| acc + &s + ",",
-    );
+fn array_to_string(array: &[Value], indent: Option<usize>) -> String {
+    if array.is_empty() {
+        return "[]".to_string();
+    }
+
+    let mut inner = array
+        .iter()
+        .map(|v| match indent {
+            Some(indent) => v.serialize_pretty_indent(indent + 4),
+            None => v.serialize(),
+        })
+        .fold(
+            {
+                let mut s = String::with_capacity(256);
+                s.push('[');
+                s
+            },
+            |acc, s| match indent {
+                Some(indent) => acc + "\n" + &" ".repeat(indent + 4) + &s + ",",
+                None => acc + &s + ",",
+            },
+        );
 
     if inner.ends_with(',') {
         inner.pop();
+    }
+
+    if let Some(indent) = indent {
+        inner.push('\n');
+
+        for _ in 0..indent {
+            inner.push(' ');
+        }
     }
 
     inner.push(']');
@@ -73,21 +110,39 @@ fn array_to_string(array: &[Value]) -> String {
     inner
 }
 
-fn object_to_string(object: &[(String, Value)]) -> String {
+fn object_to_string(object: &[(String, Value)], indent: Option<usize>) -> String {
+    if object.is_empty() {
+        return "{}".to_string();
+    }
+
     let mut inner = object
         .iter()
-        .map(|(k, v)| (string_to_string(k), v.serialize()))
+        .map(|(k, v)| match indent {
+            Some(indent) => (string_to_string(k), v.serialize_pretty_indent(indent + 4)),
+            None => (string_to_string(k), v.serialize()),
+        })
         .fold(
             {
                 let mut s = String::with_capacity(256);
                 s.push('{');
                 s
             },
-            |acc, (k, v)| acc + &k + ":" + &v + ",",
+            |acc, (k, v)| match indent {
+                Some(indent) => acc + "\n" + &" ".repeat(indent + 4) + &k + ": " + &v + ",",
+                None => acc + &k + ":" + &v + ",",
+            },
         );
 
     if inner.ends_with(',') {
         inner.pop();
+    }
+
+    if let Some(indent) = indent {
+        inner.push('\n');
+
+        for _ in 0..indent {
+            inner.push(' ');
+        }
     }
 
     inner.push('}');

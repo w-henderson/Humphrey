@@ -42,3 +42,54 @@ fn serialize_utf8_escape() {
 
     assert_eq!(serialized, expected);
 }
+
+#[test]
+fn serialize_object_pretty() {
+    let string = include_str!("./testcases/object.json");
+    let value = Value::parse(string).unwrap();
+
+    let serialized = value.serialize_pretty();
+    let expected = r#"{
+    "name": "William Henderson",
+    "favouriteNumber": 1.414,
+    "languages": [
+        "Rust",
+        "TypeScript",
+        1234,
+        false,
+        {
+            "name": "Python",
+            "version": 3.6
+        }
+    ],
+    "weaknesses": [],
+    "funnyName": {},
+    "online": true,
+    "life": null
+}"#
+    .to_string();
+
+    assert_eq!(serialized, expected);
+}
+
+#[test]
+fn serialize_array_pretty() {
+    let string = include_str!("./testcases/array.json");
+    let value = Value::parse(string).unwrap();
+
+    let serialized = value.serialize_pretty();
+    let expected = r#"[
+    {
+        "name": "w-henderson",
+        "favouriteNumber": 1.414,
+        "online": true
+    },
+    {
+        "name": "flauntingspade4",
+        "favouriteNumber": 69,
+        "online": false
+    }
+]"#;
+
+    assert_eq!(serialized, expected);
+}
