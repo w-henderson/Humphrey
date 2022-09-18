@@ -18,18 +18,18 @@ impl Value {
     }
 
     /// Serialize a JSON value into a string, with indentation.
-    pub fn serialize_pretty(&self) -> String {
-        self.serialize_pretty_indent(0)
+    pub fn serialize_pretty(&self, indent: usize) -> String {
+        self.serialize_pretty_indent(0, indent)
     }
 
-    fn serialize_pretty_indent(&self, indent: usize) -> String {
+    fn serialize_pretty_indent(&self, indent: usize, indent_size: usize) -> String {
         match self {
             Value::Null => "null".to_string(),
             Value::Bool(b) => b.to_string(),
             Value::Number(n) => n.to_string(),
             Value::String(s) => string_to_string(s),
-            Value::Array(a) => array_to_string(a, Some(indent)),
-            Value::Object(o) => object_to_string(o, Some(indent)),
+            Value::Array(a) => array_to_string(a, Some((indent, indent_size))),
+            Value::Object(o) => object_to_string(o, Some((indent, indent_size))),
         }
     }
 }
@@ -70,7 +70,7 @@ fn string_to_string(s: &str) -> String {
     string
 }
 
-fn array_to_string(array: &[Value], indent: Option<usize>) -> String {
+fn array_to_string(array: &[Value], indent: Option<(usize, usize)>) -> String {
     if array.is_empty() {
         return "[]".to_string();
     }
@@ -78,7 +78,9 @@ fn array_to_string(array: &[Value], indent: Option<usize>) -> String {
     let mut inner = array
         .iter()
         .map(|v| match indent {
-            Some(indent) => v.serialize_pretty_indent(indent + 4),
+            Some((indent, indent_size)) => {
+                v.serialize_pretty_indent(indent + indent_size, indent_size)
+            }
             None => v.serialize(),
         })
         .fold(
@@ -88,7 +90,9 @@ fn array_to_string(array: &[Value], indent: Option<usize>) -> String {
                 s
             },
             |acc, s| match indent {
-                Some(indent) => acc + "\n" + &" ".repeat(indent + 4) + &s + ",",
+                Some((indent, indent_size)) => {
+                    acc + "\n" + &" ".repeat(indent + indent_size) + &s + ","
+                }
                 None => acc + &s + ",",
             },
         );
@@ -97,7 +101,7 @@ fn array_to_string(array: &[Value], indent: Option<usize>) -> String {
         inner.pop();
     }
 
-    if let Some(indent) = indent {
+    if let Some((indent, _)) = indent {
         inner.push('\n');
 
         for _ in 0..indent {
@@ -110,7 +114,7 @@ fn array_to_string(array: &[Value], indent: Option<usize>) -> String {
     inner
 }
 
-fn object_to_string(object: &[(String, Value)], indent: Option<usize>) -> String {
+fn object_to_string(object: &[(String, Value)], indent: Option<(usize, usize)>) -> String {
     if object.is_empty() {
         return "{}".to_string();
     }
@@ -118,7 +122,10 @@ fn object_to_string(object: &[(String, Value)], indent: Option<usize>) -> String
     let mut inner = object
         .iter()
         .map(|(k, v)| match indent {
-            Some(indent) => (string_to_string(k), v.serialize_pretty_indent(indent + 4)),
+            Some((indent, indent_size)) => (
+                string_to_string(k),
+                v.serialize_pretty_indent(indent + indent_size, indent_size),
+            ),
             None => (string_to_string(k), v.serialize()),
         })
         .fold(
@@ -128,7 +135,9 @@ fn object_to_string(object: &[(String, Value)], indent: Option<usize>) -> String
                 s
             },
             |acc, (k, v)| match indent {
-                Some(indent) => acc + "\n" + &" ".repeat(indent + 4) + &k + ": " + &v + ",",
+                Some((indent, indent_size)) => {
+                    acc + "\n" + &" ".repeat(indent + indent_size) + &k + ": " + &v + ","
+                }
                 None => acc + &k + ":" + &v + ",",
             },
         );
@@ -137,7 +146,7 @@ fn object_to_string(object: &[(String, Value)], indent: Option<usize>) -> String
         inner.pop();
     }
 
-    if let Some(indent) = indent {
+    if let Some((indent, _)) = indent {
         inner.push('\n');
 
         for _ in 0..indent {

@@ -110,6 +110,8 @@ where
 
 /// Serialize a Rust data structure into a JSON string, pretty-printed with indentation.
 ///
+/// For more control over indentation, use [`Value::serialize_pretty`].
+///
 /// ## Usage
 /// ```
 /// use humphrey_json::prelude::*;
@@ -135,5 +137,5 @@ pub fn to_string_pretty<T>(v: &T) -> String
 where
     T: traits::IntoJson,
 {
-    v.to_json().serialize_pretty()
+    v.to_json().serialize_pretty(4)
 }
