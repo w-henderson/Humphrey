@@ -107,3 +107,33 @@ where
 {
     v.to_json().serialize()
 }
+
+/// Serialize a Rust data structure into a JSON string, pretty-printed with indentation.
+///
+/// ## Usage
+/// ```
+/// use humphrey_json::prelude::*;
+///
+/// #[derive(FromJson, IntoJson)]
+/// struct User {
+///     name: String,
+///     country: String,
+/// }
+///
+/// fn main() {
+///     let user = User {
+///         name: "William Henderson".into(),
+///         country: "United Kingdom".into(),
+///     };
+///
+///     let json_string = humphrey_json::to_string_pretty(&user);
+///
+///     println!("{}", json_string);
+/// }
+/// ```
+pub fn to_string_pretty<T>(v: &T) -> String
+where
+    T: traits::IntoJson,
+{
+    v.to_json().serialize_pretty()
+}
