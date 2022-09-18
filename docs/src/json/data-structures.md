@@ -97,5 +97,11 @@ Instances of any struct which implements `IntoJson` can be serialized into JSON,
 let json_string = humphrey_json::to_string(&user).unwrap();
 ```
 
+To format the JSON with newlines and to customize the indentation, you can use the `to_string_pretty` function, which takes the number of spaces to indent as an argument.
+
+```rs
+let json_string = humphrey_json::to_string_pretty(&user).unwrap();
+```
+
 ## Conclusion
 In conclusion, the derive macros, the `json_map!` macro and their associated functions are a powerful way of working with typed JSON data. To find out more about Humphrey JSON, consider looking at the [API reference](https://docs.rs/humphrey-json).

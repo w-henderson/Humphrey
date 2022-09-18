@@ -77,10 +77,16 @@ let value = json!({
 ```
 
 ## Serializing Untyped JSON
-To serialize a `Value` JSON type into its string representation, you can use either the `serialize` method or the `humphrey_json::to_string` method. The latter has the benefit that any time which can be converted to a value can be used, as you'll see in the next section.
+To serialize a `Value` JSON type into its string representation, you can use either the `serialize` method or the `humphrey_json::to_string` method. The latter has the benefit that any type which can be converted to a value can be used, as you'll see in the next section.
 
 ```rs
 let string = value.serialize();
+```
+
+You can also format the JSON with indentation and newlines using the `serialize_pretty` method, which takes the indent size as an argument.
+
+```rs
+let string = value.serialize_pretty(4);
 ```
 
 ## Conclusion
