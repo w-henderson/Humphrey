@@ -29,5 +29,5 @@ This book is up-to-date with the following crate versions.
 | Humphrey Core | 0.6.0 |
 | Humphrey Server | 0.6.0 |
 | Humphrey WebSocket | 0.4.0 |
-| Humphrey JSON | 0.2.0 |
+| Humphrey JSON | 0.2.1 |
 | Humphrey Auth | 0.1.3 |
