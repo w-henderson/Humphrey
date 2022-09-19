@@ -37,13 +37,13 @@ macro_rules! json {
         $crate::Value::Null
     };
     ([ $($elems:tt)* ]) => {
-        $crate::Value::Array(json_array_internal!([] $($elems)*))
+        $crate::Value::Array($crate::json_array_internal!([] $($elems)*))
     };
     ({}) => {
         $crate::Value::Object(Vec::new())
     };
     ({ $($elems:tt)* }) => {
-        $crate::Value::Object(json_object_internal!([] $($elems)*))
+        $crate::Value::Object($crate::json_object_internal!([] $($elems)*))
     };
     ($v:expr) => {
         $crate::Value::from($v)
@@ -64,32 +64,32 @@ macro_rules! json_array_internal {
 
     // Next value is `null`.
     ([ $($elems:expr,)* ] null $($rest:tt)*) => {
-        json_array_internal!([ $($elems,)* $crate::Value::Null, ])
+        $crate::json_array_internal!([ $($elems,)* $crate::Value::Null, ])
     };
 
     // Next value is an array.
     ([ $($elems:expr,)* ] [ $($array:tt)* ] $($rest:tt)*) => {
-        json_array_internal!([ $($elems,)* json!([ $($array)* ]), ] $($rest)*)
+        $crate::json_array_internal!([ $($elems,)* $crate::json!([ $($array)* ]), ] $($rest)*)
     };
 
     // Next value is an object.
     ([ $($elems:expr,)* ] { $($object:tt)* } $($rest:tt)*) => {
-        json_array_internal!([ $($elems,)* json!({ $($object)* }), ] $($rest)*)
+        $crate::json_array_internal!([ $($elems,)* $crate::json!({ $($object)* }), ] $($rest)*)
     };
 
     // Next value is an expression.
     ([ $($elems:expr,)* ] $value:expr, $($rest:tt)*) => {
-        json_array_internal!([ $($elems,)* json!($value), ] $($rest)*)
+        $crate::json_array_internal!([ $($elems,)* $crate::json!($value), ] $($rest)*)
     };
 
     // Last value is an expression.
     ([ $($elems:expr,)* ] $value:expr) => {
-        json_array_internal!([ $($elems,)* json!($value) ])
+        $crate::json_array_internal!([ $($elems,)* $crate::json!($value) ])
     };
 
     // Comma.
     ([ $($elems:expr,)* ] , $($rest:tt)*) => {
-        json_array_internal!([ $($elems,)* ] $($rest)*)
+        $crate::json_array_internal!([ $($elems,)* ] $($rest)*)
     };
 }
 
