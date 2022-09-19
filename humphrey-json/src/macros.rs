@@ -31,14 +31,14 @@ macro_rules! json {
         $crate::Value::Null
     };
     ([ $( $el:tt ),* $(,)? ]) => {
-        $crate::Value::Array(vec![ $( json!($el) ),* ])
+        $crate::Value::Array(vec![ $( $crate::json!($el) ),* ])
     };
     ({}) => {
         $crate::Value::Object(Vec::new())
     };
     ({ $( $k:tt : $v:tt ),* $(,)? }) => {
         $crate::Value::Object(vec![
-            $( ($k.to_string(), json!($v)) ),*
+            $( ($k.to_string(), $crate::json!($v)) ),*
         ])
     };
     ($v:tt) => {
@@ -93,7 +93,7 @@ macro_rules! json_map {
 
         impl $crate::traits::IntoJson for $t {
             fn to_json(&self) -> $crate::Value {
-                json!({
+                $crate::json!({
                     $($json_field: (&self.$struct_field)),*
                 })
             }
