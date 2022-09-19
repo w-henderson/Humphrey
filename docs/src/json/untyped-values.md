@@ -46,7 +46,7 @@ let age = value.get("age").as_number();
 let phone_1 = value["phones"].get(0);
 let second_phone = value["phones"][1];
 
-value["name"] = "Humphrey";
+value["name"] = json!("Humphrey");
 ```
 
 ## Creating Untyped JSON
