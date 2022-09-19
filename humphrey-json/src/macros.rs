@@ -1,6 +1,12 @@
 //! Provides the `json!` macro for creating JSON values and the `json_map!` macro
 //!   for serializing/deserializing them to and from Rust data structures.
 
+// This module is highly inspired by the `serde_json` crate's macro implementation.
+// However, since we use a `Vec` instead of a `Map` for storing JSON objects, the implementation is slightly simpler.
+//
+// Reference:
+// - [serde_json::macros](https://github.com/serde-rs/json/blob/94019a31c6036dc4ebb9afc44a214f950caf0d1f/src/macros.rs)
+
 /// Create a JSON value from JSON-like syntax.
 ///
 /// ## Usage
@@ -30,19 +36,103 @@ macro_rules! json {
     (null) => {
         $crate::Value::Null
     };
-    ([ $( $el:tt ),* $(,)? ]) => {
-        $crate::Value::Array(vec![ $( json!($el) ),* ])
+    ([ $($elems:tt)* ]) => {
+        $crate::Value::Array($crate::json_array_internal!([] $($elems)*))
     };
     ({}) => {
         $crate::Value::Object(Vec::new())
     };
-    ({ $( $k:tt : $v:tt ),* $(,)? }) => {
-        $crate::Value::Object(vec![
-            $( ($k.to_string(), json!($v)) ),*
-        ])
+    ({ $($elems:tt)* }) => {
+        $crate::Value::Object($crate::json_object_internal!([] $($elems)*))
     };
-    ($v:tt) => {
+    ($v:expr) => {
         $crate::Value::from($v)
+    };
+}
+
+/// Internal macro, do not use.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! json_array_internal {
+    ([ $($elems:expr,)* ]) => {
+        vec![ $( $elems, )* ]
+    };
+
+    ([ $($elems:expr),* ]) => {
+        vec![ $( $elems ),* ]
+    };
+
+    // Next value is `null`.
+    ([ $($elems:expr,)* ] null $($rest:tt)*) => {
+        $crate::json_array_internal!([ $($elems,)* $crate::Value::Null, ])
+    };
+
+    // Next value is an array.
+    ([ $($elems:expr,)* ] [ $($array:tt)* ] $($rest:tt)*) => {
+        $crate::json_array_internal!([ $($elems,)* $crate::json!([ $($array)* ]), ] $($rest)*)
+    };
+
+    // Next value is an object.
+    ([ $($elems:expr,)* ] { $($object:tt)* } $($rest:tt)*) => {
+        $crate::json_array_internal!([ $($elems,)* $crate::json!({ $($object)* }), ] $($rest)*)
+    };
+
+    // Next value is an expression.
+    ([ $($elems:expr,)* ] $value:expr, $($rest:tt)*) => {
+        $crate::json_array_internal!([ $($elems,)* $crate::json!($value), ] $($rest)*)
+    };
+
+    // Last value is an expression.
+    ([ $($elems:expr,)* ] $value:expr) => {
+        $crate::json_array_internal!([ $($elems,)* $crate::json!($value) ])
+    };
+
+    // Comma.
+    ([ $($elems:expr,)* ] , $($rest:tt)*) => {
+        $crate::json_array_internal!([ $($elems,)* ] $($rest)*)
+    };
+}
+
+/// Internal macro, do not use.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! json_object_internal {
+    ([ $($elems:expr,)* ]) => {
+        vec![ $( $elems, )* ]
+    };
+
+    ([ $($elems:expr),* ]) => {
+        vec![ $( $elems ),* ]
+    };
+
+    // Next value is `null`.
+    ([ $($elems:expr,)* ] $key:tt : null $($rest:tt)*) => {
+        $crate::json_object_internal!([ $($elems,)* ($key.to_string(), $crate::Value::Null), ] $($rest)*)
+    };
+
+    // Next value is an array.
+    ([ $($elems:expr,)* ] $key:tt : [ $($array:tt)* ] $($rest:tt)*) => {
+        $crate::json_object_internal!([ $($elems,)* ($key.to_string(), $crate::json!([ $($array)* ])), ] $($rest)*)
+    };
+
+    // Next value is an object.
+    ([ $($elems:expr,)* ] $key:tt : { $($object:tt)* } $($rest:tt)*) => {
+        $crate::json_object_internal!([ $($elems,)* ($key.to_string(), $crate::json!({ $($object)* })), ] $($rest)*)
+    };
+
+    // Next value is an expression.
+    ([ $($elems:expr,)* ] $key:tt : $value:expr, $($rest:tt)*) => {
+        $crate::json_object_internal!([ $($elems,)* ($key.to_string(), $crate::json!($value)), ] $($rest)*)
+    };
+
+    // Last value is an expression.
+    ([ $($elems:expr,)* ] $key:tt : $value:expr) => {
+        $crate::json_object_internal!([ $($elems,)* ($key.to_string(), $crate::json!($value)), ])
+    };
+
+    // Comma.
+    ([ $($elems:expr,)* ] , $($rest:tt)*) => {
+        $crate::json_object_internal!([ $($elems,)* ] $($rest)*)
     };
 }
 
@@ -93,7 +183,7 @@ macro_rules! json_map {
 
         impl $crate::traits::IntoJson for $t {
             fn to_json(&self) -> $crate::Value {
-                json!({
+                $crate::json!({
                     $($json_field: (&self.$struct_field)),*
                 })
             }
