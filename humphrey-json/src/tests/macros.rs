@@ -96,3 +96,21 @@ fn test_macro_embedded_variables() {
 
     assert_eq!(value, expected_value);
 }
+
+#[test]
+fn test_macro_complex_embedded_variables() {
+    let embedded_string = "Hello, world!";
+    let embedded_number: Option<u16> = Some(1234);
+
+    let value = json!({
+        "string": embedded_string,
+        "number": embedded_number.map(|n| n * 2)
+    });
+
+    let expected_value = Value::Object(vec![
+        ("string".into(), Value::String("Hello, world!".into())),
+        ("number".into(), Value::Number(2468.0)),
+    ]);
+
+    assert_eq!(value, expected_value);
+}
