@@ -58,6 +58,7 @@ impl MimeType {
             "html" => MimeType::TextHtml,
             "htm" => MimeType::TextHtml,
             "js" => MimeType::TextJavaScript,
+            "mjs" => MimeType::TextJavaScript,
             "txt" => MimeType::TextPlain,
             "bmp" => MimeType::ImageBmp,
             "gif" => MimeType::ImageGif,
