@@ -7,6 +7,6 @@ edition = "2021"
 humphrey = "^0.6.1"
 humphrey_auth = { version = "^0.1.4", features = ["humphrey", "json"] }
 humphrey_json = "^0.1.1"
-jasondb = "^0.2.2"
+jasondb = "=0.2.2"
 
 [workspace]
