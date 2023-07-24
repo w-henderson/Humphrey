@@ -4,7 +4,23 @@
 
 #![warn(missing_docs)]
 
+#[cfg(not(feature = "tokio"))]
 pub mod app;
+
+#[cfg(feature = "tokio")]
+pub mod app_tokio;
+#[cfg(feature = "tokio")]
+pub use app_tokio as app;
+
+#[cfg(not(feature = "tokio"))]
+pub mod stream;
+
+#[cfg(feature = "tokio")]
+#[allow(missing_docs)]
+pub mod stream {
+    pub type Stream = tokio::net::TcpStream;
+}
+
 pub mod client;
 pub mod handlers;
 pub mod http;
@@ -12,7 +28,6 @@ pub mod krauss;
 pub mod monitor;
 pub mod percent;
 pub mod route;
-pub mod stream;
 pub mod thread;
 
 #[cfg(test)]

@@ -6,8 +6,10 @@
 use rustls::ServerConnection;
 
 use std::io::{Error, Read, Write};
-use std::net::{SocketAddr, TcpStream};
+use std::net::SocketAddr;
 use std::time::Duration;
+
+use std::net::TcpStream;
 
 /// Represents a connection to a remote client or server.
 ///
