@@ -20,6 +20,8 @@ use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 
+use async_fn_traits::{AsyncFnOnce1, AsyncFnOnce2, AsyncFnOnce3};
+
 /// Represents the Humphrey app.
 ///
 /// The type parameter represents the app state, which is shared between threads.
@@ -40,53 +42,7 @@ where
 /// Represents a function able to calculate whether a connection will be accepted.
 pub type ConnectionCondition<State> = fn(&mut TcpStream, Arc<State>) -> bool;
 
-/// Represents a function able to handle a WebSocket handshake and consequent data frames.
-pub trait WebsocketHandler<State>: Fn(Request, Stream, Arc<State>) + Send + Sync {}
-impl<T, S> WebsocketHandler<S> for T where T: Fn(Request, Stream, Arc<S>) + Send + Sync {}
-
-/// Represents a function able to handle a request.
-/// It is passed the request as well as the app's state, and must return a response.
-///
-/// ## Example
-/// The most basic request handler would be as follows:
-/// ```
-/// fn handler(_: Request, _: Arc<()>) -> Response {
-///     Response::new(StatusCode::OK, b"Success")
-/// }
-/// ```
-pub trait RequestHandler<State>: Fn(Request, Arc<State>) -> Response + Send + Sync {}
-impl<T, S> RequestHandler<S> for T where T: Fn(Request, Arc<S>) -> Response + Send + Sync {}
-
-/// Represents a function able to handle a request.
-/// It is passed only the request, and must return a response.
-/// If you want access to the app's state, consider using the `RequestHandler` trait instead.
-///
-/// ## Example
-/// The most basic stateless request handler would be as follows:
-/// ```
-/// fn handler(_: Request) -> Response {
-///     Response::new(StatusCode::OK, b"Success")
-/// }
-/// ```
-pub trait StatelessRequestHandler<State>: Fn(Request) -> Response + Send + Sync {}
-impl<T, S> StatelessRequestHandler<S> for T where T: Fn(Request) -> Response + Send + Sync {}
-
-/// Represents a function able to handle a request with respect to the route it was called from.
-/// It is passed the request, the app's state, and the route it was called from, and must return a response.
-///
-/// ## Example
-/// The most basic path-aware request handler would be as follows:
-/// ```
-/// fn handler(_: Request, _: Arc<()>, route: &str) -> Response {
-///     Response::new(StatusCode::OK, format!("Success matching route {}", route))
-/// }
-/// ```
-#[rustfmt::skip]
-pub trait PathAwareRequestHandler<State>:
-    Fn(Request, Arc<State>, &str) -> Response + Send + Sync {}
-#[rustfmt::skip]
-impl<T, S> PathAwareRequestHandler<S> for T where
-    T: Fn(Request, Arc<S>, &str) -> Response + Send + Sync {}
+pub use crate::handler_traits::*;
 
 /// Represents a function able to handle an error.
 /// The first parameter of type `Option<Request>` will be `Some` if the request could be parsed.
@@ -416,7 +372,7 @@ async fn client_handler<State>(
                 let mut response = match handler {
                     Some(handler) => {
                         let mut response: Response =
-                            (handler.handler)(request.clone(), state.clone());
+                            handler.handler.serve(request.clone(), state.clone()).await;
 
                         handler.cors.set_headers(&mut response.headers);
 
@@ -569,7 +525,7 @@ pub(crate) fn get_handler<'a, State>(
 }
 
 /// Calls the correct WebSocket handler for the given request.
-fn call_websocket_handler<State>(
+async fn call_websocket_handler<State>(
     request: &Request,
     subapps: &[SubApp<State>],
     default_subapp: &SubApp<State>,
@@ -588,7 +544,7 @@ fn call_websocket_handler<State>(
                 .iter() // Iterate over the routes
                 .find(|route| route.route.route_matches(&request.uri))
             {
-                (handler.handler)(request.clone(), stream, state);
+                handler.handler.serve(request.clone(), stream, state).await;
                 return;
             }
         }
@@ -600,7 +556,7 @@ fn call_websocket_handler<State>(
         .iter()
         .find(|route| route.route.route_matches(&request.uri))
     {
-        (handler.handler)(request.clone(), stream, state)
+        handler.handler.serve(request.clone(), stream, state).await
     }
 }
 

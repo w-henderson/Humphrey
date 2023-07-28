@@ -83,7 +83,7 @@ impl<State> SubApp<State> {
     {
         self.routes.push(RouteHandler {
             route: route.to_string(),
-            handler: Box::new(move |request, _| handler(request)),
+            handler: Box::new(move |request, _| handler.serve(request)),
             cors: self.cors.as_ref().map_or(Cors::default(), |c| c.clone()),
         });
         self
@@ -98,7 +98,7 @@ impl<State> SubApp<State> {
     {
         self.routes.push(RouteHandler {
             route: route.to_string(),
-            handler: Box::new(move |request, state| handler(request, state, route)),
+            handler: Box::new(move |request, state| handler.serve(request, state, route)),
             cors: self.cors.as_ref().map_or(Cors::default(), |c| c.clone()),
         });
         self

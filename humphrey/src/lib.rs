@@ -13,6 +13,14 @@ pub mod app_tokio;
 pub use app_tokio as app;
 
 #[cfg(not(feature = "tokio"))]
+pub mod handler_traits;
+
+#[cfg(feature = "tokio")]
+pub mod handler_traits_tokio;
+#[cfg(feature = "tokio")]
+pub use handler_traits_tokio as handler_traits;
+
+#[cfg(not(feature = "tokio"))]
 pub mod stream;
 
 #[cfg(feature = "tokio")]
