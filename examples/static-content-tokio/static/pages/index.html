@@ -1,0 +1,26 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Static Content Example</title>
+</head>
+
+<body>
+  <h1>This page is served by Humphrey at the "/" route.</h1>
+
+  <h3>Image served from the "/img/ferris.png" route, but mapping the file to "/static/images/ferris.png":</h3>
+  <img src="/img/ferris.png" width=400>
+
+  <h3>This page (served from "/static/pages/index.html"):</h3>
+  <iframe src="/static/pages/index.html" width=600 height=150></iframe>
+
+  <h3>Secret Page (index file example)</h3>
+  <a href="/img/secret_page">Click me</a>
+
+  <h3>Ferris Image Redirect (redirect example)</h3>
+  <a href="/ferris">Click me</a>
+</body>
+
+</html>
