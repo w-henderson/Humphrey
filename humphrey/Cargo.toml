@@ -39,7 +39,7 @@ optional = true
 
 [features]
 tls = ["rustls", "rustls-native-certs", "rustls-pemfile"]
-tokio = ["dep:tokio", "futures", "async_fn_traits"]
+tokio = ["dep:tokio", "futures"]
 
 [lib]
 doctest = false

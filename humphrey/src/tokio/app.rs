@@ -20,8 +20,6 @@ use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 
-use async_fn_traits::{AsyncFnOnce1, AsyncFnOnce2, AsyncFnOnce3};
-
 /// Represents the Humphrey app.
 ///
 /// The type parameter represents the app state, which is shared between threads.
@@ -323,7 +321,7 @@ async fn client_handler<State>(
             if req.headers.get(&HeaderType::Upgrade) == Some("websocket") {
                 monitor.send(Event::new(EventType::WebsocketConnectionRequested).with_peer(addr));
 
-                call_websocket_handler(req, &subapps, &default_subapp, cloned_state, stream);
+                call_websocket_handler(req, &subapps, &default_subapp, cloned_state, stream).await;
 
                 monitor.send(Event::new(EventType::WebsocketConnectionClosed).with_peer(addr));
                 break;

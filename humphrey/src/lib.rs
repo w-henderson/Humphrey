@@ -6,19 +6,16 @@
 
 #[cfg(not(feature = "tokio"))]
 pub mod app;
-
-#[cfg(feature = "tokio")]
-pub mod app_tokio;
-#[cfg(feature = "tokio")]
-pub use app_tokio as app;
-
 #[cfg(not(feature = "tokio"))]
 pub mod handler_traits;
+#[cfg(not(feature = "tokio"))]
+pub mod handlers;
 
 #[cfg(feature = "tokio")]
-pub mod handler_traits_tokio;
+#[allow(missing_docs)]
+pub mod tokio;
 #[cfg(feature = "tokio")]
-pub use handler_traits_tokio as handler_traits;
+pub use crate::tokio::*;
 
 #[cfg(not(feature = "tokio"))]
 pub mod stream;
@@ -30,7 +27,6 @@ pub mod stream {
 }
 
 pub mod client;
-pub mod handlers;
 pub mod http;
 pub mod krauss;
 pub mod monitor;
