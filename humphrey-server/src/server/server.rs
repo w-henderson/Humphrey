@@ -73,13 +73,7 @@ pub fn main(config: Config) {
 
     let top_level_routes = init_app_routes(&state.config.default_host, 0);
 
-    for route in top_level_routes.routes {
-        app = app.with_route(&route.route, route.handler);
-    }
-
-    for websocket_route in top_level_routes.websocket_routes {
-        app = app.with_websocket_route(&websocket_route.route, websocket_route.handler);
-    }
+    app = app.with_default_subapp(top_level_routes);
 
     for (host_index, host) in state.config.hosts.iter().enumerate() {
         app = app.with_host(&host.matches, init_app_routes(host, host_index + 1));

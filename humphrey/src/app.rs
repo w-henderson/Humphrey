@@ -367,6 +367,13 @@ where
         self
     }
 
+    /// Sets the default sub-app for the server.
+    /// This overrides all the routes added, as they will be replaced by the routes in the default sub-app.
+    pub fn with_default_subapp(mut self, subapp: SubApp<State>) -> Self {
+        self.default_subapp = subapp;
+        self
+    }
+
     /// Registers a monitor for the server.
     pub fn with_monitor(mut self, monitor: MonitorConfig) -> Self {
         self.monitor = monitor;
