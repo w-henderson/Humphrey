@@ -1,3 +1,5 @@
+//! Defines traits for handler functions.
+
 use crate::http::{Request, Response};
 use crate::stream::Stream;
 

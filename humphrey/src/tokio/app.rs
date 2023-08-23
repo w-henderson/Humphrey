@@ -20,6 +20,9 @@ use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 
+#[cfg(feature = "tls")]
+use rustls::ServerConfig;
+
 /// Represents the Humphrey app.
 ///
 /// The type parameter represents the app state, which is shared between threads.
@@ -35,6 +38,10 @@ where
     state: Arc<State>,
     monitor: MonitorConfig,
     connection_condition: ConnectionCondition<State>,
+    #[cfg(feature = "tls")]
+    tls_config: Option<Arc<ServerConfig>>,
+    #[cfg(feature = "tls")]
+    force_https: bool,
 }
 
 /// Represents a function able to calculate whether a connection will be accepted.
@@ -87,6 +94,10 @@ where
             state: Arc::new(State::default()),
             monitor: MonitorConfig::default(),
             connection_condition: |_, _| true,
+            #[cfg(feature = "tls")]
+            tls_config: None,
+            #[cfg(feature = "tls")]
+            force_https: false,
         }
     }
 
@@ -99,6 +110,10 @@ where
             state: Arc::new(state),
             monitor: MonitorConfig::default(),
             connection_condition: |_, _| true,
+            #[cfg(feature = "tls")]
+            tls_config: None,
+            #[cfg(feature = "tls")]
+            force_https: false,
         }
     }
 
@@ -139,7 +154,7 @@ where
                             );
 
                             client_handler(
-                                stream,
+                                Stream::Tcp(stream),
                                 cloned_subapps,
                                 cloned_default_subapp,
                                 cloned_error_handler,
@@ -152,6 +167,90 @@ where
                         self.monitor.send(
                             Event::new(EventType::ConnectionDenied)
                                 .with_peer_result(stream.peer_addr()),
+                        );
+                    }
+                }
+                Err(e) => self
+                    .monitor
+                    .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
+            }
+        }
+    }
+
+    /// Securely runs the Humphrey app on the given socket address.
+    /// This function will only return if a fatal error is thrown such as the port being in use or the TLS certificate being invalid.
+    #[cfg(feature = "tls")]
+    pub async fn run_tls<A>(self, addr: A) -> Result<(), HumphreyError>
+    where
+        A: ToSocketAddrs,
+    {
+        use tokio_rustls::TlsAcceptor;
+
+        let socket = TcpListener::bind(addr).await?;
+        let subapps = Arc::new(self.subapps);
+        let default_subapp = Arc::new(self.default_subapp);
+        let error_handler = Arc::new(self.error_handler);
+        let tls_config = self.tls_config.expect("TLS certificate not supplied");
+
+        if self.force_https {
+            let cloned_monitor = self.monitor.clone();
+
+            tokio::spawn(async move {
+                force_https_thread(cloned_monitor).await.unwrap_or(());
+            });
+        }
+
+        let acceptor = TlsAcceptor::from(tls_config);
+
+        loop {
+            match socket.accept().await {
+                Ok((mut sock, _)) => {
+                    let cloned_state = self.state.clone();
+
+                    // Check that the client is allowed to connect
+                    if (self.connection_condition)(&mut sock, cloned_state) {
+                        let cloned_state = self.state.clone();
+                        let cloned_subapps = subapps.clone();
+                        let cloned_default_subapp = default_subapp.clone();
+                        let cloned_error_handler = error_handler.clone();
+                        let cloned_monitor = self.monitor.clone();
+                        let cloned_acceptor = acceptor.clone();
+
+                        cloned_monitor.send(
+                            Event::new(EventType::ConnectionSuccess)
+                                .with_peer_result(sock.peer_addr()),
+                        );
+
+                        // Spawn a new thread to handle the connection
+                        tokio::spawn(async move {
+                            cloned_monitor.send(
+                                Event::new(EventType::ThreadPoolProcessStarted)
+                                    .with_peer_result(sock.peer_addr()),
+                            );
+
+                            match cloned_acceptor.accept(sock).await {
+                                Ok(tls_stream) => {
+                                    let stream = Stream::Tls(tls_stream);
+
+                                    client_handler(
+                                        stream,
+                                        cloned_subapps,
+                                        cloned_default_subapp,
+                                        cloned_error_handler,
+                                        cloned_state,
+                                        cloned_monitor,
+                                    )
+                                    .await
+                                }
+                                Err(e) => cloned_monitor.send(
+                                    Event::new(EventType::ConnectionError).with_info(e.to_string()),
+                                ),
+                            }
+                        });
+                    } else {
+                        self.monitor.send(
+                            Event::new(EventType::ConnectionDenied)
+                                .with_peer_result(sock.peer_addr()),
                         );
                     }
                 }
@@ -269,17 +368,52 @@ where
         self
     }
 
-    /// Adds a global WebSocket handler to the server.
+    /// Sets whether HTTPS should be forced on all connections. Defaults to false.
     ///
-    /// ## Deprecated
-    /// This function is deprecated and will be removed in a future version.
-    /// Please use `with_websocket_route` instead.
-    #[deprecated(since = "0.3.0", note = "Please use `with_websocket_route` instead")]
-    pub fn with_websocket_handler<T>(mut self, handler: T) -> Self
-    where
-        T: WebsocketHandler<State> + 'static,
-    {
-        self.default_subapp = self.default_subapp.with_websocket_route("*", handler);
+    /// If this is set to true, a background thread will be spawned when `run_tls` is called to send
+    ///   redirect responses to all insecure requests on port 80.
+    #[cfg(feature = "tls")]
+    pub fn with_forced_https(mut self, forced: bool) -> Self {
+        self.force_https = forced;
+        self
+    }
+
+    /// Sets the TLS configuration for the server.
+    ///
+    /// This **must** be called before `run_tls` is called.
+    #[cfg(feature = "tls")]
+    pub fn with_cert(mut self, cert_path: impl AsRef<str>, key_path: impl AsRef<str>) -> Self {
+        use rustls::{Certificate, PrivateKey};
+        use rustls_pemfile::{read_one, Item};
+
+        use std::fs::File;
+        use std::io::BufReader;
+
+        let mut cert_file =
+            BufReader::new(File::open(cert_path.as_ref()).expect("failed to open cert file"));
+        let mut key_file =
+            BufReader::new(File::open(key_path.as_ref()).expect("failed to open key file"));
+
+        let certs: Vec<Certificate> = match read_one(&mut cert_file).unwrap().unwrap() {
+            Item::X509Certificate(cert) => vec![Certificate(cert)],
+            _ => panic!("failed to parse cert file"),
+        };
+
+        let key: PrivateKey = match read_one(&mut key_file).unwrap().unwrap() {
+            Item::PKCS8Key(key) => PrivateKey(key),
+            _ => panic!("failed to parse key file"),
+        };
+
+        let config = Arc::new(
+            ServerConfig::builder()
+                .with_safe_defaults()
+                .with_no_client_auth()
+                .with_single_cert(certs, key)
+                .expect("failed to create server config"),
+        );
+
+        self.tls_config = Some(config);
+
         self
     }
 
@@ -556,6 +690,36 @@ async fn call_websocket_handler<State>(
     {
         handler.handler.serve(request.clone(), stream, state).await
     }
+}
+
+#[cfg(feature = "tls")]
+async fn force_https_thread(monitor: MonitorConfig) -> Result<(), Box<dyn std::error::Error>> {
+    let socket = TcpListener::bind("0.0.0.0:80").await?;
+
+    while let Ok((mut stream, addr)) = socket.accept().await {
+        let request = Request::from_stream(&mut stream, addr).await?;
+
+        let response = if let Some(host) = request.headers.get(&HeaderType::Host) {
+            Response::empty(StatusCode::MovedPermanently)
+                .with_header(
+                    HeaderType::Location,
+                    format!("https://{}{}", host, request.uri),
+                )
+                .with_header(HeaderType::Connection, "Close")
+        } else {
+            Response::empty(StatusCode::OK)
+                .with_bytes(b"<h1>Please access over HTTPS</h1>")
+                .with_header(HeaderType::ContentLength, "33")
+                .with_header(HeaderType::Connection, "Close")
+        };
+
+        let response_bytes: Vec<u8> = response.into();
+        stream.write_all(&response_bytes).await?;
+
+        monitor.send(Event::new(EventType::HTTPSRedirect).with_peer(addr));
+    }
+
+    Ok(())
 }
 
 /// The default error handler for every Humphrey app.

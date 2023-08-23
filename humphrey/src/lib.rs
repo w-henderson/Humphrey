@@ -20,12 +20,6 @@ pub use crate::tokio::*;
 #[cfg(not(feature = "tokio"))]
 pub mod stream;
 
-#[cfg(feature = "tokio")]
-#[allow(missing_docs)]
-pub mod stream {
-    pub type Stream = tokio::net::TcpStream;
-}
-
 pub mod client;
 pub mod http;
 pub mod krauss;

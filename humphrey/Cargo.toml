@@ -11,7 +11,7 @@ keywords = ["http", "server", "http-server"]
 categories = ["web-programming::http-server", "network-programming"]
 
 [dependencies.rustls]
-version = "^0.20.0"
+version = "^0.21.0"
 default-features = false
 features = ["tls12"]
 optional = true
@@ -33,13 +33,13 @@ optional = true
 version = "0.3"
 optional = true
 
-[dependencies.async_fn_traits]
-version = "0.1.1"
+[dependencies.tokio-rustls]
+version = "^0.24.1"
 optional = true
 
 [features]
 tls = ["rustls", "rustls-native-certs", "rustls-pemfile"]
-tokio = ["dep:tokio", "futures"]
+tokio = ["dep:tokio", "futures", "tokio-rustls"]
 
 [lib]
 doctest = false
