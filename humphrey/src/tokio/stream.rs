@@ -32,6 +32,7 @@ impl AsyncRead for Stream {
     ) -> Poll<std::io::Result<()>> {
         match &mut *self {
             Stream::Tcp(inner) => Pin::new(inner).poll_read(cx, buf),
+            #[cfg(feature = "tls")]
             Stream::Tls(inner) => Pin::new(inner).poll_read(cx, buf),
         }
     }
@@ -45,6 +46,7 @@ impl AsyncWrite for Stream {
     ) -> Poll<std::io::Result<usize>> {
         match &mut *self {
             Stream::Tcp(inner) => Pin::new(inner).poll_write(cx, buf),
+            #[cfg(feature = "tls")]
             Stream::Tls(inner) => Pin::new(inner).poll_write(cx, buf),
         }
     }
@@ -52,6 +54,7 @@ impl AsyncWrite for Stream {
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         match &mut *self {
             Stream::Tcp(inner) => Pin::new(inner).poll_flush(cx),
+            #[cfg(feature = "tls")]
             Stream::Tls(inner) => Pin::new(inner).poll_flush(cx),
         }
     }
@@ -59,6 +62,7 @@ impl AsyncWrite for Stream {
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         match &mut *self {
             Stream::Tcp(inner) => Pin::new(inner).poll_shutdown(cx),
+            #[cfg(feature = "tls")]
             Stream::Tls(inner) => Pin::new(inner).poll_shutdown(cx),
         }
     }
