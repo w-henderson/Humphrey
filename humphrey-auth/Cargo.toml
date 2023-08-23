@@ -11,10 +11,10 @@ keywords = ["authentication"]
 categories = ["authentication"]
 
 [dependencies]
-humphrey = { version = "^0.6.0", path = "../humphrey", optional = true }
-humphrey_json = { version = ">=0.1.1", path = "../humphrey-json", optional = true}
+humphrey = { version = "^0.7.0", path = "../humphrey", optional = true }
+humphrey_json = { version = ">=0.1.1", path = "../humphrey-json", optional = true }
 argon2 = "0.3"
-uuid = { version = "0.8", features = [ "v4" ] }
+uuid = { version = "0.8", features = ["v4"] }
 rand_core = { version = "0.6", features = ["std"] }
 
 [features]

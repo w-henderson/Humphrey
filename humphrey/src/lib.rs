@@ -4,15 +4,28 @@
 
 #![warn(missing_docs)]
 
+#[cfg(not(feature = "tokio"))]
 pub mod app;
-pub mod client;
+#[cfg(not(feature = "tokio"))]
+pub mod handler_traits;
+#[cfg(not(feature = "tokio"))]
 pub mod handlers;
+
+#[cfg(feature = "tokio")]
+#[allow(missing_docs)]
+pub mod tokio;
+#[cfg(feature = "tokio")]
+pub use crate::tokio::*;
+
+#[cfg(not(feature = "tokio"))]
+pub mod stream;
+
+pub mod client;
 pub mod http;
 pub mod krauss;
 pub mod monitor;
 pub mod percent;
 pub mod route;
-pub mod stream;
 pub mod thread;
 
 #[cfg(test)]

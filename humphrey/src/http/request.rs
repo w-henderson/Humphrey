@@ -4,12 +4,19 @@ use crate::http::address::Address;
 use crate::http::cookie::Cookie;
 use crate::http::headers::{HeaderType, Headers};
 use crate::http::method::Method;
-use crate::stream::Stream;
 
 use std::error::Error;
-use std::io::{BufRead, BufReader, ErrorKind, Read};
 use std::net::SocketAddr;
+
+#[cfg(not(feature = "tokio"))]
+use crate::stream::Stream;
+#[cfg(not(feature = "tokio"))]
+use std::io::{BufRead, BufReader, ErrorKind, Read};
+#[cfg(not(feature = "tokio"))]
 use std::time::Duration;
+
+#[cfg(feature = "tokio")]
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 
 /// Represents a request to the server.
 /// Contains parsed information about the request's data.
@@ -64,6 +71,7 @@ impl Error for RequestError {}
 
 impl Request {
     /// Attempts to read and parse one HTTP request from the given reader.
+    #[cfg(not(feature = "tokio"))]
     pub fn from_stream<T>(stream: &mut T, address: SocketAddr) -> Result<Self, RequestError>
     where
         T: Read,
@@ -76,7 +84,23 @@ impl Request {
         Self::from_stream_inner(stream, address, first_buf[0])
     }
 
+    /// Attempts to read and parse one HTTP request from the given reader.
+    #[cfg(feature = "tokio")]
+    pub async fn from_stream<T>(stream: &mut T, address: SocketAddr) -> Result<Self, RequestError>
+    where
+        T: AsyncReadExt + Unpin,
+    {
+        let mut first_buf: [u8; 1] = [0; 1];
+        stream
+            .read_exact(&mut first_buf)
+            .await
+            .map_err(|_| RequestError::Disconnected)?;
+
+        Self::from_stream_inner(stream, address, first_buf[0]).await
+    }
+
     /// Attempts to read and parse one HTTP request from the given stream, timing out after the timeout.
+    #[cfg(not(feature = "tokio"))]
     pub fn from_stream_with_timeout(
         stream: &mut Stream,
         address: SocketAddr,
@@ -124,6 +148,7 @@ impl Request {
     }
 
     /// Attempts to read and parse one HTTP request from the given reader.
+    #[cfg(not(feature = "tokio"))]
     fn from_stream_inner<T>(
         stream: &mut T,
         address: SocketAddr,
@@ -195,6 +220,106 @@ impl Request {
             let mut content_buf: Vec<u8> = vec![0u8; content_length];
             reader
                 .read_exact(&mut content_buf)
+                .map_err(|_| RequestError::Stream)?;
+
+            Ok(Self {
+                method,
+                uri,
+                query,
+                version,
+                headers,
+                content: Some(content_buf),
+                address,
+            })
+        } else {
+            Ok(Self {
+                method,
+                uri,
+                query,
+                version,
+                headers,
+                content: None,
+                address,
+            })
+        }
+    }
+
+    /// Attempts to read and parse one HTTP request from the given reader.
+    #[cfg(feature = "tokio")]
+    async fn from_stream_inner<T>(
+        stream: &mut T,
+        address: SocketAddr,
+        first_byte: u8,
+    ) -> Result<Self, RequestError>
+    where
+        T: AsyncReadExt + Unpin,
+    {
+        let mut reader = BufReader::new(stream);
+        let mut start_line_buf: Vec<u8> = Vec::with_capacity(256);
+        reader
+            .read_until(0xA, &mut start_line_buf)
+            .await
+            .map_err(|_| RequestError::Stream)?;
+
+        start_line_buf.insert(0, first_byte);
+
+        let start_line_string =
+            std::str::from_utf8(&start_line_buf).map_err(|_| RequestError::Request)?;
+        let mut start_line = start_line_string.split(' ');
+
+        let method = Method::from_name(start_line.next().to_error(RequestError::Request)?)?;
+        let mut uri_iter = start_line
+            .next()
+            .to_error(RequestError::Request)?
+            .splitn(2, '?');
+        let version = start_line
+            .next()
+            .to_error(RequestError::Request)?
+            .strip_suffix("\r\n")
+            .unwrap_or("")
+            .to_string();
+
+        safe_assert(!version.is_empty())?;
+
+        let uri = uri_iter.next().unwrap().to_string();
+        let query = uri_iter.next().unwrap_or("").to_string();
+
+        let mut headers = Headers::new();
+
+        loop {
+            let mut line_buf: Vec<u8> = Vec::with_capacity(256);
+            reader
+                .read_until(0xA, &mut line_buf)
+                .await
+                .map_err(|_| RequestError::Stream)?;
+            let line = std::str::from_utf8(&line_buf).map_err(|_| RequestError::Request)?;
+
+            if line == "\r\n" {
+                break;
+            } else {
+                safe_assert(line.len() >= 2)?;
+                let line_without_crlf = &line[0..line.len() - 2];
+                let mut line_parts = line_without_crlf.splitn(2, ':');
+                headers.add(
+                    HeaderType::from(line_parts.next().to_error(RequestError::Request)?),
+                    line_parts
+                        .next()
+                        .to_error(RequestError::Request)?
+                        .trim_start(),
+                );
+            }
+        }
+
+        let address =
+            Address::from_headers(&headers, address).map_err(|_| RequestError::Request)?;
+
+        if let Some(content_length) = headers.get(&HeaderType::ContentLength) {
+            let content_length: usize =
+                content_length.parse().map_err(|_| RequestError::Request)?;
+            let mut content_buf: Vec<u8> = vec![0u8; content_length];
+            reader
+                .read_exact(&mut content_buf)
+                .await
                 .map_err(|_| RequestError::Stream)?;
 
             Ok(Self {

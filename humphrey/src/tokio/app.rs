@@ -14,12 +14,11 @@ use crate::monitor::event::{Event, EventType};
 use crate::monitor::MonitorConfig;
 use crate::route::{Route, RouteHandler, SubApp};
 use crate::stream::Stream;
-use crate::thread::pool::ThreadPool;
 
-use std::io::Write;
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
-use std::time::Duration;
+
+use tokio::io::AsyncWriteExt;
+use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 
 #[cfg(feature = "tls")]
 use rustls::ServerConfig;
@@ -33,32 +32,17 @@ pub struct App<State = ()>
 where
     State: Send + Sync + 'static,
 {
-    thread_pool: ThreadPool,
     subapps: Vec<SubApp<State>>,
     default_subapp: SubApp<State>,
     error_handler: ErrorHandler,
     state: Arc<State>,
     monitor: MonitorConfig,
-    connection_handler: ConnectionHandler<State>,
     connection_condition: ConnectionCondition<State>,
-    connection_timeout: Option<Duration>,
     #[cfg(feature = "tls")]
     tls_config: Option<Arc<ServerConfig>>,
     #[cfg(feature = "tls")]
     force_https: bool,
 }
-
-/// Represents a function able to handle a connection.
-/// In most cases, the default connection handler should be used.
-pub type ConnectionHandler<State> = fn(
-    Stream,
-    Arc<Vec<SubApp<State>>>,
-    Arc<SubApp<State>>,
-    Arc<ErrorHandler>,
-    Arc<State>,
-    MonitorConfig,
-    Option<Duration>,
-);
 
 /// Represents a function able to calculate whether a connection will be accepted.
 pub type ConnectionCondition<State> = fn(&mut TcpStream, Arc<State>) -> bool;
@@ -104,15 +88,12 @@ where
         State: Default,
     {
         Self {
-            thread_pool: ThreadPool::new(32),
             subapps: Vec::new(),
             default_subapp: SubApp::default(),
             error_handler,
             state: Arc::new(State::default()),
             monitor: MonitorConfig::default(),
-            connection_handler: client_handler,
             connection_condition: |_, _| true,
-            connection_timeout: None,
             #[cfg(feature = "tls")]
             tls_config: None,
             #[cfg(feature = "tls")]
@@ -121,17 +102,14 @@ where
     }
 
     /// Initialises a new Humphrey app with the given configuration options.
-    pub fn new_with_config(threads: usize, state: State) -> Self {
+    pub fn new_with_config(state: State) -> Self {
         Self {
-            thread_pool: ThreadPool::new(threads),
             subapps: Vec::new(),
             default_subapp: SubApp::default(),
             error_handler,
             state: Arc::new(state),
             monitor: MonitorConfig::default(),
-            connection_handler: client_handler,
             connection_condition: |_, _| true,
-            connection_timeout: None,
             #[cfg(feature = "tls")]
             tls_config: None,
             #[cfg(feature = "tls")]
@@ -141,21 +119,18 @@ where
 
     /// Runs the Humphrey app on the given socket address.
     /// This function will only return if a fatal error is thrown such as the port being in use.
-    pub fn run<A>(mut self, addr: A) -> Result<(), HumphreyError>
+    pub async fn run<A>(self, addr: A) -> Result<(), HumphreyError>
     where
         A: ToSocketAddrs,
     {
-        let socket = TcpListener::bind(addr)?;
+        let socket = TcpListener::bind(addr).await?;
         let subapps = Arc::new(self.subapps);
         let default_subapp = Arc::new(self.default_subapp);
         let error_handler = Arc::new(self.error_handler);
 
-        self.thread_pool.register_monitor(self.monitor.clone());
-        self.thread_pool.start();
-
-        for stream in socket.incoming() {
-            match stream {
-                Ok(mut stream) => {
+        loop {
+            match socket.accept().await {
+                Ok((mut stream, _)) => {
                     let cloned_state = self.state.clone();
 
                     // Check that the client is allowed to connect
@@ -165,8 +140,6 @@ where
                         let cloned_subapps = subapps.clone();
                         let cloned_default_subapp = default_subapp.clone();
                         let cloned_error_handler = error_handler.clone();
-                        let cloned_handler = self.connection_handler;
-                        let cloned_timeout = self.connection_timeout;
 
                         cloned_monitor.send(
                             Event::new(EventType::ConnectionSuccess)
@@ -174,21 +147,21 @@ where
                         );
 
                         // Spawn a new thread to handle the connection
-                        self.thread_pool.execute(move || {
+                        tokio::spawn(async move {
                             cloned_monitor.send(
                                 Event::new(EventType::ThreadPoolProcessStarted)
                                     .with_peer_result(stream.peer_addr()),
                             );
 
-                            (cloned_handler)(
+                            client_handler(
                                 Stream::Tcp(stream),
                                 cloned_subapps,
                                 cloned_default_subapp,
                                 cloned_error_handler,
                                 cloned_state,
                                 cloned_monitor,
-                                cloned_timeout,
                             )
+                            .await
                         });
                     } else {
                         self.monitor.send(
@@ -202,42 +175,36 @@ where
                     .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
             }
         }
-
-        Ok(())
     }
 
     /// Securely runs the Humphrey app on the given socket address.
     /// This function will only return if a fatal error is thrown such as the port being in use or the TLS certificate being invalid.
     #[cfg(feature = "tls")]
-    pub fn run_tls<A>(mut self, addr: A) -> Result<(), HumphreyError>
+    pub async fn run_tls<A>(self, addr: A) -> Result<(), HumphreyError>
     where
         A: ToSocketAddrs,
     {
-        use rustls::ServerConnection;
+        use tokio_rustls::TlsAcceptor;
 
-        let socket = TcpListener::bind(addr)?;
+        let socket = TcpListener::bind(addr).await?;
         let subapps = Arc::new(self.subapps);
         let default_subapp = Arc::new(self.default_subapp);
         let error_handler = Arc::new(self.error_handler);
-
-        self.thread_pool.register_monitor(self.monitor.clone());
-        self.thread_pool.start();
+        let tls_config = self.tls_config.expect("TLS certificate not supplied");
 
         if self.force_https {
             let cloned_monitor = self.monitor.clone();
 
-            if self.thread_pool.thread_count() < 2 {
-                println!("Error: A minimum of two threads are required to force HTTPS since one is required for redirects.");
-                std::process::exit(1);
-            }
-
-            self.thread_pool
-                .execute(|| force_https_thread(cloned_monitor).unwrap_or(()));
+            tokio::spawn(async move {
+                force_https_thread(cloned_monitor).await.unwrap_or(());
+            });
         }
 
-        for sock in socket.incoming() {
-            match sock {
-                Ok(mut sock) => {
+        let acceptor = TlsAcceptor::from(tls_config);
+
+        loop {
+            match socket.accept().await {
+                Ok((mut sock, _)) => {
                     let cloned_state = self.state.clone();
 
                     // Check that the client is allowed to connect
@@ -246,14 +213,8 @@ where
                         let cloned_subapps = subapps.clone();
                         let cloned_default_subapp = default_subapp.clone();
                         let cloned_error_handler = error_handler.clone();
-                        let cloned_handler = self.connection_handler;
-                        let cloned_timeout = self.connection_timeout;
                         let cloned_monitor = self.monitor.clone();
-                        let cloned_config = self
-                            .tls_config
-                            .as_ref()
-                            .expect("TLS certificate not supplied")
-                            .clone();
+                        let cloned_acceptor = acceptor.clone();
 
                         cloned_monitor.send(
                             Event::new(EventType::ConnectionSuccess)
@@ -261,25 +222,30 @@ where
                         );
 
                         // Spawn a new thread to handle the connection
-                        self.thread_pool.execute(move || {
+                        tokio::spawn(async move {
                             cloned_monitor.send(
                                 Event::new(EventType::ThreadPoolProcessStarted)
                                     .with_peer_result(sock.peer_addr()),
                             );
 
-                            let server = ServerConnection::new(cloned_config).unwrap();
-                            let tls_stream = rustls::StreamOwned::new(server, sock);
-                            let stream = Stream::Tls(tls_stream);
+                            match cloned_acceptor.accept(sock).await {
+                                Ok(tls_stream) => {
+                                    let stream = Stream::Tls(tls_stream);
 
-                            (cloned_handler)(
-                                stream,
-                                cloned_subapps,
-                                cloned_default_subapp,
-                                cloned_error_handler,
-                                cloned_state,
-                                cloned_monitor,
-                                cloned_timeout,
-                            )
+                                    client_handler(
+                                        stream,
+                                        cloned_subapps,
+                                        cloned_default_subapp,
+                                        cloned_error_handler,
+                                        cloned_state,
+                                        cloned_monitor,
+                                    )
+                                    .await
+                                }
+                                Err(e) => cloned_monitor.send(
+                                    Event::new(EventType::ConnectionError).with_info(e.to_string()),
+                                ),
+                            }
                         });
                     } else {
                         self.monitor.send(
@@ -293,8 +259,6 @@ where
                     .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
             }
         }
-
-        Ok(())
     }
 
     /// Sets the default state for the server.
@@ -367,13 +331,6 @@ where
         self
     }
 
-    /// Sets the default sub-app for the server.
-    /// This overrides all the routes added, as they will be replaced by the routes in the default sub-app.
-    pub fn with_default_subapp(mut self, subapp: SubApp<State>) -> Self {
-        self.default_subapp = subapp;
-        self
-    }
-
     /// Registers a monitor for the server.
     pub fn with_monitor(mut self, monitor: MonitorConfig) -> Self {
         self.monitor = monitor;
@@ -390,12 +347,6 @@ where
     /// For example, this could be used for implementing whitelists and blacklists.
     pub fn with_connection_condition(mut self, condition: ConnectionCondition<State>) -> Self {
         self.connection_condition = condition;
-        self
-    }
-
-    /// Sets the connection timeout, the amount of time to wait between keep-alive requests.
-    pub fn with_connection_timeout(mut self, timeout: Option<Duration>) -> Self {
-        self.connection_timeout = timeout;
         self
     }
 
@@ -466,27 +417,6 @@ where
         self
     }
 
-    /// Adds a global WebSocket handler to the server.
-    ///
-    /// ## Deprecated
-    /// This function is deprecated and will be removed in a future version.
-    /// Please use `with_websocket_route` instead.
-    #[deprecated(since = "0.3.0", note = "Please use `with_websocket_route` instead")]
-    pub fn with_websocket_handler<T>(mut self, handler: T) -> Self
-    where
-        T: WebsocketHandler<State> + 'static,
-    {
-        self.default_subapp = self.default_subapp.with_websocket_route("*", handler);
-        self
-    }
-
-    /// Overrides the default connection handler, allowing for manual control over the TCP requests and responses.
-    /// Not recommended as it basically disables most of the server's features.
-    pub fn with_custom_connection_handler(mut self, handler: ConnectionHandler<State>) -> Self {
-        self.connection_handler = handler;
-        self
-    }
-
     /// Gets a reference to the app's state.
     /// This should only be used in the main thread, as the state is passed to request handlers otherwise.
     pub fn get_state(&self) -> Arc<State> {
@@ -498,14 +428,13 @@ where
 /// The connection will be opened upon the first request and closed as soon as a request is
 ///   received without the `Connection: Keep-Alive` header.
 #[allow(clippy::too_many_arguments)]
-fn client_handler<State>(
+async fn client_handler<State>(
     mut stream: Stream,
     subapps: Arc<Vec<SubApp<State>>>,
     default_subapp: Arc<SubApp<State>>,
     error_handler: Arc<ErrorHandler>,
     state: Arc<State>,
     monitor: MonitorConfig,
-    timeout: Option<Duration>,
 ) {
     let addr = if let Ok(addr) = stream.peer_addr() {
         addr
@@ -517,10 +446,7 @@ fn client_handler<State>(
 
     loop {
         // Parses the request from the stream
-        let request = match timeout {
-            Some(timeout) => Request::from_stream_with_timeout(&mut stream, addr, timeout),
-            None => Request::from_stream(&mut stream, addr),
-        };
+        let request = Request::from_stream(&mut stream, addr).await;
 
         let cloned_state = state.clone();
 
@@ -529,7 +455,7 @@ fn client_handler<State>(
             if req.headers.get(&HeaderType::Upgrade) == Some("websocket") {
                 monitor.send(Event::new(EventType::WebsocketConnectionRequested).with_peer(addr));
 
-                call_websocket_handler(req, &subapps, &default_subapp, cloned_state, stream);
+                call_websocket_handler(req, &subapps, &default_subapp, cloned_state, stream).await;
 
                 monitor.send(Event::new(EventType::WebsocketConnectionClosed).with_peer(addr));
                 break;
@@ -578,7 +504,7 @@ fn client_handler<State>(
                 let mut response = match handler {
                     Some(handler) => {
                         let mut response: Response =
-                            handler.handler.serve(request.clone(), state.clone());
+                            handler.handler.serve(request.clone(), state.clone()).await;
 
                         handler.cors.set_headers(&mut response.headers);
 
@@ -643,7 +569,7 @@ fn client_handler<State>(
         let status = response.status_code;
         let response_bytes: Vec<u8> = response.into();
 
-        if let Err(e) = stream.write_all(&response_bytes) {
+        if let Err(e) = stream.write_all(&response_bytes).await {
             monitor.send(
                 Event::new(EventType::RequestServedError)
                     .with_peer(addr)
@@ -731,7 +657,7 @@ pub(crate) fn get_handler<'a, State>(
 }
 
 /// Calls the correct WebSocket handler for the given request.
-fn call_websocket_handler<State>(
+async fn call_websocket_handler<State>(
     request: &Request,
     subapps: &[SubApp<State>],
     default_subapp: &SubApp<State>,
@@ -750,7 +676,7 @@ fn call_websocket_handler<State>(
                 .iter() // Iterate over the routes
                 .find(|route| route.route.route_matches(&request.uri))
             {
-                handler.handler.serve(request.clone(), stream, state);
+                handler.handler.serve(request.clone(), stream, state).await;
                 return;
             }
         }
@@ -762,17 +688,16 @@ fn call_websocket_handler<State>(
         .iter()
         .find(|route| route.route.route_matches(&request.uri))
     {
-        handler.handler.serve(request.clone(), stream, state)
+        handler.handler.serve(request.clone(), stream, state).await
     }
 }
 
 #[cfg(feature = "tls")]
-fn force_https_thread(monitor: MonitorConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let socket = TcpListener::bind("0.0.0.0:80")?;
+async fn force_https_thread(monitor: MonitorConfig) -> Result<(), Box<dyn std::error::Error>> {
+    let socket = TcpListener::bind("0.0.0.0:80").await?;
 
-    for mut stream in socket.incoming().flatten() {
-        let addr = stream.peer_addr()?;
-        let request = Request::from_stream(&mut stream, addr)?;
+    while let Ok((mut stream, addr)) = socket.accept().await {
+        let request = Request::from_stream(&mut stream, addr).await?;
 
         let response = if let Some(host) = request.headers.get(&HeaderType::Host) {
             Response::empty(StatusCode::MovedPermanently)
@@ -789,7 +714,7 @@ fn force_https_thread(monitor: MonitorConfig) -> Result<(), Box<dyn std::error::
         };
 
         let response_bytes: Vec<u8> = response.into();
-        stream.write_all(&response_bytes)?;
+        stream.write_all(&response_bytes).await?;
 
         monitor.send(Event::new(EventType::HTTPSRedirect).with_peer(addr));
     }

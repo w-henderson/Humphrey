@@ -113,6 +113,13 @@ jobs:
           command: check
           args: --manifest-path examples/stateful/Cargo.toml
 
+      - name: Check Tokio stateful example
+        if: always()
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/stateful-tokio/Cargo.toml
+
       - name: Check static content example
         if: always()
         uses: actions-rs/cargo@v1
@@ -120,12 +127,26 @@ jobs:
           command: check
           args: --manifest-path examples/static-content/Cargo.toml
 
+      - name: Check Tokio static content example
+        if: always()
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/static-content-tokio/Cargo.toml
+
       - name: Check TLS example
         if: always()
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --manifest-path examples/tls/Cargo.toml
+
+      - name: Check Tokio TLS example
+        if: always()
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/tls-tokio/Cargo.toml
 
       - name: Check WebSocket example
         if: always()

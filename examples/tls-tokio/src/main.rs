@@ -5,18 +5,19 @@ use humphrey::http::{Request, Response, StatusCode};
 use humphrey::App;
 use std::error::Error;
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     let app: App<()> = App::new()
         .with_stateless_route("/", home)
         .with_cert("keys/localhost.pem", "keys/localhost-key.pem")
         .with_forced_https(true);
 
-    app.run_tls("0.0.0.0:443")?;
+    app.run_tls("0.0.0.0:443").await?;
 
     Ok(())
 }
 
-fn home(_: Request) -> Response {
+async fn home(_: Request) -> Response {
     Response::new(
         StatusCode::OK,
         "<html><body><h1>This is served over HTTPS!</h1></body></html>",

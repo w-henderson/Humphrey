@@ -1,0 +1,25 @@
+<html>
+
+<head>
+  <title>Humphrey Stateful Demo</title>
+
+  <script>
+    function incrementPresses() {
+      fetch("/api/addPress").then(() => {
+        fetch("/api/getPresses").then(res => res.text())
+          .then(text => {
+            document.querySelector("#presses").innerHTML = text;
+          });
+      });
+    }
+  </script>
+</head>
+
+<body>
+  <h1>Button has been pressed <span id="presses">{presses}</span> times since the server was started.</h1>
+  Try opening the page again in a new tab or refreshing the page! You'll see that the count is consistent as it is stored server-side in the app's state.<br><br>
+  
+  <button onclick="incrementPresses()">Press Me</button>
+</body>
+
+</html>
