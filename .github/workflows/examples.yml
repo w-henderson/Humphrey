@@ -141,6 +141,13 @@ jobs:
           command: check
           args: --manifest-path examples/tls/Cargo.toml
 
+      - name: Check Tokio TLS example
+        if: always()
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/tls-tokio/Cargo.toml
+
       - name: Check WebSocket example
         if: always()
         uses: actions-rs/cargo@v1
