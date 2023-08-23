@@ -136,4 +136,4 @@ let app: App = App::new()
 If you visit the panic route in your browser now, you won't get a response from the server as the thread has panicked, but you'll see the panic in the console and the file, as well as that the thread was restarted in the console.
 
 ## Conclusion
-In conclusion, Humphrey provides a flexible way for logging internal events. Next, we'll look at Humphrey's client capabilities.
+In conclusion, Humphrey provides a flexible way for logging internal events. Next, we'll look at how to use Humphrey with the Tokio async runtime.
