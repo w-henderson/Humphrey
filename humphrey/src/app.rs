@@ -21,6 +21,8 @@ use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
 use std::time::Duration;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 #[cfg(feature = "tls")]
 use rustls::ServerConfig;
 
@@ -42,6 +44,7 @@ where
     connection_handler: ConnectionHandler<State>,
     connection_condition: ConnectionCondition<State>,
     connection_timeout: Option<Duration>,
+    shutdown: Option<Arc<AtomicBool>>,
     #[cfg(feature = "tls")]
     tls_config: Option<Arc<ServerConfig>>,
     #[cfg(feature = "tls")]
@@ -113,6 +116,7 @@ where
             connection_handler: client_handler,
             connection_condition: |_, _| true,
             connection_timeout: None,
+            shutdown: None,
             #[cfg(feature = "tls")]
             tls_config: None,
             #[cfg(feature = "tls")]
@@ -132,6 +136,7 @@ where
             connection_handler: client_handler,
             connection_condition: |_, _| true,
             connection_timeout: None,
+            shutdown: None,
             #[cfg(feature = "tls")]
             tls_config: None,
             #[cfg(feature = "tls")]
@@ -146,6 +151,11 @@ where
         A: ToSocketAddrs,
     {
         let socket = TcpListener::bind(addr)?;
+
+        if self.shutdown.is_some() {
+            socket.set_nonblocking(true).expect("Cannot set non-blocking");
+        }
+
         let subapps = Arc::new(self.subapps);
         let default_subapp = Arc::new(self.default_subapp);
         let error_handler = Arc::new(self.error_handler);
@@ -197,6 +207,11 @@ where
                         );
                     }
                 }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    if let Some(ref shutdown) = self.shutdown {
+                        if shutdown.load(Ordering::Relaxed) { println!("got shutdown"); break }
+                    }
+                },
                 Err(e) => self
                     .monitor
                     .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
@@ -295,6 +310,11 @@ where
         }
 
         Ok(())
+    }
+
+    pub fn with_shutdown(mut self, shutdown: Arc<AtomicBool>) -> Self {
+        self.shutdown = Some(shutdown);
+        self
     }
 
     /// Sets the default state for the server.
