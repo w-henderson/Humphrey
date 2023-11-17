@@ -209,7 +209,7 @@ where
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     if let Some(ref shutdown) = self.shutdown {
-                        if shutdown.load(Ordering::Relaxed) { println!("got shutdown"); break }
+                        if shutdown.load(Ordering::Relaxed) { break }
                     }
                 },
                 Err(e) => self
@@ -231,6 +231,11 @@ where
         use rustls::ServerConnection;
 
         let socket = TcpListener::bind(addr)?;
+
+        if self.shutdown.is_some() {
+            socket.set_nonblocking(true).expect("Cannot set non-blocking");
+        }
+
         let subapps = Arc::new(self.subapps);
         let default_subapp = Arc::new(self.default_subapp);
         let error_handler = Arc::new(self.error_handler);
@@ -303,6 +308,11 @@ where
                         );
                     }
                 }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    if let Some(ref shutdown) = self.shutdown {
+                        if shutdown.load(Ordering::Relaxed) { break }
+                    }
+                },
                 Err(e) => self
                     .monitor
                     .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
@@ -312,6 +322,7 @@ where
         Ok(())
     }
 
+    /// Adds a flag for shutdown. When it becomes true, the loop in run or run_tls stops.
     pub fn with_shutdown(mut self, shutdown: Arc<AtomicBool>) -> Self {
         self.shutdown = Some(shutdown);
         self
