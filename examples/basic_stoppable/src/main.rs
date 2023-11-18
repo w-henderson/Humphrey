@@ -1,5 +1,5 @@
 use humphrey::http::{Request, Response, StatusCode};
-use humphrey::App;
+use humphrey::{handlers, App};
 use std::error::Error;
 
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};

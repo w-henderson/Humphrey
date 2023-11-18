@@ -76,7 +76,7 @@ impl ThreadPool {
         let rx = Arc::new(Mutex::new(rx));
         let mut threads = Vec::with_capacity(self.thread_count);
 
-        let (recovery_tx, recovery_rx): (Sender<usize>, Receiver<usize>) = channel();
+        let (recovery_tx, recovery_rx): (Sender<Option<usize>>, Receiver<Option<usize>>) = channel();
 
         for id in 0..self.thread_count {
             threads.push(Thread::new(
@@ -99,7 +99,19 @@ impl ThreadPool {
         );
 
         self.recovery_thread = Some(recovery_thread);
+        
         self.started = true;
+    }
+
+    /// Stops the thread pool.
+    pub fn stop(&mut self) {
+        if let Some(ref recovery_thread) = self.recovery_thread {
+            if let Err(err) = recovery_thread.tx.send(None) { println!("{err}") }
+        }
+        self.recovery_thread = None;
+        if let Err(err) = self.tx.send(Message::Shutdown) { println!("{err}") }
+        self.monitor = None;
+        self.started = false;
     }
 
     /// Register a monitor for the thread pool.
@@ -135,7 +147,7 @@ impl Thread {
     pub fn new(
         id: usize,
         rx: Arc<Mutex<Receiver<Message>>>,
-        panic_tx: Sender<usize>,
+        panic_tx: Sender<Option<usize>>,
         monitor: Option<MonitorConfig>,
     ) -> Self {
         let thread = Builder::new()
@@ -176,7 +188,7 @@ impl Thread {
 impl Drop for ThreadPool {
     fn drop(&mut self) {
         if let Some(mut recovery_thread) = self.recovery_thread.take() {
-            if let Some(thread) = recovery_thread.0.take() {
+            if let Some(thread) = recovery_thread.handle.take() {
                 thread.join().unwrap();
             }
         }
@@ -184,6 +196,7 @@ impl Drop for ThreadPool {
         for thread in &mut *self.threads.lock().unwrap() {
             if let Some(thread) = thread.os_thread.take() {
                 thread.join().unwrap();
+
             }
         }
     }

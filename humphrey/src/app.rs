@@ -23,6 +23,18 @@ use std::time::Duration;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(windows)]
+mod os_dep {
+    pub use std::os::windows::io::AsRawSocket;
+    pub use winapi::um::winsock2;
+}
+#[cfg(not(windows))]
+mod os_dep {
+    pub use libc;
+    pub use std::os::unix::io::AsRawFd;
+}
+use os_dep::*;
+
 #[cfg(feature = "tls")]
 use rustls::ServerConfig;
 
@@ -210,14 +222,21 @@ where
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     if let Some(ref shutdown) = self.shutdown {
                         if shutdown.load(Ordering::Relaxed) { break }
-                    }
+					}
+					std::thread::sleep(std::time::Duration::from_millis(10));
                 },
                 Err(e) => self
                     .monitor
                     .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
             }
         }
-
+		unsafe {
+            #[cfg(windows)]
+            winsock2::closesocket(socket.as_raw_socket() as usize);
+            #[cfg(not(windows))]
+            libc::close(socket.as_raw_fd());
+        }
+		self.thread_pool.stop();
         Ok(())
     }
 
@@ -318,7 +337,13 @@ where
                     .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
             }
         }
-
+		unsafe {
+            #[cfg(windows)]
+            winsock2::closesocket(socket.as_raw_socket() as usize);
+            #[cfg(not(windows))]
+            libc::close(socket.as_raw_fd());
+        }
+		self.thread_pool.stop();
         Ok(())
     }
 

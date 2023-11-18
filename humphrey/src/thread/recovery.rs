@@ -10,16 +10,19 @@ use std::sync::{Arc, Mutex};
 use std::thread::{panicking, spawn, JoinHandle};
 
 /// Marker struct to detect thread panics.
-pub struct PanicMarker(pub usize, pub Sender<usize>);
+pub struct PanicMarker(pub usize, pub Sender<Option<usize>>);
 
 /// Manages the recovery thread.
-pub struct RecoveryThread(pub Option<JoinHandle<()>>);
+pub struct RecoveryThread {
+    pub handle: Option<JoinHandle<()>>,
+    pub tx: Sender<Option<usize>>,
+}
 
 impl RecoveryThread {
     /// Creates and starts a new recovery thread.
     pub fn new(
-        rx: Receiver<usize>,
-        tx: Sender<usize>,
+        rx: Receiver<Option<usize>>,
+        tx: Sender<Option<usize>>,
         task_rx: Arc<Mutex<Receiver<Message>>>,
         threads: Arc<Mutex<Vec<Thread>>>,
         monitor: Option<MonitorConfig>,
@@ -60,44 +63,53 @@ impl RecoveryThread {
             };
         }
 
-        let thread = spawn(move || loop {
+        let thread = spawn({
+            let tx = tx.clone(); 
+            move || loop {
             for panicking_thread in &rx {
-                let mut threads = threads.lock().unwrap();
+                if let Some(panicking_thread) = panicking_thread {
+                    let mut threads = threads.lock().unwrap();
 
-                // End the OS thread that panicked.
-                if let Some(thread) = threads[panicking_thread].os_thread.take() {
-                    thread.join().ok();
-                }
+                    // End the OS thread that panicked.
+                    if let Some(thread) = threads[panicking_thread].os_thread.take() {
+                        thread.join().ok();
+                    }
 
-                // Start a new thread with the same ID.
-                let restarted_thread = Thread::new(
-                    panicking_thread,
-                    task_rx.clone(),
-                    tx.clone(),
-                    monitor.clone(),
-                );
-
-                // Put the new thread in the old thread's place.
-                threads[panicking_thread] = restarted_thread;
-
-                // Log that the thread restarted.
-                if let Some(monitor) = &monitor {
-                    monitor.send(
-                        Event::new(EventType::ThreadRestarted)
-                            .with_info(format!("Thread {} was restarted", panicking_thread)),
+                    // Start a new thread with the same ID.
+                    let restarted_thread = Thread::new(
+                        panicking_thread,
+                        task_rx.clone(),
+                        tx.clone(),
+                        monitor.clone(),
                     );
+
+                    // Put the new thread in the old thread's place.
+                    threads[panicking_thread] = restarted_thread;
+
+                    // Log that the thread restarted.
+                    if let Some(monitor) = &monitor {
+                        monitor.send(
+                            Event::new(EventType::ThreadRestarted)
+                                .with_info(format!("Thread {} was restarted", panicking_thread)),
+                        );
+                    }
+                } else {
+                    // stopping recovery
+                    break;
                 }
             }
-        });
+        }});
 
-        Self(Some(thread))
+        Self {
+            handle: Some(thread), tx
+        }
     }
 }
 
 impl Drop for PanicMarker {
     fn drop(&mut self) {
         if panicking() {
-            self.1.send(self.0).ok();
+            self.1.send(Some(self.0)).ok();
         }
     }
 }
