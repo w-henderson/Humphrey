@@ -237,6 +237,7 @@ where
             libc::close(socket.as_raw_fd());
         }
 		self.thread_pool.stop();
+        drop(self.thread_pool);
         Ok(())
     }
 

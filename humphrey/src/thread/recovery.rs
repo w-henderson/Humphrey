@@ -14,7 +14,9 @@ pub struct PanicMarker(pub usize, pub Sender<Option<usize>>);
 
 /// Manages the recovery thread.
 pub struct RecoveryThread {
+    /// handle
     pub handle: Option<JoinHandle<()>>,
+    /// Sends a number of a thread or None to shutdown
     pub tx: Sender<Option<usize>>,
 }
 
@@ -65,7 +67,7 @@ impl RecoveryThread {
 
         let thread = spawn({
             let tx = tx.clone(); 
-            move || loop {
+            move || {
             for panicking_thread in &rx {
                 if let Some(panicking_thread) = panicking_thread {
                     let mut threads = threads.lock().unwrap();
@@ -98,7 +100,8 @@ impl RecoveryThread {
                     break;
                 }
             }
-        }});
+        }
+    });
 
         Self {
             handle: Some(thread), tx

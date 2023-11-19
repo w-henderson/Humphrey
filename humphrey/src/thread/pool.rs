@@ -156,7 +156,14 @@ impl Thread {
                 let panic_marker = PanicMarker(id, panic_tx);
 
                 loop {
-                    let task = { rx.lock().unwrap().recv().unwrap() };
+                    // take care of forceful shutdown, i.e. when drop(thread) is called, unwrap fails
+                    let task = match rx.lock() {
+                        Ok(res) => match res.recv() {
+                            Ok(res) => res,
+                            Err(_) => break,
+                        },
+                        Err(_) => break,
+                    };
 
                     match task {
                         Message::Function(f, t) => {
@@ -170,10 +177,11 @@ impl Thread {
 
                             (f)()
                         }
-                        Message::Shutdown => break,
+                        Message::Shutdown =>  {
+                            break
+                        },
                     }
                 }
-
                 drop(panic_marker);
             })
             .expect("Thread could not be spawned");
@@ -195,8 +203,9 @@ impl Drop for ThreadPool {
 
         for thread in &mut *self.threads.lock().unwrap() {
             if let Some(thread) = thread.os_thread.take() {
-                thread.join().unwrap();
-
+                // this seem necessary because the thread might be blocking
+                drop(thread);
+                //thread.join().unwrap();
             }
         }
     }
