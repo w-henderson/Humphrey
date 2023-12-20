@@ -2,8 +2,7 @@
 //! Tests beginning with `y` should be successfully parsed.
 //! Tests beginning with `n` should throw an error but not panic.
 
-#![allow(non_upper_case_globals)]
-#![allow(non_snake_case)]
+#![allow(invalid_from_utf8, non_snake_case, non_upper_case_globals)]
 
 macro_rules! create_test {
     ($($name:ident: $path:literal,)+) => {

@@ -86,7 +86,7 @@ pub fn main(config: Config) {
             .with_forced_https(tls_config.force);
 
         if state.config.port != 443 {
-            state.logger.warn(&format!(
+            state.logger.warn(format!(
                 "HTTPS is typically served on port 443, so your setting of {} may cause issues.",
                 state.config.port,
             ));
@@ -114,18 +114,18 @@ pub fn main(config: Config) {
         }
     }
 
-    logger.debug(&format!("Configuration: {:?}", state.config));
+    logger.debug(format!("Configuration: {:?}", state.config));
 
     logger.info("Starting server");
 
     #[cfg(feature = "plugins")]
     if let Ok(plugins_count) = load_plugins(&state.config, state.clone()) {
-        logger.info(&format!("Loaded {} plugins", plugins_count))
+        logger.info(format!("Loaded {} plugins", plugins_count))
     } else {
         exit(1);
     };
 
-    logger.info(&format!("Running at {}", addr));
+    logger.info(format!("Running at {}", addr));
 
     #[cfg(feature = "tls")]
     if state.config.tls_config.is_some() {
@@ -162,7 +162,7 @@ fn verify_connection(stream: &mut TcpStream, state: Arc<AppState>) -> bool {
         if state.config.blacklist.mode == BlacklistMode::Block
             && state.config.blacklist.list.contains(&address.ip())
         {
-            state.logger.warn(&format!(
+            state.logger.warn(format!(
                 "{}: Blacklisted IP attempted to connect",
                 &address.ip()
             ));
@@ -301,7 +301,7 @@ fn proxy_websocket(
 
         destination.write_all(&bytes)?;
 
-        state.logger.info(&format!(
+        state.logger.info(format!(
             "{}: WebSocket connected, proxying data",
             source_addr
         ));
@@ -338,7 +338,7 @@ fn proxy_websocket(
     } else {
         state
             .logger
-            .error(&format!("{}: Could not connect to WebSocket", source_addr));
+            .error(format!("{}: Could not connect to WebSocket", source_addr));
     }
 
     Ok(())
@@ -355,20 +355,20 @@ fn load_plugins(config: &Config, state: Arc<AppState>) -> Result<usize, ()> {
             #[allow(clippy::significant_drop_in_scrutinee)]
             match manager.load_plugin(&plugin.library, &plugin.config, app_state) {
                 PluginLoadResult::Ok(name) => {
-                    state.logger.info(&format!("Initialised plugin {}", name));
+                    state.logger.info(format!("Initialised plugin {}", name));
                 }
                 PluginLoadResult::NonFatal(e) => {
                     state
                         .logger
-                        .warn(&format!("Non-fatal plugin error in {}", plugin.name));
-                    state.logger.warn(&format!("Error message: {}", e));
+                        .warn(format!("Non-fatal plugin error in {}", plugin.name));
+                    state.logger.warn(format!("Error message: {}", e));
                     state.logger.warn("Ignoring this plugin");
                 }
                 PluginLoadResult::Fatal(e) => {
                     state
                         .logger
-                        .error(&format!("Could not initialise plugin {}", plugin.name));
-                    state.logger.error(&format!("Error message: {}", e));
+                        .error(format!("Could not initialise plugin {}", plugin.name));
+                    state.logger.error(format!("Error message: {}", e));
 
                     return Err(());
                 }

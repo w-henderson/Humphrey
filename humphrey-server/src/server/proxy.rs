@@ -71,7 +71,7 @@ pub fn proxy_handler(
         .list
         .contains(&request.address.origin_addr)
     {
-        state.logger.warn(&format!(
+        state.logger.warn(format!(
             "{}: Blacklisted IP attempted to request {}",
             request.address, request.uri
         ));
@@ -92,7 +92,7 @@ pub fn proxy_handler(
         let status: u16 = response.status_code.into();
         let status_string: &str = response.status_code.into();
 
-        state.logger.info(&format!(
+        state.logger.info(format!(
             "{}: {} {} {}",
             request.address, status, status_string, request.uri
         ));
