@@ -16,6 +16,19 @@ jobs:
     name: Check Crates
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+      - name: Install MSRV Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.60.0
+      - uses: Swatinem/rust-cache@v2
+      - name: "check MSRV"
+        run: cargo check
+
+  msrv:
+    name: Check MSRV
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout sources
         uses: actions/checkout@v2
 
