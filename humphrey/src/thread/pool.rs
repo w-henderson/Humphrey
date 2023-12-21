@@ -102,6 +102,14 @@ impl ThreadPool {
         self.started = true;
     }
 
+    /// Stops the thread pool.
+    pub fn stop(&mut self) {
+        self.recovery_thread = None;
+        self.tx.send(Message::Shutdown).unwrap();
+        self.monitor = None;
+        self.started = false;
+    }
+
     /// Register a monitor for the thread pool.
     pub fn register_monitor(&mut self, monitor: MonitorConfig) {
         self.monitor = Some(monitor);
@@ -144,7 +152,14 @@ impl Thread {
                 let panic_marker = PanicMarker(id, panic_tx);
 
                 loop {
-                    let task = { rx.lock().unwrap().recv().unwrap() };
+                    // When the tx pair has been dropped (shutdown initiated), we want to break out.
+                    let task = match rx.lock() {
+                        Ok(res) => match res.recv() {
+                            Ok(res) => res,
+                            Err(_) => break,
+                        },
+                        Err(_) => break,
+                    };
 
                     match task {
                         Message::Function(f, t) => {
@@ -183,7 +198,7 @@ impl Drop for ThreadPool {
 
         for thread in &mut *self.threads.lock().unwrap() {
             if let Some(thread) = thread.os_thread.take() {
-                thread.join().unwrap();
+                drop(thread)
             }
         }
     }
