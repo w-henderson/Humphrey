@@ -17,8 +17,11 @@ use crate::stream::Stream;
 use crate::thread::pool::ThreadPool;
 
 use std::io::Write;
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Receiver;
 use std::sync::Arc;
+use std::thread;
 use std::time::Duration;
 
 #[cfg(feature = "tls")]
@@ -42,6 +45,7 @@ where
     connection_handler: ConnectionHandler<State>,
     connection_condition: ConnectionCondition<State>,
     connection_timeout: Option<Duration>,
+    shutdown: Option<Receiver<()>>,
     #[cfg(feature = "tls")]
     tls_config: Option<Arc<ServerConfig>>,
     #[cfg(feature = "tls")]
@@ -113,6 +117,7 @@ where
             connection_handler: client_handler,
             connection_condition: |_, _| true,
             connection_timeout: None,
+            shutdown: None,
             #[cfg(feature = "tls")]
             tls_config: None,
             #[cfg(feature = "tls")]
@@ -132,6 +137,7 @@ where
             connection_handler: client_handler,
             connection_condition: |_, _| true,
             connection_timeout: None,
+            shutdown: None,
             #[cfg(feature = "tls")]
             tls_config: None,
             #[cfg(feature = "tls")]
@@ -143,9 +149,9 @@ where
     /// This function will only return if a fatal error is thrown such as the port being in use.
     pub fn run<A>(mut self, addr: A) -> Result<(), HumphreyError>
     where
-        A: ToSocketAddrs,
+        A: ToSocketAddrs + Clone,
     {
-        let socket = TcpListener::bind(addr)?;
+        let socket = TcpListener::bind(addr.clone())?;
         let subapps = Arc::new(self.subapps);
         let default_subapp = Arc::new(self.default_subapp);
         let error_handler = Arc::new(self.error_handler);
@@ -153,55 +159,74 @@ where
         self.thread_pool.register_monitor(self.monitor.clone());
         self.thread_pool.start();
 
-        for stream in socket.incoming() {
-            match stream {
-                Ok(mut stream) => {
-                    let cloned_state = self.state.clone();
+        // Shared shutdown signal between socket.incoming() and shutdown signal receiver.
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let shutdown_clone = shutdown.clone();
+        let main_app_thread = thread::spawn(move || {
+            for stream in socket.incoming() {
+                if shutdown_clone.load(Ordering::SeqCst) {
+                    break;
+                }
 
-                    // Check that the client is allowed to connect
-                    if (self.connection_condition)(&mut stream, cloned_state) {
+                match stream {
+                    Ok(mut stream) => {
                         let cloned_state = self.state.clone();
-                        let cloned_monitor = self.monitor.clone();
-                        let cloned_subapps = subapps.clone();
-                        let cloned_default_subapp = default_subapp.clone();
-                        let cloned_error_handler = error_handler.clone();
-                        let cloned_handler = self.connection_handler;
-                        let cloned_timeout = self.connection_timeout;
 
-                        cloned_monitor.send(
-                            Event::new(EventType::ConnectionSuccess)
-                                .with_peer_result(stream.peer_addr()),
-                        );
+                        // Check that the client is allowed to connect
+                        if (self.connection_condition)(&mut stream, cloned_state) {
+                            let cloned_state = self.state.clone();
+                            let cloned_monitor = self.monitor.clone();
+                            let cloned_subapps = subapps.clone();
+                            let cloned_default_subapp = default_subapp.clone();
+                            let cloned_error_handler = error_handler.clone();
+                            let cloned_handler = self.connection_handler;
+                            let cloned_timeout = self.connection_timeout;
 
-                        // Spawn a new thread to handle the connection
-                        self.thread_pool.execute(move || {
                             cloned_monitor.send(
-                                Event::new(EventType::ThreadPoolProcessStarted)
+                                Event::new(EventType::ConnectionSuccess)
                                     .with_peer_result(stream.peer_addr()),
                             );
 
-                            (cloned_handler)(
-                                Stream::Tcp(stream),
-                                cloned_subapps,
-                                cloned_default_subapp,
-                                cloned_error_handler,
-                                cloned_state,
-                                cloned_monitor,
-                                cloned_timeout,
-                            )
-                        });
-                    } else {
-                        self.monitor.send(
-                            Event::new(EventType::ConnectionDenied)
-                                .with_peer_result(stream.peer_addr()),
-                        );
+                            // Spawn a new thread to handle the connection
+                            self.thread_pool.execute(move || {
+                                cloned_monitor.send(
+                                    Event::new(EventType::ThreadPoolProcessStarted)
+                                        .with_peer_result(stream.peer_addr()),
+                                );
+
+                                (cloned_handler)(
+                                    Stream::Tcp(stream),
+                                    cloned_subapps,
+                                    cloned_default_subapp,
+                                    cloned_error_handler,
+                                    cloned_state,
+                                    cloned_monitor,
+                                    cloned_timeout,
+                                )
+                            });
+                        } else {
+                            self.monitor.send(
+                                Event::new(EventType::ConnectionDenied)
+                                    .with_peer_result(stream.peer_addr()),
+                            );
+                        }
                     }
+                    Err(e) => self
+                        .monitor
+                        .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
                 }
-                Err(e) => self
-                    .monitor
-                    .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
             }
-        }
+            self.thread_pool.stop();
+        });
+
+        if let Some(s) = self.shutdown {
+            // We wait for the shutdown signal, then wake up the main app thread with a new connection
+            let _ = s.recv();
+            shutdown.store(true, Ordering::SeqCst);
+            let _ = TcpStream::connect(unspecified_socket_to_loopback(addr));
+        };
+
+        let _ = main_app_thread.join();
 
         Ok(())
     }
@@ -211,11 +236,11 @@ where
     #[cfg(feature = "tls")]
     pub fn run_tls<A>(mut self, addr: A) -> Result<(), HumphreyError>
     where
-        A: ToSocketAddrs,
+        A: ToSocketAddrs + Clone,
     {
         use rustls::ServerConnection;
 
-        let socket = TcpListener::bind(addr)?;
+        let socket = TcpListener::bind(addr.clone())?;
         let subapps = Arc::new(self.subapps);
         let default_subapp = Arc::new(self.default_subapp);
         let error_handler = Arc::new(self.error_handler);
@@ -235,64 +260,82 @@ where
                 .execute(|| force_https_thread(cloned_monitor).unwrap_or(()));
         }
 
-        for sock in socket.incoming() {
-            match sock {
-                Ok(mut sock) => {
-                    let cloned_state = self.state.clone();
+        // Shared shutdown signal between socket.incoming() and shutdown signal receiver.
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let shutdown_clone = shutdown.clone();
+        let main_app_thread = thread::spawn(move || {
+            for sock in socket.incoming() {
+                if shutdown_clone.load(Ordering::SeqCst) {
+                    break;
+                }
 
-                    // Check that the client is allowed to connect
-                    if (self.connection_condition)(&mut sock, cloned_state) {
+                match sock {
+                    Ok(mut sock) => {
                         let cloned_state = self.state.clone();
-                        let cloned_subapps = subapps.clone();
-                        let cloned_default_subapp = default_subapp.clone();
-                        let cloned_error_handler = error_handler.clone();
-                        let cloned_handler = self.connection_handler;
-                        let cloned_timeout = self.connection_timeout;
-                        let cloned_monitor = self.monitor.clone();
-                        let cloned_config = self
-                            .tls_config
-                            .as_ref()
-                            .expect("TLS certificate not supplied")
-                            .clone();
 
-                        cloned_monitor.send(
-                            Event::new(EventType::ConnectionSuccess)
-                                .with_peer_result(sock.peer_addr()),
-                        );
+                        // Check that the client is allowed to connect
+                        if (self.connection_condition)(&mut sock, cloned_state) {
+                            let cloned_state = self.state.clone();
+                            let cloned_subapps = subapps.clone();
+                            let cloned_default_subapp = default_subapp.clone();
+                            let cloned_error_handler = error_handler.clone();
+                            let cloned_handler = self.connection_handler;
+                            let cloned_timeout = self.connection_timeout;
+                            let cloned_monitor = self.monitor.clone();
+                            let cloned_config = self
+                                .tls_config
+                                .as_ref()
+                                .expect("TLS certificate not supplied")
+                                .clone();
 
-                        // Spawn a new thread to handle the connection
-                        self.thread_pool.execute(move || {
                             cloned_monitor.send(
-                                Event::new(EventType::ThreadPoolProcessStarted)
+                                Event::new(EventType::ConnectionSuccess)
                                     .with_peer_result(sock.peer_addr()),
                             );
 
-                            let server = ServerConnection::new(cloned_config).unwrap();
-                            let tls_stream = rustls::StreamOwned::new(server, sock);
-                            let stream = Stream::Tls(tls_stream);
+                            // Spawn a new thread to handle the connection
+                            self.thread_pool.execute(move || {
+                                cloned_monitor.send(
+                                    Event::new(EventType::ThreadPoolProcessStarted)
+                                        .with_peer_result(sock.peer_addr()),
+                                );
 
-                            (cloned_handler)(
-                                stream,
-                                cloned_subapps,
-                                cloned_default_subapp,
-                                cloned_error_handler,
-                                cloned_state,
-                                cloned_monitor,
-                                cloned_timeout,
-                            )
-                        });
-                    } else {
-                        self.monitor.send(
-                            Event::new(EventType::ConnectionDenied)
-                                .with_peer_result(sock.peer_addr()),
-                        );
+                                let server = ServerConnection::new(cloned_config).unwrap();
+                                let tls_stream = rustls::StreamOwned::new(server, sock);
+                                let stream = Stream::Tls(tls_stream);
+
+                                (cloned_handler)(
+                                    stream,
+                                    cloned_subapps,
+                                    cloned_default_subapp,
+                                    cloned_error_handler,
+                                    cloned_state,
+                                    cloned_monitor,
+                                    cloned_timeout,
+                                )
+                            });
+                        } else {
+                            self.monitor.send(
+                                Event::new(EventType::ConnectionDenied)
+                                    .with_peer_result(sock.peer_addr()),
+                            );
+                        }
                     }
+                    Err(e) => self
+                        .monitor
+                        .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
                 }
-                Err(e) => self
-                    .monitor
-                    .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
             }
-        }
+            self.thread_pool.stop();
+        });
+        if let Some(s) = self.shutdown {
+            // We wait for the shutdown signal, then wake up the main app thread with a new connection
+            let _ = s.recv();
+            shutdown.store(true, Ordering::SeqCst);
+            let _ = TcpStream::connect(unspecified_socket_to_loopback(addr));
+        };
+
+        let _ = main_app_thread.join();
 
         Ok(())
     }
@@ -377,6 +420,12 @@ where
     /// Registers a monitor for the server.
     pub fn with_monitor(mut self, monitor: MonitorConfig) -> Self {
         self.monitor = monitor;
+        self
+    }
+
+    /// Registers a shutdown signal to gracefully shutdown the app, ending the run/run_tls loop.
+    pub fn with_shutdown(mut self, shutdown_receiver: Receiver<()>) -> Self {
+        self.shutdown = Some(shutdown_receiver);
         self
     }
 
@@ -807,4 +856,18 @@ pub(crate) fn error_handler(status_code: StatusCode) -> Response {
     );
 
     Response::new(status_code, body.as_bytes())
+}
+
+fn unspecified_socket_to_loopback<S>(socket: S) -> SocketAddr
+where
+    S: ToSocketAddrs,
+{
+    let mut socket = socket.to_socket_addrs().unwrap().next().unwrap(); // This can't fail, because the server was able to start.
+    if socket.ip().is_unspecified() {
+        match socket.ip() {
+            IpAddr::V4(_) => socket.set_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
+            IpAddr::V6(_) => socket.set_ip(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0x1))),
+        };
+    }
+    socket
 }

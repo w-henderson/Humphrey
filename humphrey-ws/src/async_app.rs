@@ -54,6 +54,8 @@ where
     on_disconnect: Option<Box<dyn EventHandler<State, StreamState>>>,
     /// The event handler called when a client sends a message.
     on_message: Option<Box<dyn MessageHandler<State, StreamState>>>,
+    /// Shutdown signal for the application.
+    shutdown: Option<Receiver<()>>,
 }
 
 /// Represents a stateful WebSocket stream.
@@ -183,6 +185,7 @@ where
             on_connect: None,
             on_disconnect: None,
             on_message: None,
+            shutdown: None,
         }
     }
 
@@ -220,6 +223,7 @@ where
             on_connect: None,
             on_disconnect: None,
             on_message: None,
+            shutdown: None,
         }
     }
 
@@ -250,6 +254,7 @@ where
             on_connect: None,
             on_disconnect: None,
             on_message: None,
+            shutdown: None,
         }
     }
 
@@ -280,6 +285,7 @@ where
             on_connect: None,
             on_disconnect: None,
             on_message: None,
+            shutdown: None,
         }
     }
 
@@ -399,6 +405,12 @@ where
         let mut last_ping = Instant::now();
 
         loop {
+            if let Some(ref s) = self.shutdown {
+                if s.try_recv().is_ok() {
+                    break;
+                }
+            }
+
             let keys: Vec<SocketAddr> = self.streams.keys().copied().collect();
 
             // Calculate whether a ping should be sent this iteration.
@@ -540,6 +552,13 @@ where
                 sleep(interval);
             }
         }
+        self.thread_pool.stop();
+    }
+
+    /// Registers a shutdown signal to gracefully shutdown the app
+    pub fn with_shutdown(mut self, shutdown_receiver: Receiver<()>) -> Self {
+        self.shutdown = Some(shutdown_receiver);
+        self
     }
 }
 
