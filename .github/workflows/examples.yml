@@ -161,3 +161,10 @@ jobs:
         with:
           command: check
           args: --manifest-path examples/wildcard/Cargo.toml
+
+      - name: Check shutdown example
+        if: always()
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/shutdown/Cargo.toml
