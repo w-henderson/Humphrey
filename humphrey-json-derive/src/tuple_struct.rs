@@ -34,7 +34,7 @@ pub fn from_json_tuple_struct(ast: DeriveInput, r#struct: &DataStruct) -> TokenS
 /// Derives the `IntoJson` trait for a tuple struct.
 pub fn into_json_tuple_struct(ast: DeriveInput, r#struct: &DataStruct) -> TokenStream {
     let field_count = r#struct.fields.len();
-    let field_iter = (0..field_count).into_iter().map(Index::from);
+    let field_iter = (0..field_count).map(Index::from);
 
     let name = &ast.ident;
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();

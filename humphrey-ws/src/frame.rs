@@ -182,7 +182,7 @@ impl From<Frame> for Vec<u8> {
             buf.extend_from_slice(&(f.length as u16).to_be_bytes());
         } else {
             buf[1] = (f.mask as u8) << 7 | 127;
-            buf.extend_from_slice(&(f.length as u64).to_be_bytes());
+            buf.extend_from_slice(&(f.length).to_be_bytes());
         }
 
         // Add the masking key (if required)

@@ -57,7 +57,7 @@ pub fn directory_handler(
     if let Some(located) = try_find_path(directory, &simplified_uri, &INDEX_FILES) {
         match located {
             LocatedPath::Directory => {
-                state.logger.info(&format!(
+                state.logger.info(format!(
                     "{}: 301 Moved Permanently {}",
                     request.address, request.uri
                 ));
@@ -67,7 +67,7 @@ pub fn directory_handler(
             LocatedPath::File(path) => inner_file_handler(request, state, path, host),
         }
     } else {
-        state.logger.warn(&format!(
+        state.logger.warn(format!(
             "{}: 404 Not Found {}",
             request.address, request.uri
         ));
@@ -81,7 +81,7 @@ pub fn redirect_handler(request: Request, state: Arc<AppState>, target: &str) ->
         return response;
     }
 
-    state.logger.info(&format!(
+    state.logger.info(format!(
         "{}: 301 Moved Permanently {}",
         request.address, request.uri
     ));
@@ -105,16 +105,16 @@ fn inner_file_handler(
     if state.config.cache.size_limit >= contents.len() {
         let mut cache = state.cache.write().unwrap();
         cache.set(&request.uri, host, contents.clone(), mime_type);
-        state.logger.debug(&format!("Cached route {}", request.uri));
+        state.logger.debug(format!("Cached route {}", request.uri));
     } else if state.config.cache.size_limit > 0 {
         state
             .logger
-            .warn(&format!("Couldn't cache, cache too small {}", request.uri));
+            .warn(format!("Couldn't cache, cache too small {}", request.uri));
     }
 
     state
         .logger
-        .info(&format!("{}: 200 OK {}", request.address, request.uri));
+        .info(format!("{}: 200 OK {}", request.address, request.uri));
     Response::empty(StatusCode::OK)
         .with_header(HeaderType::ContentType, mime_type.to_string())
         .with_bytes(contents)
@@ -128,7 +128,7 @@ fn blacklist_check(request: &Request, state: Arc<AppState>) -> Option<Response> 
         .list
         .contains(&request.address.origin_addr)
     {
-        state.logger.warn(&format!(
+        state.logger.warn(format!(
             "{}: Blacklisted IP attempted to request {}",
             request.address, request.uri
         ));
@@ -146,7 +146,7 @@ fn cache_check(request: &Request, state: Arc<AppState>, host: usize) -> Option<R
     if state.config.cache.size_limit > 0 {
         let cache = state.cache.read().unwrap();
         if let Some(cached) = cache.get(&request.uri, host) {
-            state.logger.info(&format!(
+            state.logger.info(format!(
                 "{}: 200 OK (cached) {}",
                 request.address, request.uri
             ));

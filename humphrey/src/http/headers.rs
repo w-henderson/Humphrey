@@ -230,17 +230,17 @@ pub enum HeaderType {
 
 impl PartialOrd for HeaderType {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if self.category() != other.category() {
-            self.category().partial_cmp(&other.category())
-        } else {
-            self.to_string().partial_cmp(&other.to_string())
-        }
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for HeaderType {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
+        if self.category() != other.category() {
+            self.category().cmp(&other.category())
+        } else {
+            self.to_string().cmp(&other.to_string())
+        }
     }
 }
 

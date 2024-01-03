@@ -30,7 +30,7 @@
 
 <hr><br>
 
-Humphrey is a very fast, robust and flexible HTTP/1.1 web server, with support for static and dynamic content through its Rust crate and plugin system. It has no dependencies when only using default features, and the binary is easily extensible with a flexible configuration file and dynamically-loaded plugins. It also provides a WebSocket API for the easy integration of WebSockets into your application, a JSON manipulation crate, and a simple authentication system for authenticating users and managing sessions.
+Humphrey is a very fast, robust and flexible HTTP/1.1 web server, with support for static and dynamic content through its Rust crate and plugin system. It has no dependencies when only using default features, and the binary is easily extensible with a flexible configuration file and dynamically-loaded plugins. It also provides a WebSocket API for the easy integration of WebSockets into your application, a JSON manipulation crate, and a simple authentication system for authenticating users and managing sessions. The current Minimum Supported Rust Version is 1.60.
 
 ## Quick Links
 - [Use Humphrey as a crate](https://humphrey.whenderson.dev/core/index.html)

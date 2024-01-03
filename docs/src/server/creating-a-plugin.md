@@ -16,7 +16,7 @@ Then, in the `Cargo.toml` file, you'll need to specify the `humphrey` and `humph
 [package]
 name = "my_plugin"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 humphrey = "*"
