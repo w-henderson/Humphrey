@@ -1,15 +1,14 @@
 on:
   push:
-    paths:
-    - "humphrey/**"
-    - "humphrey-auth/**"
-    - "humphrey-json/**"
-    - "humphrey-json-derive/**"
-    - "humphrey-server/**"
-    - "humphrey-ws/**"
-    - ".github/**"
+    branches: [master, main]
+
+  pull_request:
+    branches: [master, main]
 
 name: CI
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   check:

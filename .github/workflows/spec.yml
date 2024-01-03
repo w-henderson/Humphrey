@@ -1,11 +1,22 @@
 on:
   push:
+    branches: [master, main]
+    paths:
+    - "humphrey-json/**"
+    - "humphrey-json-derive/**"
+    - ".github/workflows/spec.yml"
+
+  pull_request:
+    branches: [master, main]
     paths:
     - "humphrey-json/**"
     - "humphrey-json-derive/**"
     - ".github/workflows/spec.yml"
 
 name: JSON Specification Compliance
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   test:
