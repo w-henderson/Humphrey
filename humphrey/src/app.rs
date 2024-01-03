@@ -17,7 +17,7 @@ use crate::stream::Stream;
 use crate::thread::pool::ThreadPool;
 
 use std::io::Write;
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
@@ -223,7 +223,7 @@ where
             // We wait for the shutdown signal, then wake up the main app thread with a new connection
             let _ = s.recv();
             shutdown.store(true, Ordering::SeqCst);
-            let _ = TcpStream::connect(addr);
+            let _ = TcpStream::connect(unspecified_socket_to_loopback(addr));
         };
 
         let _ = main_app_thread.join();
@@ -332,7 +332,7 @@ where
             // We wait for the shutdown signal, then wake up the main app thread with a new connection
             let _ = s.recv();
             shutdown.store(true, Ordering::SeqCst);
-            let _ = TcpStream::connect(addr);
+            let _ = TcpStream::connect(unspecified_socket_to_loopback(addr));
         };
 
         let _ = main_app_thread.join();
@@ -856,4 +856,18 @@ pub(crate) fn error_handler(status_code: StatusCode) -> Response {
     );
 
     Response::new(status_code, body.as_bytes())
+}
+
+fn unspecified_socket_to_loopback<S>(socket: S) -> SocketAddr
+where
+    S: ToSocketAddrs,
+{
+    let mut socket = socket.to_socket_addrs().unwrap().next().unwrap(); // This can't fail, because the server was able to start.
+    if socket.ip().is_unspecified() {
+        match socket.ip() {
+            IpAddr::V4(_) => socket.set_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
+            IpAddr::V6(_) => socket.set_ip(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0x1))),
+        };
+    }
+    socket
 }
