@@ -37,9 +37,13 @@ optional = true
 version = "^0.24.1"
 optional = true
 
+[dependencies.tokio-util]
+version = "0.7"
+optional = true
+
 [features]
 tls = ["rustls", "rustls-native-certs", "rustls-pemfile"]
-tokio = ["dep:tokio", "futures", "tokio-rustls"]
+tokio = ["dep:tokio", "futures", "tokio-rustls", "tokio-util"]
 
 [lib]
 doctest = false

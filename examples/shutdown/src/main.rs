@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with_shutdown(app_rx)
         .with_stateless_route("/hello", |_| Response::new(StatusCode::OK, "Hello world!"));
 
-    // Shutdown both the main app after 5 seconds
+    // Shutdown the main app after 5 seconds
     spawn(move || {
         sleep(Duration::from_secs(5));
         let _ = shutdown_app.send(());

@@ -91,7 +91,7 @@ jobs:
         with:
           command: check
           args: --manifest-path examples/host/Cargo.toml
-          
+
       - name: Check monitor example
         if: always()
         uses: actions-rs/cargo@v1
@@ -168,3 +168,10 @@ jobs:
         with:
           command: check
           args: --manifest-path examples/shutdown/Cargo.toml
+
+      - name: Check shutdown-tokio example
+        if: always()
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path examples/shutdown-tokio/Cargo.toml
