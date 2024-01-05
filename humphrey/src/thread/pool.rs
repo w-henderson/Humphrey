@@ -18,7 +18,7 @@ pub struct ThreadPool {
     started: bool,
     threads: Arc<Mutex<Vec<Thread>>>,
     recovery_thread: Option<RecoveryThread>,
-    tx: Sender<Message>,
+    tx: Option<Sender<Message>>,
     monitor: Option<MonitorConfig>,
 }
 
@@ -65,7 +65,7 @@ impl ThreadPool {
             started: false,
             threads: Arc::new(Mutex::new(Vec::new())),
             recovery_thread: None,
-            tx: channel().0,
+            tx: Some(channel().0),
             monitor: None,
         }
     }
@@ -76,7 +76,8 @@ impl ThreadPool {
         let rx = Arc::new(Mutex::new(rx));
         let mut threads = Vec::with_capacity(self.thread_count);
 
-        let (recovery_tx, recovery_rx): (Sender<usize>, Receiver<usize>) = channel();
+        let (recovery_tx, recovery_rx): (Sender<Option<usize>>, Receiver<Option<usize>>) =
+            channel();
 
         for id in 0..self.thread_count {
             threads.push(Thread::new(
@@ -88,7 +89,7 @@ impl ThreadPool {
         }
 
         self.threads = Arc::new(Mutex::new(threads));
-        self.tx = tx;
+        self.tx = Some(tx);
 
         let recovery_thread = RecoveryThread::new(
             recovery_rx,
@@ -104,8 +105,12 @@ impl ThreadPool {
 
     /// Stops the thread pool.
     pub fn stop(&mut self) {
-        self.recovery_thread = None;
-        self.tx.send(Message::Shutdown).unwrap();
+        self.tx = None;
+        if let Some(rt) = self.recovery_thread.take() {
+            if rt.0.is_some() {
+                let _ = rt.0.unwrap().join();
+            }
+        }
         self.monitor = None;
         self.started = false;
     }
@@ -127,9 +132,10 @@ impl ThreadPool {
 
         let boxed_task = Box::new(task);
         let time_into_pool = Instant::now();
-        self.tx
-            .send(Message::Function(boxed_task, time_into_pool))
-            .unwrap();
+        if let Some(tx) = &self.tx {
+            tx.send(Message::Function(boxed_task, time_into_pool))
+                .unwrap();
+        };
     }
 
     /// Returns the configured number of threads.
@@ -143,13 +149,13 @@ impl Thread {
     pub fn new(
         id: usize,
         rx: Arc<Mutex<Receiver<Message>>>,
-        panic_tx: Sender<usize>,
+        panic_tx: Sender<Option<usize>>,
         monitor: Option<MonitorConfig>,
     ) -> Self {
         let thread = Builder::new()
             .name(format!("{}", id))
             .spawn(move || {
-                let panic_marker = PanicMarker(id, panic_tx);
+                let panic_marker = PanicMarker(id, panic_tx.clone());
 
                 loop {
                     // When the tx pair has been dropped (shutdown initiated), we want to break out.
@@ -177,6 +183,7 @@ impl Thread {
                     }
                 }
 
+                let _ = panic_tx.send(None); // Shutdown panic_thread
                 drop(panic_marker);
             })
             .expect("Thread could not be spawned");
@@ -198,7 +205,7 @@ impl Drop for ThreadPool {
 
         for thread in &mut *self.threads.lock().unwrap() {
             if let Some(thread) = thread.os_thread.take() {
-                drop(thread)
+                thread.join().unwrap();
             }
         }
     }

@@ -14,13 +14,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with_stateless_route("/hello", |_| Response::new(StatusCode::OK, "Hello world!"));
 
     // Shutdown the main app after 5 seconds
-    spawn(move || {
+    let t = spawn(move || {
         sleep(Duration::from_secs(5));
         let _ = shutdown_app.send(());
     });
 
     // Returns after shutdown signal
     app.run("0.0.0.0:8080").unwrap();
+
+    // Wait for thread to fully finish. Unneeded but placed here for full memory tests.
+    t.join().unwrap();
 
     Ok(())
 }
