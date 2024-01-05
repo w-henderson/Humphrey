@@ -134,7 +134,7 @@ where
 
         loop {
             let shutdown = async {
-                if let Some(sd) = self.shutdown.clone() {
+                if let Some(sd) = self.shutdown.as_ref() {
                     sd.cancelled().await
                 } else {
                     futures::future::pending().await
@@ -220,7 +220,7 @@ where
 
         loop {
             let shutdown = async {
-                if let Some(sd) = self.shutdown.clone() {
+                if let Some(sd) = self.shutdown.as_ref() {
                     sd.cancelled().await
                 } else {
                     futures::future::pending().await
