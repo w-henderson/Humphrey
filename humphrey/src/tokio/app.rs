@@ -19,6 +19,7 @@ use std::sync::Arc;
 
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
+use tokio_util::sync::CancellationToken;
 
 #[cfg(feature = "tls")]
 use rustls::ServerConfig;
@@ -42,6 +43,7 @@ where
     tls_config: Option<Arc<ServerConfig>>,
     #[cfg(feature = "tls")]
     force_https: bool,
+    shutdown: Option<CancellationToken>,
 }
 
 /// Represents a function able to calculate whether a connection will be accepted.
@@ -98,6 +100,7 @@ where
             tls_config: None,
             #[cfg(feature = "tls")]
             force_https: false,
+            shutdown: None,
         }
     }
 
@@ -114,6 +117,7 @@ where
             tls_config: None,
             #[cfg(feature = "tls")]
             force_https: false,
+            shutdown: None,
         }
     }
 
@@ -129,51 +133,63 @@ where
         let error_handler = Arc::new(self.error_handler);
 
         loop {
-            match socket.accept().await {
-                Ok((mut stream, _)) => {
-                    let cloned_state = self.state.clone();
+            let shutdown = async {
+                if let Some(sd) = self.shutdown.as_ref() {
+                    sd.cancelled().await
+                } else {
+                    futures::future::pending().await
+                }
+            };
+            tokio::select! {
+                () = shutdown => { break Ok(()); }
+                s = socket.accept() => {
+                    match s {
+                        Ok((mut stream, _)) => {
+                            let cloned_state = self.state.clone();
 
-                    // Check that the client is allowed to connect
-                    if (self.connection_condition)(&mut stream, cloned_state) {
-                        let cloned_state = self.state.clone();
-                        let cloned_monitor = self.monitor.clone();
-                        let cloned_subapps = subapps.clone();
-                        let cloned_default_subapp = default_subapp.clone();
-                        let cloned_error_handler = error_handler.clone();
+                            // Check that the client is allowed to connect
+                            if (self.connection_condition)(&mut stream, cloned_state) {
+                                let cloned_state = self.state.clone();
+                                let cloned_monitor = self.monitor.clone();
+                                let cloned_subapps = subapps.clone();
+                                let cloned_default_subapp = default_subapp.clone();
+                                let cloned_error_handler = error_handler.clone();
 
-                        cloned_monitor.send(
-                            Event::new(EventType::ConnectionSuccess)
-                                .with_peer_result(stream.peer_addr()),
-                        );
+                                cloned_monitor.send(
+                                    Event::new(EventType::ConnectionSuccess)
+                                        .with_peer_result(stream.peer_addr()),
+                                );
 
-                        // Spawn a new thread to handle the connection
-                        tokio::spawn(async move {
-                            cloned_monitor.send(
-                                Event::new(EventType::ThreadPoolProcessStarted)
-                                    .with_peer_result(stream.peer_addr()),
-                            );
+                                // Spawn a new thread to handle the connection
+                                tokio::spawn(async move {
+                                    cloned_monitor.send(
+                                        Event::new(EventType::ThreadPoolProcessStarted)
+                                            .with_peer_result(stream.peer_addr()),
+                                    );
 
-                            client_handler(
-                                Stream::Tcp(stream),
-                                cloned_subapps,
-                                cloned_default_subapp,
-                                cloned_error_handler,
-                                cloned_state,
-                                cloned_monitor,
-                            )
-                            .await
-                        });
-                    } else {
-                        self.monitor.send(
-                            Event::new(EventType::ConnectionDenied)
-                                .with_peer_result(stream.peer_addr()),
-                        );
+                                    client_handler(
+                                        Stream::Tcp(stream),
+                                        cloned_subapps,
+                                        cloned_default_subapp,
+                                        cloned_error_handler,
+                                        cloned_state,
+                                        cloned_monitor,
+                                    )
+                                        .await
+                                });
+                            } else {
+                                self.monitor.send(
+                                    Event::new(EventType::ConnectionDenied)
+                                        .with_peer_result(stream.peer_addr()),
+                                );
+                            }
+                        }
+                        Err(e) => self
+                            .monitor
+                            .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
                     }
                 }
-                Err(e) => self
-                    .monitor
-                    .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
-            }
+            };
         }
     }
 
@@ -203,60 +219,73 @@ where
         let acceptor = TlsAcceptor::from(tls_config);
 
         loop {
-            match socket.accept().await {
-                Ok((mut sock, _)) => {
-                    let cloned_state = self.state.clone();
+            let shutdown = async {
+                if let Some(sd) = self.shutdown.as_ref() {
+                    sd.cancelled().await
+                } else {
+                    futures::future::pending().await
+                }
+            };
 
-                    // Check that the client is allowed to connect
-                    if (self.connection_condition)(&mut sock, cloned_state) {
-                        let cloned_state = self.state.clone();
-                        let cloned_subapps = subapps.clone();
-                        let cloned_default_subapp = default_subapp.clone();
-                        let cloned_error_handler = error_handler.clone();
-                        let cloned_monitor = self.monitor.clone();
-                        let cloned_acceptor = acceptor.clone();
+            tokio::select! {
+                () = shutdown => { break Ok(()); }
+                 s = socket.accept() => {
+                    match s {
+                        Ok((mut sock, _)) => {
+                            let cloned_state = self.state.clone();
 
-                        cloned_monitor.send(
-                            Event::new(EventType::ConnectionSuccess)
-                                .with_peer_result(sock.peer_addr()),
-                        );
+                            // Check that the client is allowed to connect
+                            if (self.connection_condition)(&mut sock, cloned_state) {
+                                let cloned_state = self.state.clone();
+                                let cloned_subapps = subapps.clone();
+                                let cloned_default_subapp = default_subapp.clone();
+                                let cloned_error_handler = error_handler.clone();
+                                let cloned_monitor = self.monitor.clone();
+                                let cloned_acceptor = acceptor.clone();
 
-                        // Spawn a new thread to handle the connection
-                        tokio::spawn(async move {
-                            cloned_monitor.send(
-                                Event::new(EventType::ThreadPoolProcessStarted)
-                                    .with_peer_result(sock.peer_addr()),
-                            );
+                                cloned_monitor.send(
+                                    Event::new(EventType::ConnectionSuccess)
+                                        .with_peer_result(sock.peer_addr()),
+                                );
 
-                            match cloned_acceptor.accept(sock).await {
-                                Ok(tls_stream) => {
-                                    let stream = Stream::Tls(tls_stream);
+                                // Spawn a new thread to handle the connection
+                                tokio::spawn(async move {
+                                    cloned_monitor.send(
+                                        Event::new(EventType::ThreadPoolProcessStarted)
+                                            .with_peer_result(sock.peer_addr()),
+                                    );
 
-                                    client_handler(
-                                        stream,
-                                        cloned_subapps,
-                                        cloned_default_subapp,
-                                        cloned_error_handler,
-                                        cloned_state,
-                                        cloned_monitor,
-                                    )
-                                    .await
-                                }
-                                Err(e) => cloned_monitor.send(
-                                    Event::new(EventType::ConnectionError).with_info(e.to_string()),
-                                ),
+                                    match cloned_acceptor.accept(sock).await {
+                                        Ok(tls_stream) => {
+                                            let stream = Stream::Tls(tls_stream);
+
+                                            client_handler(
+                                                stream,
+                                                cloned_subapps,
+                                                cloned_default_subapp,
+                                                cloned_error_handler,
+                                                cloned_state,
+                                                cloned_monitor,
+                                            )
+                                                .await
+                                        }
+                                        Err(e) => cloned_monitor.send(
+                                            Event::new(EventType::ConnectionError).with_info(e.to_string()),
+                                        ),
+                                    }
+                                });
+                            } else {
+                                self.monitor.send(
+                                    Event::new(EventType::ConnectionDenied)
+                                        .with_peer_result(sock.peer_addr()),
+                                );
                             }
-                        });
-                    } else {
-                        self.monitor.send(
-                            Event::new(EventType::ConnectionDenied)
-                                .with_peer_result(sock.peer_addr()),
-                        );
+                        }
+                        Err(e) => self
+                            .monitor
+                            .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
                     }
                 }
-                Err(e) => self
-                    .monitor
-                    .send(Event::new(EventType::ConnectionError).with_info(e.to_string())),
             }
         }
     }
@@ -414,6 +443,12 @@ where
 
         self.tls_config = Some(config);
 
+        self
+    }
+
+    /// Registers a shutdown signal to gracefully shutdown the app, ending the run/run_tls loop.
+    pub fn with_shutdown(mut self, cancel_token: CancellationToken) -> Self {
+        self.shutdown = Some(cancel_token);
         self
     }
 

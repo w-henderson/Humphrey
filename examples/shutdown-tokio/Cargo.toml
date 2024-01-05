@@ -1,0 +1,11 @@
+[package]
+name = "shutdown-tokio"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+humphrey = { path = "../../humphrey", features = ["tokio"] }
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+
+[workspace]
