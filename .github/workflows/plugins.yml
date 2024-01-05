@@ -1,10 +1,14 @@
 on:
   push:
-    paths:
-    - "plugins/**"
-    - ".github/**"
+    branches: [master, main]
+
+  pull_request:
+    branches: [master, main]
 
 name: Plugins
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   check:

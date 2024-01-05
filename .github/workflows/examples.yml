@@ -1,16 +1,14 @@
 on:
   push:
-    paths:
-    - "humphrey/**"
-    - "humphrey-auth/**"
-    - "humphrey-json/**"
-    - "humphrey-json-derive/**"
-    - "humphrey-server/**"
-    - "humphrey-ws/**"
-    - "examples/**"
-    - ".github/**"
+    branches: [master, main]
+
+  pull_request:
+    branches: [master, main]
 
 name: Examples
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   examples:
@@ -91,7 +89,7 @@ jobs:
         with:
           command: check
           args: --manifest-path examples/host/Cargo.toml
-          
+
       - name: Check monitor example
         if: always()
         uses: actions-rs/cargo@v1
