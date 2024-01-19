@@ -105,6 +105,9 @@ impl ThreadPool {
 
     /// Stops the thread pool.
     pub fn stop(&mut self) {
+        if let Some(tx) = &self.tx {
+            tx.send(Message::Shutdown).unwrap();
+        };
         self.tx = None;
         if let Some(rt) = self.recovery_thread.take() {
             if rt.0.is_some() {
